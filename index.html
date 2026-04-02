@@ -36,6 +36,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .bf{height:100%;border-radius:3px;}
 .sec{padding:14px;}
 </style>
+<!-- Firebase SDK compat (fonctionne sans module) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div id="app">
@@ -44,7 +47,63 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <nav id="nav"></nav>
 </div>
 <script>
-var COMPTES=[
+// ═══ FIREBASE ═══
+var db=null;
+try{
+  firebase.initializeApp({
+    apiKey:"AIzaSyD2V04148tPm3Yit--Gwj3aR6ybeLcciAI",
+    authDomain:"saloni-manager-1c0d3.firebaseapp.com",
+    projectId:"saloni-manager-1c0d3",
+    storageBucket:"saloni-manager-1c0d3.firebasestorage.app",
+    messagingSenderId:"372199257115",
+    appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"
+  });
+  db=firebase.firestore();
+}catch(e){console.log("Firebase:",e);}
+
+var _syncBar=null;
+function showSync(msg,col){
+  var b=document.getElementById("syncBar");
+  if(!b){b=document.createElement("div");b.id="syncBar";b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:200;padding:4px;text-align:center;font-size:11px;font-weight:700;transition:all .3s;";document.body.appendChild(b);}
+  b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";
+  if(_syncBar)clearTimeout(_syncBar);
+  if(col==="#10b981"){_syncBar=setTimeout(function(){b.style.display="none";},2000);}
+}
+
+var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports"];
+var _unsubs=[];
+
+function startSync(){
+  if(!db)return;
+  _unsubs.forEach(function(u){u();});_unsubs=[];
+  showSync("⟳ Connexion Firebase…","#f59e0b");
+  var loaded=0;
+  COLS.forEach(function(col){
+    var u=db.collection("saloni_"+col).onSnapshot(function(snap){
+      S.data[col]=snap.docs.map(function(d){var x=d.data();delete x._t;return x;});
+      loaded++;
+      if(loaded>=COLS.length){showSync("✓ Synchronisé","#10b981");}
+      if(S.user)R();
+    },function(e){showSync("⚠️ Hors ligne — données locales","#ef4444");});
+    _unsubs.push(u);
+  });
+}
+
+function fbSave(col,item){
+  // Sauvegarde locale immédiate
+  save();
+  // Sync Firebase
+  if(!db)return;
+  try{
+    db.collection("saloni_"+col).doc(String(item.id)).set(Object.assign({},item,{_t:firebase.firestore.FieldValue.serverTimestamp()}));
+  }catch(e){console.log("fbSave:",e);}
+}
+
+function fbDel(col,id){
+  save();
+  if(!db)return;
+  try{db.collection("saloni_"+col).doc(String(id)).delete();}catch(e){}
+}
   {pseudo:"gerant",mdp:"saloni2026",role:"Gérant",niveau:3},
   {pseudo:"admin",mdp:"admin123",role:"Admin",niveau:2},
   {pseudo:"abidjan",mdp:"saloni123",role:"Abidjan",niveau:1}
