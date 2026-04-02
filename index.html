@@ -36,9 +36,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .bf{height:100%;border-radius:3px;}
 .sec{padding:14px;}
 </style>
-<!-- Firebase SDK compat (fonctionne sans module) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- Firebase chargé de façon asynchrone -->
 </head>
 <body>
 <div id="app">
@@ -47,19 +45,39 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <nav id="nav"></nav>
 </div>
 <script>
-// ═══ FIREBASE ═══
+// ═══ FIREBASE — chargement asynchrone ═══
 var db=null;
-try{
-  firebase.initializeApp({
-    apiKey:"AIzaSyD2V04148tPm3Yit--Gwj3aR6ybeLcciAI",
-    authDomain:"saloni-manager-1c0d3.firebaseapp.com",
-    projectId:"saloni-manager-1c0d3",
-    storageBucket:"saloni-manager-1c0d3.firebasestorage.app",
-    messagingSenderId:"372199257115",
-    appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"
-  });
-  db=firebase.firestore();
-}catch(e){console.log("Firebase:",e);}
+var _fbReady=false;
+
+function loadFirebase(){
+  // Charger les scripts Firebase dynamiquement
+  var s1=document.createElement("script");
+  s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
+  s1.onload=function(){
+    var s2=document.createElement("script");
+    s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";
+    s2.onload=function(){
+      try{
+        firebase.initializeApp({
+          apiKey:"AIzaSyD2V04148tPm3Yit--Gwj3aR6ybeLcciAI",
+          authDomain:"saloni-manager-1c0d3.firebaseapp.com",
+          projectId:"saloni-manager-1c0d3",
+          storageBucket:"saloni-manager-1c0d3.firebasestorage.app",
+          messagingSenderId:"372199257115",
+          appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"
+        });
+        db=firebase.firestore();
+        _fbReady=true;
+        // Si déjà connecté, démarrer la sync
+        if(S.user)startSync();
+      }catch(e){console.log("Firebase init:",e);}
+    };
+    s2.onerror=function(){console.log("Firebase Firestore non chargé");};
+    document.head.appendChild(s2);
+  };
+  s1.onerror=function(){console.log("Firebase App non chargé");};
+  document.head.appendChild(s1);
+}
 
 var _syncBar=null;
 function showSync(msg,col){
@@ -330,7 +348,11 @@ function reacAl(){S.ign=[];try{localStorage.removeItem("sal_ign");}catch(e){}rSc
 function rstAll(){S.data={chauffeurs:[],salonis:[],versements:[],depenses:[],amendes:[],messages:[],rapports:[]};save();fM();}
 function toggleP(){var i=document.getElementById("lm");if(i)i.type=i.type==="password"?"text":"password";}
 function login(){var p=(document.getElementById("lp")&&document.getElementById("lp").value||"").trim().toLowerCase();var m=(document.getElementById("lm")&&document.getElementById("lm").value||"").trim();var c=COMPTES.filter(function(x){return x.pseudo===p&&x.mdp===m;})[0];if(c){S.user=c;pingSession();checkRapportsAuto();setTimeout(function(){rBanRetards();},1000);R();}else{var e=document.getElementById("LE");if(e){e.style.display="block";e.textContent="Identifiant ou mot de passe incorrect.";}}}
-load();R();
+// Démarrage — app immédiate, Firebase en arrière-plan
+load();
+R();
+// Charger Firebase après que l'app soit affichée
+setTimeout(loadFirebase, 100);
 </script>
 </body>
 </html>
