@@ -744,9 +744,37 @@ function chatInput(cid){
   +'</div>';
 }
  
+function joursRestants(dateStr){
+  if(!dateStr)return null;
+  var exp=new Date(dateStr);var now=new Date();
+  now.setHours(0,0,0,0);exp.setHours(0,0,0,0);
+  return Math.round((exp-now)/(1000*60*60*24));
+}
+function getDocAlerts(c){
+  var alerts=[];
+  var docs=[
+    {key:"permisExp",label:"Permis"},
+    {key:"cgFin",label:"Carte grise"},
+    {key:"vignetteExp",label:"Vignette"}
+  ];
+  docs.forEach(function(d){
+    var j=joursRestants(c[d.key]);
+    if(j===null)return;
+    if(j<0)alerts.push({sev:"expire",label:d.label,jours:j,msg:d.label+" expiré depuis "+Math.abs(j)+" jour(s)"});
+    else if(j<=30)alerts.push({sev:"bientot",label:d.label,jours:j,msg:d.label+" expire dans "+j+" jour(s)"});
+  });
+  return alerts;
+}
 function getAl(){
 var a=[];
-S.data.chauffeurs.forEach(function(c){if(c.dette>0)a.push({id:"dt-"+c.id,icon:"💸",msg:"Dette: "+c.nom+" — "+fc(c.dette)});});
+S.data.chauffeurs.forEach(function(c){
+  if(c.dette>0)a.push({id:"dt-"+c.id,icon:"💸",msg:"Dette: "+c.nom+" — "+fc(c.dette)});
+  var docAl=getDocAlerts(c);
+  docAl.forEach(function(d){
+    var icon=d.sev==="expire"?"🚨":"⚠️";
+    a.push({id:"doc-"+c.id+"-"+d.label,icon:icon,msg:c.nom+" — "+d.msg});
+  });
+});
 return{all:a,vis:a.filter(function(x){return S.ign.indexOf(x.id)<0;})};
 }
 function pill(l,c){return'<span class="pill" style="background:'+c+'18;color:'+c+';border:1px solid '+c+'33;">'+l+'</span>';}
@@ -879,7 +907,7 @@ var chHtml=CH.length===0
 :CH.map(function(c){
 var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c),p=pc(val,obj);
 var col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";
-return'<div onclick="oV('+c.id+')" style="background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:13px;margin-bottom:9px;cursor:pointer;">'
+return'<div onclick="'+(hasPerm("versement")?"oV("+c.id+")":"oD("+c.id+")")+'" style="background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:13px;margin-bottom:9px;cursor:pointer;">'
 +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
 +'<div><div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div>'
 +'<div style="font-size:10px;color:#64748b;">'+(c.saloniId||"—")+' · '+c.zone+'</div></div>'
@@ -1014,10 +1042,22 @@ return'<div class="card" style="margin-bottom:10px;border-left:3px solid '+(CHC[
 +pill(c.statut,CHC[c.statut]||"#64748b")+'</div>'
 +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px;">'
 +stats.map(function(x){return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:8px;padding:5px 6px;text-align:center;"><div style="font-size:8px;color:#64748b;">'+x[0]+'</div><div style="font-size:10px;font-weight:700;color:'+x[2]+';margin-top:1px;">'+x[1]+'</div></div>';}).join("")
-+'</div>'+bar(p,col)
++'</div>'
++(function(){
+  var docAl=getDocAlerts(c);
+  if(!docAl.length)return"";
+  return'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">'
+  +docAl.map(function(d){
+    var col=d.sev==="expire"?"#dc2626":"#d97706";
+    var bg=d.sev==="expire"?"#fef2f2":"#fffbeb";
+    var bd=d.sev==="expire"?"#fecaca":"#fde68a";
+    return'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+bg+';color:'+col+';border:1px solid '+bd+';font-weight:700;">'+(d.sev==="expire"?"🚨":"⚠️")+' '+d.msg+'</span>';
+  }).join("")+'</div>';
+})()
++bar(p,col)
 +'<div style="display:flex;gap:5px;margin-top:9px;">'
 +'<button onclick="oD('+c.id+')" class="bgr" style="flex:1;font-size:11px;padding:8px;">Details</button>'
-+'<button onclick="oRp('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;">Rapport</button>'
++(hasPerm("rapport")?'<button onclick="oRp('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;">Rapport</button>':"")
 +(hasPerm("versement")?'<button onclick="oV('+c.id+')" class="bor" style="flex:1;font-size:11px;padding:8px;">+Vers.</button>':"")
 +'</div></div>';
 }).join("");
@@ -1458,11 +1498,27 @@ html='<div class="sec">'+(hasPerm("message")?'<button onclick="oM(\'msg\')" clas
 +(MS.length===0?'<div class="card" style="text-align:center;padding:30px;color:#64748b;">Aucun message</div>'
 :[].concat(MS).reverse().map(function(m){
 var dest=m.pour?S.data.chauffeurs.filter(function(c){return c.id===m.pour;})[0]:null;
-return'<div onclick="mkLu('+m.id+')" style="background:#fff;border:1px solid '+(m.lu===false?"#bfdbfe":"#dbeafe")+';border-radius:14px;padding:13px;margin-bottom:9px;cursor:pointer;">'
-+'<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
-+'<div style="font-weight:700;font-size:13px;color:#0f172a;">'+(dest?dest.nom:"Tous")+'</div>'
+var destNom=dest?dest.nom:"Tous les chauffeurs";
+var expediteur=m.de||"Système";
+var estAuto=m.auto===true;
+var coulBord=m.lu===false?"#93c5fd":"#dbeafe";
+var modeColors={"Wave":"#1a9fff","Orange Money":"#f97316","MTN Money":"#eab308"};
+return'<div onclick="mkLu('+m.id+')" style="background:#fff;border:1px solid '+coulBord+';border-radius:14px;padding:13px;margin-bottom:9px;cursor:pointer;">'
+// En-tête : expéditeur → destinataire
++'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px;">'
++'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
++'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#1d4ed8;">✉️ '+expediteur+'</div>'
++'<div style="font-size:10px;color:#94a3b8;font-weight:600;">→</div>'
++'<div style="background:'+(dest?"#f0fdf4":"#fffbeb")+';border:1px solid '+(dest?"#bbf7d0":"#fde68a")+';border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:'+(dest?"#059669":"#d97706")+';">'+destNom+'</div>'
++(estAuto?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:700;color:#dc2626;">🤖 Auto</div>':"")
++'</div>'
 +(m.lu===false?pill("Nouveau","#1d4ed8"):"")
-+'</div><div style="font-size:13px;color:#64748b;line-height:1.5;">'+m.texte+'</div></div>';
++'</div>'
+// Date et heure
++'<div style="font-size:9px;color:#94a3b8;margin-bottom:6px;">'+m.date+(m.heure?" à "+m.heure:"")+'</div>'
+// Texte du message
++'<div style="font-size:12px;color:#334155;line-height:1.6;background:#f8faff;border-radius:9px;padding:9px 11px;">'+m.texte+'</div>'
++'</div>';
 }).join(""))
 +'</div>';
 }
@@ -1526,6 +1582,11 @@ body=lbl("Nom complet",'<input id="cn" type="text"/>')
 +'<div id="objJ" class="mb">'+lbl("Objectif/jour (F)",'<input id="co" type="number" value="5000" inputmode="numeric"/>')+'</div>'
 +'<div id="objS" style="display:none;" class="mb">'+lbl("Objectif/semaine (F)",'<input id="cos" type="number" value="30000" inputmode="numeric"/>')+'</div>'
 +lbl("Statut",sl("cst",["actif","repos","suspendu"]))
++'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:11px;padding:12px;margin-bottom:12px;">'
++'<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">📋 DOCUMENTS & VALIDITÉS</div>'
++'<div class="row2">'+lbl("Permis — Expiration",'<input id="cPermis" type="date"/>')+lbl("Carte grise — Début",'<input id="cCgDebut" type="date"/>')+'</div>'
++'<div class="row2">'+lbl("Carte grise — Fin",'<input id="cCgFin" type="date"/>')+lbl("Vignette — Expiration",'<input id="cVignette" type="date"/>')+'</div>'
++'</div>'
 +'<button onclick="saveCh()" class="bor">Enregistrer</button>';
 }
 else if(M==="sal"){
@@ -1571,19 +1632,89 @@ body='<div style="text-align:center;padding:12px 0;">'
 else if(M==="det"){
 var cd=S.detCh;if(!cd){fM();return;}
 var tC2=VE.filter(function(v){return v.chauffeurId===cd.id;}).reduce(function(s,v){return s+v.montant;},0);
-var ders=[].concat(VE).filter(function(v){return v.chauffeurId===cd.id;}).reverse().slice(0,6);
-body='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:13px;margin-bottom:13px;">'
+var ders=[].concat(VE).filter(function(v){return v.chauffeurId===cd.id;}).reverse().slice(0,5);
+var docAl=getDocAlerts(cd);
+ 
+// ── Infos générales ──
+body='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:13px;margin-bottom:12px;">'
 +'<div style="font-weight:800;font-size:15px;color:#0f172a;">'+cd.nom+'</div>'
-+'<div style="font-size:11px;color:#64748b;margin-top:2px;">'+(cd.tel||"—")+' - '+cd.zone+'</div></div>'
-+'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:13px;">'
++'<div style="font-size:11px;color:#64748b;margin-top:2px;">'+(cd.tel||"—")+' · '+cd.zone+'</div>'
++'</div>'
+ 
+// ── KPIs financiers ──
++'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;">'
 +[{l:"Total",v:fc(tC2),c:"#059669"},{l:"Solde",v:fc(cd.solde),c:cd.solde>=0?"#1d4ed8":"#dc2626"},{l:"Dette",v:cd.dette>0?fc(cd.dette):"—",c:cd.dette>0?"#dc2626":"#64748b"}].map(function(it){
 return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:9px;text-align:center;"><div style="font-size:9px;color:#64748b;">'+it.l+'</div><div style="font-size:12px;font-weight:800;color:'+it.c+';margin-top:3px;">'+it.v+'</div></div>';
 }).join("")+'</div>'
-+'<div style="max-height:130px;overflow-y:auto;margin-bottom:13px;">'
+ 
+// ── Alertes documents ──
++(docAl.length>0
+?'<div style="margin-bottom:12px;">'
++docAl.map(function(d){
+  var col=d.sev==="expire"?"#dc2626":"#d97706";
+  var bg=d.sev==="expire"?"#fef2f2":"#fffbeb";
+  var bd=d.sev==="expire"?"#fecaca":"#fde68a";
+  return'<div style="background:'+bg+';border:1px solid '+bd+';border-radius:9px;padding:8px 11px;margin-bottom:5px;font-size:11px;font-weight:700;color:'+col+';">'+(d.sev==="expire"?"🚨":"⚠️")+" "+d.msg+'</div>';
+}).join("")+'</div>':"")
+ 
+// ── Validités documents ──
++'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:12px;padding:12px;margin-bottom:12px;">'
++'<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:9px;">📋 VALIDITÉS</div>'
++(function(){
+  var rows=[
+    {label:"Permis",key:"permisExp",icon:"🪪"},
+    {label:"Carte grise (début)",key:"cgDebut",icon:"📄"},
+    {label:"Carte grise (fin)",key:"cgFin",icon:"📄"},
+    {label:"Vignette",key:"vignetteExp",icon:"🏷️"}
+  ];
+  return rows.map(function(r){
+    var val=cd[r.key]||"";
+    var j=joursRestants(val);
+    var statut="";
+    if(val){
+      if(j===null)statut="";
+      else if(j<0)statut='<span style="color:#dc2626;font-size:9px;font-weight:700;">Expiré</span>';
+      else if(j<=30)statut='<span style="color:#d97706;font-size:9px;font-weight:700;">'+j+'j restants</span>';
+      else statut='<span style="color:#059669;font-size:9px;font-weight:700;">✓ Valide</span>';
+    }
+    return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eff6ff;">'
+    +'<div style="font-size:11px;color:#64748b;">'+r.icon+' '+r.label+'</div>'
+    +'<div style="text-align:right;"><div style="font-size:11px;font-weight:700;color:#0f172a;">'+(val||'<span style="color:#94a3b8;">Non renseigné</span>')+'</div>'
+    +(statut?'<div>'+statut+'</div>':"")
+    +'</div></div>';
+  }).join("");
+})()
++'</div>'
+ 
+// ── Dossiers chauffeur ──
++'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:12px;padding:12px;margin-bottom:12px;">'
++'<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:9px;">📁 DOSSIERS</div>'
++(function(){
+  var docs=cd.docs||{};
+  var types=[
+    {key:"permis",label:"Permis de conduire",icon:"🪪"},
+    {key:"contrat",label:"Contrat",icon:"📝"},
+    {key:"identite",label:"Pièce d'identité",icon:"🪪"}
+  ];
+  return types.map(function(t){
+    var hasDoc=docs[t.key]&&docs[t.key].length>10;
+    return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eff6ff;">'
+    +'<div style="font-size:12px;font-weight:600;color:#0f172a;">'+t.icon+' '+t.label+'</div>'
+    +'<div style="display:flex;gap:6px;align-items:center;">'
+    +(hasDoc?'<button onclick="voirDoc(\''+cd.id+'\',\''+t.key+'\')" style="padding:5px 9px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:10px;font-weight:700;cursor:pointer;">👁 Voir</button>'
+    :'<span style="font-size:10px;color:#94a3b8;">Aucun fichier</span>')
+    +'<button onclick="deposerDoc('+cd.id+',\''+t.key+'\')" style="padding:5px 9px;border-radius:8px;background:'+(hasDoc?"#fffbeb":"linear-gradient(135deg,#1d4ed8,#3b82f6)")+';border:1px solid '+(hasDoc?"#fde68a":"transparent")+';color:'+(hasDoc?"#d97706":"#fff")+';font-size:10px;font-weight:700;cursor:pointer;">'+(hasDoc?"🔄 Remplacer":"📎 Déposer")+'</button>'
+    +'</div></div>';
+  }).join("");
+})()
++'</div>'
+ 
+// ── Derniers versements ──
++'<div style="max-height:120px;overflow-y:auto;margin-bottom:12px;">'
 +ders.map(function(v){
 var mc={"Wave":"#1a9fff","Orange Money":"#f97316","MTN Money":"#eab308","Virement":"#7c3aed","Especes":"#059669"};
 var col2=mc[v.mode]||"#64748b";
-return'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #dbeafe;">'
+return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #dbeafe;">'
 +'<div><span style="font-size:11px;color:#64748b;">'+v.date+'</span>'
 +(v.ref?'<div style="font-size:9px;color:'+col2+';font-weight:700;">🔖 '+v.ref+'</div>':"")
 +'</div>'
@@ -1591,10 +1722,13 @@ return'<div style="display:flex;justify-content:space-between;align-items:center
 +'<div style="font-size:9px;color:'+col2+';font-weight:700;">'+(v.mode||"")+'</div></div>'
 +'</div>';
 }).join("")+'</div>'
+ 
+// ── Actions ──
 +'<div style="display:flex;gap:7px;">'
 +(hasPerm("supprimer")?'<button onclick="oM(\'sup\',{id:'+cd.id+'})" style="padding:11px;border-radius:11px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;">Suppr.</button>':"")
-+'<button onclick="oRp('+cd.id+')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:12px;font-weight:700;cursor:pointer;">Rapport</button>'
-+'<button onclick="oV('+cd.id+')" class="bor" style="flex:1;padding:11px;font-size:12px;">+Versement</button></div>';
++(hasPerm("rapport")?'<button onclick="oRp('+cd.id+')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:12px;font-weight:700;cursor:pointer;">Rapport</button>':"")
++(hasPerm("versement")?'<button onclick="oV('+cd.id+')" class="bor" style="flex:1;padding:11px;font-size:12px;">+Versement</button>':"")
++'</div>';
 }
 else if(M==="rp"){
 var cr=CH.filter(function(x){return x.id===MD.id;})[0];if(!cr){fM();return;}
@@ -1829,7 +1963,13 @@ fbSave("versements",item);fM();
 function saveCh(){
 var nom=gv("cn").trim();if(!nom)return;
 var freq=gv("cfp")||"Journalier";
-var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:""};
+var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),
+objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,
+freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",
+solde:0,dette:0,avance:0,photo:"",
+permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",
+docs:{permis:"",contrat:"",identite:""}
+};
 S.data.chauffeurs.push(item);
 jLog("chauffeur_ajout","Nouveau chauffeur: "+nom+" ("+gv("cz")+")");
 fbSave("chauffeurs",item);fM();
@@ -1981,6 +2121,39 @@ function envoyerAlerteManuel(cid){
   marquerAlerteSent(c.id);
   jLog("versement_suppr","📲 Alerte manuelle: "+c.nom+" (manque "+fc(manque)+")");
   rScreen();
+}
+function deposerDoc(cid, docKey){
+var inp=document.createElement("input");
+inp.type="file";inp.accept="image/*,application/pdf";
+inp.onchange=function(e){
+  var file=e.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var data=ev.target.result;
+    var ch=S.data.chauffeurs.filter(function(c){return c.id===cid;})[0];
+    if(!ch)return;
+    if(!ch.docs)ch.docs={};
+    ch.docs[docKey]=data;
+    fbSave("chauffeurs",ch);
+    if(S.detCh&&S.detCh.id===cid)S.detCh=ch;
+    jLog("chauffeur_ajout","Document déposé: "+docKey+" pour "+ch.nom);
+    R();
+  };
+  reader.readAsDataURL(file);
+};
+inp.click();
+}
+function voirDoc(cid, docKey){
+var ch=S.data.chauffeurs.filter(function(c){return c.id===cid;})[0];
+if(!ch||!ch.docs||!ch.docs[docKey])return;
+var data=ch.docs[docKey];
+// Ouvrir dans un nouvel onglet
+var win=window.open("","_blank");
+if(data.indexOf("application/pdf")>=0){
+  win.document.write('<html><body style="margin:0;"><embed src="'+data+'" width="100%" height="100%" type="application/pdf"/></body></html>');
+}else{
+  win.document.write('<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+data+'" style="max-width:100%;max-height:100vh;object-fit:contain;"/></body></html>');
+}
 }
 function toggleP(){var i=document.getElementById("lm");if(i)i.type=i.type==="password"?"text":"password";}
 function login(){
