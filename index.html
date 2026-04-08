@@ -835,7 +835,7 @@ if(lm)lm.onkeydown=function(e){if(e.key==="Enter")login();};
  
 function rHD(){
 var al=getAl();var conx=getConx();
-var tt={home:"",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal d'activite",alertesAuto:"Alertes automatiques",chat:"Chat"};
+var tt={home:"",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal d'activite",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"Retour sur Investissement"};
 var left=S.tab==="home"
 ?'<div style="display:flex;align-items:center;gap:9px;">'
 +'<div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:17px;">🛺</div>'
@@ -1183,6 +1183,7 @@ var items=[
 {ic:"🤖",lb:"Alertes automatiques",sb:cfg2.actif?"Actif — "+(cfg2.heure||"20")+"h00":"Désactivé",act:"sT('alertesAuto')"},
 {ic:"📒",lb:"Journal",sb:getJournal("tous").length+" action(s) enregistrée(s)",act:"sT('journal')"}
 ];
+if(S.user.niveau>=3)items.push({ic:"📈",lb:"RSI",sb:"Retour sur investissement",act:"sT('rsi')"});
 // Changer mot de passe : uniquement comptes de base (pas les sous-comptes)
 var estSousCompte=S.data.sousComptes&&S.data.sousComptes.filter(function(c){return c.pseudo===S.user.pseudo;}).length>0;
 if(!estSousCompte)items.push({ic:"🔑",lb:"Mon mot de passe",sb:"Modifier mon mot de passe",act:"oM('chgMdpSelf')"});
@@ -1447,6 +1448,143 @@ html='<div class="sec">'
 +'</div>';
 }
  
+else if(S.tab==="rsi"){
+if(S.user.niveau<3){
+html='<div class="sec"><div class="card" style="text-align:center;padding:30px;color:#dc2626;">❌ Accès réservé au Gérant</div></div>';
+}else{
+var SAL2=S.data.salonis;
+var VE2=S.data.versements;
+ 
+// ── Stats globales RSI ──
+var totalInvesti=SAL2.reduce(function(s,sal){return s+(sal.prixAchat||0);},0);
+var totalRecup=VE2.reduce(function(s,v){return s+v.montant;},0);
+var rsiPct=totalInvesti>0?Math.round(totalRecup/totalInvesti*100):0;
+var restant=Math.max(0,totalInvesti-totalRecup);
+ 
+// Calcul projection : moyenne mensuelle des 3 derniers mois
+var now=new Date();
+var moisMap={};
+VE2.forEach(function(v){
+  var parts=v.date.split("/");
+  if(parts.length===3){
+    var mkey=parts[1]+"/"+parts[2];
+    moisMap[mkey]=(moisMap[mkey]||0)+v.montant;
+  }
+});
+var moisVals=Object.keys(moisMap).sort().slice(-3).map(function(k){return moisMap[k];});
+var moyMois=moisVals.length>0?Math.round(moisVals.reduce(function(s,v){return s+v;},0)/moisVals.length):0;
+var moisRestants=moyMois>0?Math.ceil(restant/moyMois):null;
+var dateRSI=null;
+if(moisRestants!==null){
+  var d=new Date();d.setMonth(d.getMonth()+moisRestants);
+  dateRSI=d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+}
+ 
+// ── Barre progression globale ──
+var pctCap=Math.min(rsiPct,100);
+var coulGlob=rsiPct>=100?"#059669":rsiPct>=60?"#d97706":"#dc2626";
+ 
+html='<div class="sec">'
+// Header KPIs
++'<div style="background:linear-gradient(135deg,#0f172a,#1d4ed8);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 6px 20px rgba(29,78,216,.3);">'
++'<div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Retour sur Investissement Global</div>'
++'<div style="font-size:36px;font-weight:900;color:#fff;margin-bottom:2px;">'+rsiPct+'%</div>'
++'<div style="height:8px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden;margin-bottom:10px;">'
++'<div style="height:100%;width:'+pctCap+'%;background:'+(rsiPct>=100?"#10b981":"linear-gradient(90deg,#3b82f6,#10b981)")+';border-radius:4px;transition:width .6s;"></div></div>'
++'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
++[{l:"Investi",v:fc(totalInvesti),c:"rgba(255,255,255,.9)"},{l:"Récupéré",v:fc(totalRecup),c:"#34d399"}].map(function(x){
+  return'<div><div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;">'+x.l+'</div>'
+  +'<div style="font-size:15px;font-weight:800;color:'+x.c+';margin-top:2px;">'+x.v+'</div></div>';
+}).join("")
++'</div></div>'
+ 
+// Projection
++(rsiPct<100
+?'<div style="background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:14px;margin-bottom:14px;">'
++'<div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:8px;">📅 Projection RSI</div>'
++'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
++[
+  {l:"Reste à récupérer",v:fc(restant),c:"#dc2626"},
+  {l:"Moy. mensuelle",v:moyMois>0?fc(moyMois):"Pas encore de données",c:"#1d4ed8"},
+  {l:"Mois restants",v:moisRestants!==null?moisRestants+" mois":"—",c:"#d97706"},
+  {l:"Date estimée",v:dateRSI||"—",c:"#059669"}
+].map(function(x){
+  return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:10px;text-align:center;">'
+  +'<div style="font-size:9px;color:#64748b;">'+x.l+'</div>'
+  +'<div style="font-size:12px;font-weight:800;color:'+x.c+';margin-top:3px;">'+x.v+'</div></div>';
+}).join("")
++'</div></div>'
+:'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-bottom:14px;text-align:center;">'
++'<div style="font-size:40px;margin-bottom:8px;">🎉</div>'
++'<div style="font-size:16px;font-weight:800;color:#059669;">RSI Atteint !</div>'
++'<div style="font-size:12px;color:#64748b;margin-top:4px;">Bénéfice net: '+fc(totalRecup-totalInvesti)+'</div></div>')
+ 
+// ── Par saloni ──
++'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">📊 RSI par saloni</div>'
++(SAL2.length===0?'<div class="card" style="text-align:center;padding:20px;color:#64748b;">Aucun saloni — ajoutez un saloni avec son prix d\'achat</div>'
+:SAL2.map(function(sal){
+  if(!sal.prixAchat||sal.prixAchat===0){
+    return'<div class="card" style="margin-bottom:10px;opacity:.6;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<div><div style="font-weight:700;font-size:14px;color:#1d4ed8;">'+sal.id+'</div>'
+    +'<div style="font-size:11px;color:#94a3b8;">'+( sal.marque||"")+" · "+(sal.immat||"—")+'</div></div>'
+    +'<span style="font-size:11px;color:#94a3b8;font-style:italic;">Prix d\'achat non renseigné</span>'
+    +'</div></div>';
+  }
+  // Chauffeur lié à ce saloni
+  var chSal=S.data.chauffeurs.filter(function(c){return String(c.saloniId)===String(sal.id);});
+  var chIds=chSal.map(function(c){return c.id;});
+  var recupSal=VE2.filter(function(v){return chIds.indexOf(v.chauffeurId)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var pSal=Math.round(recupSal/sal.prixAchat*100);
+  var pSalCap=Math.min(pSal,100);
+  var colSal=pSal>=100?"#059669":pSal>=60?"#d97706":"#dc2626";
+  // Projection par saloni
+  var moisMapSal={};
+  VE2.filter(function(v){return chIds.indexOf(v.chauffeurId)>=0;}).forEach(function(v){
+    var parts=v.date.split("/");
+    if(parts.length===3){var mk=parts[1]+"/"+parts[2];moisMapSal[mk]=(moisMapSal[mk]||0)+v.montant;}
+  });
+  var mvSal=Object.keys(moisMapSal).sort().slice(-3).map(function(k){return moisMapSal[k];});
+  var moyMoisSal=mvSal.length>0?Math.round(mvSal.reduce(function(s,v){return s+v;},0)/mvSal.length):0;
+  var restSal=Math.max(0,sal.prixAchat-recupSal);
+  var moisRSal=moyMoisSal>0?Math.ceil(restSal/moyMoisSal):null;
+ 
+  return'<div class="card" style="margin-bottom:12px;border-top:3px solid '+colSal+';">'
+  +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">'
+  +'<div><div style="font-weight:800;font-size:15px;color:#1d4ed8;">'+sal.id+'</div>'
+  +'<div style="font-size:11px;color:#64748b;">'+( sal.marque||"")+" · "+(sal.immat||"—")+'</div>'
+  +(sal.dateAchat?'<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Acheté le: '+sal.dateAchat+'</div>':"")
+  +(chSal.length>0?'<div style="font-size:10px;color:#64748b;margin-top:2px;">Chauffeur: '+chSal.map(function(c){return c.nom.split(" ")[0];}).join(", ")+'</div>':"")
+  +'</div>'
+  +'<div style="text-align:right;"><div style="font-size:22px;font-weight:900;color:'+colSal+'">'+pSal+'%</div>'
+  +'<div style="font-size:9px;color:#64748b;">'+fc(recupSal)+" / "+fc(sal.prixAchat)+'</div></div></div>'
+  // Barre
+  +'<div style="height:10px;background:#f0f4ff;border-radius:5px;overflow:hidden;margin-bottom:10px;">'
+  +'<div style="height:100%;width:'+pSalCap+'%;background:'+( pSal>=100?"linear-gradient(90deg,#059669,#10b981)":"linear-gradient(90deg,#3b82f6,#1d4ed8)")+';border-radius:5px;transition:width .5s;"></div></div>'
+  // Stats
+  +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">'
+  +[
+    {l:"Investi",v:fc(sal.prixAchat),c:"#0f172a"},
+    {l:"Récupéré",v:fc(recupSal),c:colSal},
+    {l:pSal>=100?"Bénéfice":"Reste",v:fc(Math.abs(sal.prixAchat-recupSal)),c:pSal>=100?"#059669":"#dc2626"}
+  ].map(function(x){
+    return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:8px;padding:7px;text-align:center;">'
+    +'<div style="font-size:8px;color:#64748b;">'+x.l+'</div>'
+    +'<div style="font-size:11px;font-weight:800;color:'+x.c+';margin-top:2px;">'+x.v+'</div></div>';
+  }).join("")
+  +'</div>'
+  // Projection
+  +(pSal<100&&moisRSal!==null
+  ?'<div style="margin-top:9px;padding:8px;background:#eff6ff;border-radius:9px;font-size:11px;color:#1d4ed8;font-weight:600;text-align:center;">'
+  +'⏱ RSI estimé dans '+moisRSal+' mois · Moy: '+fc(moyMoisSal)+'/mois</div>'
+  :pSal>=100?'<div style="margin-top:9px;padding:8px;background:#f0fdf4;border-radius:9px;font-size:11px;color:#059669;font-weight:700;text-align:center;">🎉 RSI atteint ! Bénéfice net: '+fc(recupSal-sal.prixAchat)+'</div>'
+  :"")
+  +'</div>';
+}).join(""))
++'</div>';
+}
+}
+ 
 else if(S.tab==="journal"){
 var jFil=S.jFil||"tous";
 var logs=getJournal(jFil);
@@ -1593,6 +1731,8 @@ else if(M==="sal"){
 body='<div class="row2">'+lbl("N Saloni",'<input id="si" type="text"/>')+lbl("Marque",'<input id="sm" type="text"/>')+'</div>'
 +'<div class="row2">'+lbl("Immat",'<input id="sr" type="text"/>')+lbl("Km",'<input id="sk" type="number" value="0" inputmode="numeric"/>')+'</div>'
 +lbl("Chauffeur",'<select id="sch"><option value="">Aucun</option>'+CH.map(function(c){return'<option value="'+c.id+'">'+c.nom+'</option>';}).join("")+'</select>')
++lbl("Prix d'achat (FCFA)",'<input id="sprix" type="number" inputmode="numeric" placeholder="Ex: 1500000" style="font-size:18px;font-weight:800;text-align:center;color:#1d4ed8;"/>')
++lbl("Date d'achat",'<input id="sdateachat" type="date"/>')
 +'<button onclick="saveSal()" class="bor">Enregistrer</button>';
 }
 else if(M==="dep"){
@@ -1697,12 +1837,12 @@ return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:10p
     {key:"identite",label:"Pièce d'identité",icon:"🪪"}
   ];
   return types.map(function(t){
-    var hasDoc=docs[t.key]&&docs[t.key].length>10;
+    var hasDoc=cd.docs&&cd.docs[t.key]&&typeof cd.docs[t.key]==="string"&&cd.docs[t.key].length>100;
     return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eff6ff;">'
     +'<div style="font-size:12px;font-weight:600;color:#0f172a;">'+t.icon+' '+t.label+'</div>'
     +'<div style="display:flex;gap:6px;align-items:center;">'
     +(hasDoc?'<button onclick="voirDoc(\''+cd.id+'\',\''+t.key+'\')" style="padding:5px 9px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:10px;font-weight:700;cursor:pointer;">👁 Voir</button>'
-    :'<span style="font-size:10px;color:#94a3b8;">Aucun fichier</span>')
+    :'<span style="font-size:10px;color:#94a3b8;font-style:italic;">Aucun fichier</span>')
     +'<button onclick="deposerDoc('+cd.id+',\''+t.key+'\')" style="padding:5px 9px;border-radius:8px;background:'+(hasDoc?"#fffbeb":"linear-gradient(135deg,#1d4ed8,#3b82f6)")+';border:1px solid '+(hasDoc?"#fde68a":"transparent")+';color:'+(hasDoc?"#d97706":"#fff")+';font-size:10px;font-weight:700;cursor:pointer;">'+(hasDoc?"🔄 Remplacer":"📎 Déposer")+'</button>'
     +'</div></div>';
   }).join("");
@@ -2032,7 +2172,9 @@ inp.click();
 }
 function saveSal(){
 var id=gv("si").trim();if(!id)return;
-var item={id:id,marque:gv("sm"),immat:gv("sr"),km:parseInt(gv("sk"))||0,chauffeurId:parseInt(gv("sch"))||null,statut:"en service"};
+var item={id:id,marque:gv("sm"),immat:gv("sr"),km:parseInt(gv("sk"))||0,
+chauffeurId:parseInt(gv("sch"))||null,statut:"en service",
+prixAchat:parseFloat(gv("sprix"))||0,dateAchat:gv("sdateachat")||""};
 S.data.salonis.push(item);
 jLog("saloni_ajout","Nouveau saloni: "+id+" ("+gv("sm")+")");
 fbSave("salonis",item);fM();
@@ -2122,38 +2264,91 @@ function envoyerAlerteManuel(cid){
   jLog("versement_suppr","📲 Alerte manuelle: "+c.nom+" (manque "+fc(manque)+")");
   rScreen();
 }
+var _docCidPending=null,_docKeyPending=null;
+ 
+function _ensureDocInput(){
+var inp=document.getElementById("_docInp");
+if(!inp){
+  inp=document.createElement("input");
+  inp.type="file";inp.accept="image/*";
+  inp.id="_docInp";
+  inp.style.cssText="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;";
+  document.body.appendChild(inp);
+}
+return inp;
+}
+ 
 function deposerDoc(cid, docKey){
-var inp=document.createElement("input");
-inp.type="file";inp.accept="image/*,application/pdf";
+_docCidPending=cid;_docKeyPending=docKey;
+var inp=_ensureDocInput();
+inp.onchange=null;
+inp.value="";
 inp.onchange=function(e){
   var file=e.target.files[0];if(!file)return;
+  var targetCid=_docCidPending,targetKey=_docKeyPending;
   var reader=new FileReader();
   reader.onload=function(ev){
-    var data=ev.target.result;
-    var ch=S.data.chauffeurs.filter(function(c){return c.id===cid;})[0];
-    if(!ch)return;
-    if(!ch.docs)ch.docs={};
-    ch.docs[docKey]=data;
-    fbSave("chauffeurs",ch);
-    if(S.detCh&&S.detCh.id===cid)S.detCh=ch;
-    jLog("chauffeur_ajout","Document déposé: "+docKey+" pour "+ch.nom);
-    R();
+    var dataUrl=ev.target.result;
+    var img=new Image();
+    img.onload=function(){
+      var MAX=800;
+      var w=img.width,h=img.height;
+      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
+      else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+      var canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      var data=canvas.toDataURL("image/jpeg",0.75);
+      var ch=S.data.chauffeurs.filter(function(c){return String(c.id)===String(targetCid);})[0];
+      if(ch){
+        if(!ch.docs)ch.docs={};
+        ch.docs[targetKey]=data;
+        fbSave("chauffeurs",ch);
+        if(S.detCh&&S.detCh.id===targetCid)S.detCh=ch;
+      }
+      try{localStorage.setItem("doc_"+targetCid+"_"+targetKey,data);}catch(ex){}
+      jLog("chauffeur_ajout","Document depose: "+targetKey);
+      inp.value="";
+      R();
+    };
+    img.src=dataUrl;
   };
   reader.readAsDataURL(file);
 };
 inp.click();
 }
+ 
 function voirDoc(cid, docKey){
-var ch=S.data.chauffeurs.filter(function(c){return c.id===cid;})[0];
-if(!ch||!ch.docs||!ch.docs[docKey])return;
-var data=ch.docs[docKey];
-// Ouvrir dans un nouvel onglet
-var win=window.open("","_blank");
-if(data.indexOf("application/pdf")>=0){
-  win.document.write('<html><body style="margin:0;"><embed src="'+data+'" width="100%" height="100%" type="application/pdf"/></body></html>');
-}else{
-  win.document.write('<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+data+'" style="max-width:100%;max-height:100vh;object-fit:contain;"/></body></html>');
-}
+// Chercher dans chauffeur d'abord (comme getPhoto)
+var ch=S.data.chauffeurs.filter(function(c){return String(c.id)===String(cid);})[0];
+var data=(ch&&ch.docs&&ch.docs[docKey]&&ch.docs[docKey].length>100)?ch.docs[docKey]:null;
+// Puis localStorage
+if(!data){try{data=localStorage.getItem("doc_"+cid+"_"+docKey);}catch(e){}}
+if(!data||data.length<100){alert("Document introuvable. Redéposez-le.");return;}
+var labels={permis:"Permis de conduire",contrat:"Contrat",identite:"Piece d'identite"};
+var titre=labels[docKey]||docKey;
+var oldV=document.getElementById("docViewer");if(oldV)oldV.remove();
+var div=document.createElement("div");
+div.id="docViewer";
+div.style.cssText="position:fixed;inset:0;z-index:9999;background:#111;display:flex;flex-direction:column;";
+var hd=document.createElement("div");
+hd.style.cssText="background:#1d4ed8;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;";
+var t=document.createElement("span");
+t.style.cssText="color:#fff;font-weight:700;font-size:15px;";
+t.textContent=titre;
+var b=document.createElement("button");
+b.textContent="Fermer";
+b.style.cssText="background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 16px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;";
+b.onclick=function(){div.remove();};
+hd.appendChild(t);hd.appendChild(b);
+var bd=document.createElement("div");
+bd.style.cssText="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;";
+var img=document.createElement("img");
+img.style.cssText="width:100%;border-radius:10px;display:block;";
+img.src=data;
+bd.appendChild(img);
+div.appendChild(hd);div.appendChild(bd);
+document.body.appendChild(div);
 }
 function toggleP(){var i=document.getElementById("lm");if(i)i.type=i.type==="password"?"text":"password";}
 function login(){
