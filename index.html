@@ -574,6 +574,7 @@ appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"
 });
 db=firebase.firestore();
 if(S.user)startSync();
+loadMdpOverrides(function(){});
 }catch(e){console.log("FB:",e);}
 };
 document.head.appendChild(s2);
@@ -639,14 +640,41 @@ try{var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");return sess.filt
 }
 setInterval(function(){if(S.user)pingSession();},60000);
  
+// Overrides de mots de passe stockés en Firebase
+var _mdpOverrides={};
+function loadMdpOverrides(cb){
+if(!db){cb();return;}
+db.collection("sal_config").doc("mdp_overrides").get().then(function(doc){
+  if(doc.exists)_mdpOverrides=doc.data()||{};
+  cb();
+}).catch(function(){cb();});
+}
+function saveMdpOverride(pseudo, newMdp){
+_mdpOverrides[pseudo]=newMdp;
+// localStorage fallback
+try{
+  var ov=JSON.parse(localStorage.getItem("sal_mdp_overrides")||"{}");
+  ov[pseudo]=newMdp;
+  localStorage.setItem("sal_mdp_overrides",JSON.stringify(ov));
+}catch(e){}
+// Firebase sync
+if(db){
+  try{db.collection("sal_config").doc("mdp_overrides").set(_mdpOverrides);}catch(e){}
+}
+}
+ 
 function tousComptes(){
 var base=COMPTES_BASE.map(function(c){
-// Appliquer override mot de passe si défini
-try{
-var ov=JSON.parse(localStorage.getItem("sal_mdp_overrides")||"{}");
-if(ov[c.pseudo])return Object.assign({},c,{mdp:ov[c.pseudo]});
-}catch(e){}
-return c;
+  // Chercher override dans Firebase d'abord, puis localStorage
+  var newMdp=_mdpOverrides[c.pseudo]||null;
+  if(!newMdp){
+    try{
+      var ov=JSON.parse(localStorage.getItem("sal_mdp_overrides")||"{}");
+      newMdp=ov[c.pseudo]||null;
+    }catch(e){}
+  }
+  if(newMdp)return Object.assign({},c,{mdp:newMdp});
+  return c;
 });
 return base.concat(S.data.sousComptes||[]);
 }
@@ -1972,31 +2000,27 @@ function saveMdpSelf(){
 var old=gv("mdpOld").trim(),np=gv("mdpNew").trim(),cp=gv("mdpConf").trim();
 if(!old||!np){alert("Remplir tous les champs");return;}
 if(np!==cp){alert("Les mots de passe ne correspondent pas");return;}
-// Vérifier ancien mot de passe
+if(np.length<4){alert("Mot de passe trop court (4 caractères min)");return;}
 var tous=tousComptes();
 var compte=tous.filter(function(c){return c.pseudo===S.user.pseudo&&c.mdp===old;})[0];
 if(!compte){alert("Mot de passe actuel incorrect");return;}
-// Mettre à jour
 var isSousCompte=S.data.sousComptes&&S.data.sousComptes.filter(function(c){return c.pseudo===S.user.pseudo;}).length>0;
 if(isSousCompte){
-S.data.sousComptes=S.data.sousComptes.map(function(c){
-if(c.pseudo!==S.user.pseudo)return c;
-c.mdp=np;return c;
-});
-var upd=S.data.sousComptes.filter(function(c){return c.pseudo===S.user.pseudo;})[0];
-if(upd)fbSave("sousComptes",upd);
-save();
+  // Sous-compte → Firebase via sousComptes collection
+  S.data.sousComptes=S.data.sousComptes.map(function(c){
+    if(c.pseudo!==S.user.pseudo)return c;
+    c.mdp=np;return c;
+  });
+  var upd=S.data.sousComptes.filter(function(c){return c.pseudo===S.user.pseudo;})[0];
+  if(upd)fbSave("sousComptes",upd);
+  save();
 }else{
-// Compte de base : stocker override dans localStorage
-try{
-var overrides=JSON.parse(localStorage.getItem("sal_mdp_overrides")||"{}");
-overrides[S.user.pseudo]=np;
-localStorage.setItem("sal_mdp_overrides",JSON.stringify(overrides));
-}catch(e){}
+  // Compte de base → stocker dans Firebase sal_config + localStorage
+  saveMdpOverride(S.user.pseudo, np);
 }
 S.user.mdp=np;
 fM();
-alert("Mot de passe modifié ✅");
+alert("Mot de passe modifié ✅\nLe nouveau mot de passe est actif sur tous les appareils.");
 }
 function saveMdp(id){
 var np=gv("newmdp").trim(),cp=gv("confmdp").trim();
@@ -2354,20 +2378,81 @@ function toggleP(){var i=document.getElementById("lm");if(i)i.type=i.type==="pas
 function login(){
 var p=(document.getElementById("lp")&&document.getElementById("lp").value||"").trim().toLowerCase();
 var m=(document.getElementById("lm")&&document.getElementById("lm").value||"").trim();
-var c=tousComptes().filter(function(x){return x.pseudo===p&&x.mdp===m;})[0];
-if(c){
-S.user=c;pingSession();checkRetards();load();
-jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+")");
-R();
-if("serviceWorker" in navigator){
-window.addEventListener("load",function(){
-navigator.serviceWorker.register("sw.js").catch(function(){});
-});
+if(!p||!m)return;
+ 
+// Montrer "connexion en cours..."
+var LE=document.getElementById("LE");
+if(LE){LE.style.display="block";LE.style.background="#eff6ff";LE.style.color="#1d4ed8";LE.style.borderColor="#bfdbfe";LE.textContent="Connexion en cours...";}
+ 
+// Essayer d'abord avec les données locales
+function tryLogin(){
+  var c=tousComptes().filter(function(x){return x.pseudo===p&&x.mdp===m;})[0];
+  if(c){
+    S.user=c;pingSession();checkRetards();load();
+    jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+")");
+    R();
+    if("serviceWorker" in navigator){
+      window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});
+    }
+    setTimeout(initFirebase,200);
+  }else{
+    if(LE){LE.style.display="block";LE.style.background="#fef2f2";LE.style.color="#dc2626";LE.style.borderColor="#fecaca";LE.textContent="Identifiant ou mot de passe incorrect.";}
+  }
 }
-setTimeout(initFirebase,200);
+ 
+// Si Firebase dispo → charger sousComptes + mdp_overrides en temps réel avant login
+if(db){
+  // Charger les overrides de mots de passe
+  loadMdpOverrides(function(){
+    // Charger les sous-comptes depuis Firebase
+    db.collection("sal_sousComptes").get().then(function(snap){
+      S.data.sousComptes=snap.docs.map(function(d){var x=d.data();delete x._t;return x;});
+      save();
+      tryLogin();
+    }).catch(function(){tryLogin();});
+  });
 }else{
-var e=document.getElementById("LE");
-if(e){e.style.display="block";e.textContent="Identifiant ou mot de passe incorrect.";}
+  // Firebase pas encore dispo → init Firebase d'abord, puis réessayer
+  var origInit=initFirebase;
+  // Tenter login immédiat avec données locales
+  var c0=tousComptes().filter(function(x){return x.pseudo===p&&x.mdp===m;})[0];
+  if(c0){
+    // Compte de base trouvé localement
+    tryLogin();
+  }else{
+    // Sous-compte → charger Firebase d'abord
+    if(LE){LE.textContent="Chargement du compte...";}
+    var s1=document.createElement("script");
+    s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
+    s1.onload=function(){
+      var s2=document.createElement("script");
+      s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";
+      s2.onload=function(){
+        try{
+          if(!firebase.apps.length){
+            firebase.initializeApp({
+              apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",
+              authDomain:"saloni-manager-1c0d3.firebaseapp.com",
+              projectId:"saloni-manager-1c0d3",
+              storageBucket:"saloni-manager-1c0d3.firebasestorage.app",
+              messagingSenderId:"372199257115",
+              appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"
+            });
+          }
+          db=firebase.firestore();
+          loadMdpOverrides(function(){
+            db.collection("sal_sousComptes").get().then(function(snap){
+              S.data.sousComptes=snap.docs.map(function(d){var x=d.data();delete x._t;return x;});
+              save();
+              tryLogin();
+            }).catch(function(){tryLogin();});
+          });
+        }catch(e){tryLogin();}
+      };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s1);
+  }
 }
 }
  
