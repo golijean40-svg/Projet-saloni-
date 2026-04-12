@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>Saloni Manager</title>
 <link rel="manifest" href="manifest.json"/>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <meta name="theme-color" content="#1d4ed8"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="Saloni"/>
@@ -2966,40 +2968,43 @@ var _fcmToken = null;
 
 function initFCM(){
   if(!("Notification" in window)){
-    console.log("Notifications non supportées");
+    showGPSErrMsg("Notifications non supportees sur cet appareil.");
     return;
   }
-  // Charger Firebase Messaging
-  var s = document.createElement("script");
-  s.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js";
-  s.onload = function(){
-    try{
-      var messaging = firebase.messaging();
-      
-      // Demander permission + obtenir token
-      Notification.requestPermission().then(function(permission){
-        if(permission === "granted"){
-          messaging.getToken({vapidKey: FCM_VAPID_KEY}).then(function(token){
-            if(token){
-              _fcmToken = token;
-              // Sauvegarder le token avec l'utilisateur dans Firebase
-              saveFCMToken(token);
-              console.log("FCM token:", token.substring(0,20)+"...");
-            }
-          }).catch(function(err){
-            console.log("FCM token error:", err);
-          });
-        }
-      });
-      
-      // Recevoir les notifications quand l'app est ouverte
-      messaging.onMessage(function(payload){
-        showPushNotification(payload.notification.title, payload.notification.body, payload.data);
-      });
-      
-    }catch(e){ console.log("FCM init error:", e); }
-  };
-  document.head.appendChild(s);
+  try{
+    var messaging = firebase.messaging();
+    
+    Notification.requestPermission().then(function(permission){
+      if(permission === "granted"){
+        messaging.getToken({vapidKey: FCM_VAPID_KEY}).then(function(token){
+          if(token){
+            _fcmToken = token;
+            saveFCMToken(token);
+            showPushNotification("Saloni Manager", "Notifications activees avec succes !", {});
+            R();
+          }else{
+            showGPSErrMsg("Token FCM vide. Verifie la cle VAPID.");
+          }
+        }).catch(function(err){
+          showGPSErrMsg("Erreur token: "+err.message);
+        });
+        
+        messaging.onMessage(function(payload){
+          if(payload.notification){
+            showPushNotification(payload.notification.title, payload.notification.body, payload.data||{});
+          }
+        });
+        
+      }else{
+        showGPSErrMsg("Permission notifications refusee.");
+      }
+    }).catch(function(err){
+      showGPSErrMsg("Erreur permission: "+err.message);
+    });
+    
+  }catch(e){
+    showGPSErrMsg("Erreur FCM: "+e.message);
+  }
 }
 
 function saveFCMToken(token){
@@ -3115,4 +3120,4 @@ load();checkEtAppliquerSanctions();R();showInstallBanner();setTimeout(chargerPos
 
 </script>
 </body>
-</html>
+</html>tf
