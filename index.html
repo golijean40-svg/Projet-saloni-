@@ -6,8 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>Saloni Manager</title>
 <link rel="manifest" href="manifest.json"/>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <meta name="theme-color" content="#1d4ed8"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="Saloni"/>
@@ -460,7 +458,31 @@ function _pdfFinancier(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orienta
 
 // ══ FIREBASE ══
 var db=null,syncTimer=null;
-function initFirebase(){var s1=document.createElement("script");s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";s1.onload=function(){var s2=document.createElement("script");s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";s2.onload=function(){try{firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});db=firebase.firestore();if(S.user){startSync();setTimeout(ecouterNotifications,2000);}loadMdpOverrides(function(){});}catch(e){console.log("FB:",e);}};document.head.appendChild(s2);};document.head.appendChild(s1);}
+function initFirebase(){
+  var s1=document.createElement("script");
+  s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
+  s1.onload=function(){
+    var s2=document.createElement("script");
+    s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";
+    s2.onload=function(){
+      var s3=document.createElement("script");
+      s3.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js";
+      s3.onload=function(){
+        try{
+          if(!firebase.apps.length){
+            firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});
+          }
+          db=firebase.firestore();
+          if(S.user){startSync();setTimeout(ecouterNotifications,2000);}
+          loadMdpOverrides(function(){});
+        }catch(e){console.log("FB:",e);}
+      };
+      document.head.appendChild(s3);
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
 function showSync(msg,col){var b=document.getElementById("syncBar");if(!b)return;b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";if(syncTimer)clearTimeout(syncTimer);if(col==="#10b981")syncTimer=setTimeout(function(){b.style.display="none";},2000);}
 var unsubs=[];
 var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports","sousComptes","chats","primes","entretiens","sanctions","positions"];
@@ -1515,7 +1537,31 @@ function _pdfFinancier(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orienta
 
 // ══ FIREBASE ══
 var db=null,syncTimer=null;
-function initFirebase(){var s1=document.createElement("script");s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";s1.onload=function(){var s2=document.createElement("script");s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";s2.onload=function(){try{firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});db=firebase.firestore();if(S.user){startSync();setTimeout(ecouterNotifications,2000);}loadMdpOverrides(function(){});}catch(e){console.log("FB:",e);}};document.head.appendChild(s2);};document.head.appendChild(s1);}
+function initFirebase(){
+  var s1=document.createElement("script");
+  s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
+  s1.onload=function(){
+    var s2=document.createElement("script");
+    s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";
+    s2.onload=function(){
+      var s3=document.createElement("script");
+      s3.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js";
+      s3.onload=function(){
+        try{
+          if(!firebase.apps.length){
+            firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});
+          }
+          db=firebase.firestore();
+          if(S.user){startSync();setTimeout(ecouterNotifications,2000);}
+          loadMdpOverrides(function(){});
+        }catch(e){console.log("FB:",e);}
+      };
+      document.head.appendChild(s3);
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
 function showSync(msg,col){var b=document.getElementById("syncBar");if(!b)return;b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";if(syncTimer)clearTimeout(syncTimer);if(col==="#10b981")syncTimer=setTimeout(function(){b.style.display="none";},2000);}
 var unsubs=[];
 var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports","sousComptes","chats","primes","entretiens","sanctions","positions"];
@@ -3120,4 +3166,4 @@ load();checkEtAppliquerSanctions();R();showInstallBanner();setTimeout(chargerPos
 
 </script>
 </body>
-</html>tf
+</html>
