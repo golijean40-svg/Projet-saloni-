@@ -2916,7 +2916,6 @@ function login(){
           S.user=c;show2FA(c,function(){secResetTimer();pingSession();checkRetards();load();jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+") — 2FA validée");R();setTimeout(initFirebase,200);});
         }else{
           S.user=c;secResetTimer();pingSession();checkRetards();load();
-          setTimeout(function(){if(db)initFCM();},1000);
           jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+(c.typeCompte==="chauffeur"?" — Chauffeur":"")+")"+(c.chauffeurId?" — chauffeur #"+c.chauffeurId:""));
           R();setTimeout(initFirebase,200);
         }
@@ -3013,44 +3012,30 @@ var FCM_VAPID_KEY = "BH1an_4oHrWVLTqi5ERSNA-xRyf2qGiWn-3zAFI9_b2NraCQG4NYYfuUT5K
 var _fcmToken = null;
 
 function initFCM(){
+  // Utiliser l'API Notification native (sans Firebase Messaging)
   if(!("Notification" in window)){
     showGPSErrMsg("Notifications non supportees sur cet appareil.");
     return;
   }
-  try{
-    var messaging = firebase.messaging();
-    
-    Notification.requestPermission().then(function(permission){
-      if(permission === "granted"){
-        messaging.getToken({vapidKey: FCM_VAPID_KEY}).then(function(token){
-          if(token){
-            _fcmToken = token;
-            saveFCMToken(token);
-            showPushNotification("Saloni Manager", "Notifications activees avec succes !", {});
-            R();
-          }else{
-            showGPSErrMsg("Token FCM vide. Verifie la cle VAPID.");
-          }
-        }).catch(function(err){
-          showGPSErrMsg("Erreur token: "+err.message);
+  Notification.requestPermission().then(function(permission){
+    if(permission === "granted"){
+      _fcmToken = "native_"+Date.now();
+      try{localStorage.setItem("sal_notif_ok","1");}catch(e){}
+      // Afficher une notification de test
+      try{
+        new Notification("Saloni Manager", {
+          body: "Notifications activees avec succes !",
+          icon: "./icon-192.png"
         });
-        
-        messaging.onMessage(function(payload){
-          if(payload.notification){
-            showPushNotification(payload.notification.title, payload.notification.body, payload.data||{});
-          }
-        });
-        
-      }else{
-        showGPSErrMsg("Permission notifications refusee.");
-      }
-    }).catch(function(err){
-      showGPSErrMsg("Erreur permission: "+err.message);
-    });
-    
-  }catch(e){
-    showGPSErrMsg("Erreur FCM: "+e.message);
-  }
+      }catch(e){}
+      showPushNotification("Saloni Manager", "Notifications activees !", {});
+      R();
+    }else{
+      showGPSErrMsg("Permission notifications refusee par iOS.");
+    }
+  }).catch(function(err){
+    showGPSErrMsg("Erreur: "+err.message);
+  });
 }
 
 function saveFCMToken(token){
