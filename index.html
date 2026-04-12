@@ -589,11 +589,10 @@ function rNAV(){
       {id:"monprofil",ic:"👤",lb:"Profil"}
     ];
   }else{
-    var nbLigne=getPositions().filter(function(p){return p.actif&&p.lat&&(Date.now()-p.ts)<300000;}).length;
     T=[
       {id:"home",ic:"⊞",lb:"Accueil"},
       {id:"chauffeurs",ic:"👥",lb:"Équipe"},
-      {id:"carte",ic:"📍",lb:"Carte",badge:nbLigne>0?nbLigne:0},
+      {id:"versements",ic:"💵",lb:"Versements"},
       {id:"chat",ic:"💬",lb:"Chat",badge:nbChat},
       {id:"plus",ic:"⋯",lb:"Plus"}
     ];
@@ -955,7 +954,7 @@ function renderHomeChauf(sc,c){
   // Boutons action rapide
   +'<div style="display:flex;gap:8px;margin-bottom:14px;">'
   +'<button onclick="sT(\'entretien\')" style="flex:1;padding:11px;border-radius:12px;background:#fffbeb;border:1.5px solid #fde68a;color:#d97706;font-size:12px;font-weight:700;cursor:pointer;">🔧 Entretien</button>'
-  +'<button onclick="toggleGPSChauffeur()" id="gpsToggleBtn" style="flex:1;padding:11px;border-radius:12px;background:'+(gpsEstActif()?'linear-gradient(135deg,#059669,#10b981);border:none;color:#fff':'#f0fdf4;border:1.5px solid #bbf7d0;color:#059669')+';font-size:12px;font-weight:700;cursor:pointer;">'+(gpsEstActif()?'📡 GPS ON':'📍 GPS OFF')+'</button>'
+
   +'</div>'
   // Derniers versements
   +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Mes derniers versements</div>'
@@ -1645,11 +1644,10 @@ function rNAV(){
       {id:"monprofil",ic:"👤",lb:"Profil"}
     ];
   }else{
-    var nbLigne=getPositions().filter(function(p){return p.actif&&p.lat&&(Date.now()-p.ts)<300000;}).length;
     T=[
       {id:"home",ic:"⊞",lb:"Accueil"},
       {id:"chauffeurs",ic:"👥",lb:"Équipe"},
-      {id:"carte",ic:"📍",lb:"Carte",badge:nbLigne>0?nbLigne:0},
+      {id:"versements",ic:"💵",lb:"Versements"},
       {id:"chat",ic:"💬",lb:"Chat",badge:nbChat},
       {id:"plus",ic:"⋯",lb:"Plus"}
     ];
@@ -2011,7 +2009,7 @@ function renderHomeChauf(sc,c){
   // Boutons action rapide
   +'<div style="display:flex;gap:8px;margin-bottom:14px;">'
   +'<button onclick="sT(\'entretien\')" style="flex:1;padding:11px;border-radius:12px;background:#fffbeb;border:1.5px solid #fde68a;color:#d97706;font-size:12px;font-weight:700;cursor:pointer;">🔧 Entretien</button>'
-  +'<button onclick="toggleGPSChauffeur()" id="gpsToggleBtn" style="flex:1;padding:11px;border-radius:12px;background:'+(gpsEstActif()?'linear-gradient(135deg,#059669,#10b981);border:none;color:#fff':'#f0fdf4;border:1.5px solid #bbf7d0;color:#059669')+';font-size:12px;font-weight:700;cursor:pointer;">'+(gpsEstActif()?'📡 GPS ON':'📍 GPS OFF')+'</button>'
+
   +'</div>'
   // Derniers versements
   +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Mes derniers versements</div>'
@@ -2247,7 +2245,7 @@ function rScreenGlobal(sc){
 +'<button onclick="oD('+c.id+')" class="bgr" style="flex:1;font-size:11px;padding:8px;min-width:60px;">Détails</button>'
 +(hasPerm("rapport")?'<button onclick="oRp('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">Rapport</button>':"")
 +'<button onclick="modalEntretien('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔧</button>'
-+'<button onclick="gpsParId('+(c.id)+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.08);color:#059669;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">📍</button>'
++(hasPerm('chauffeur')?'<button onclick="oEditCh('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">✏️</button>':"")
 +(hasPerm("versement")?'<button onclick="oV('+c.id+')" class="bor" style="flex:1;font-size:11px;padding:8px;min-width:60px;">+Vers.</button>':"")
 +'</div>'
 +(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";}).length>0?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:7px 10px;margin-top:7px;font-size:10px;color:#dc2626;font-weight:700;">⚠️ Sanction active — '+(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";})[0]||{}).description+'</div>':"")
@@ -2345,7 +2343,6 @@ function rScreenGlobal(sc){
       {ic:"📊",lb:"Bilan PDF",sb:"Résumé financier complet",act:"exportPDF('financier')"},
       {ic:"🤖",lb:"Alertes automatiques",sb:cfg2.actif?"Actif — "+(cfg2.heure||"20")+"h00":"Désactivé",act:"sT('alertesAuto')"},
       {ic:"📒",lb:"Journal",sb:getJournal("tous").length+" action(s)",act:"sT('journal')"},
-      {ic:"📍",lb:"Localisation",sb:(function(){var n=getPositions().filter(function(p){return p.actif&&p.lat&&(Date.now()-p.ts)<300000;}).length;return n>0?n+" en ligne":"Aucun en ligne";}()),act:"sT('carte')",badge:getPositions().filter(function(p){return p.actif&&p.lat&&(Date.now()-p.ts)<300000;}).length},
       {ic:"🔧",lb:"Entretiens",sb:(function(){var a=getAlerteEntretiens().filter(function(x){return x.urgent;});return a.length>0?a.length+" urgent(s)":getAlerteEntretiens().length+" alerte(s)";}()),act:"sT('entretiens')",badge:getAlerteEntretiens().filter(function(x){return x.urgent;}).length},
       {ic:"⚠️",lb:"Sanctions",sb:getNbSanctionsActives()+" active(s)",act:"sT('sanctions')",badge:getNbSanctionsActives()}
     ];
@@ -2578,7 +2575,7 @@ function rModal(){
   var M=S.modal,MD=S.mdat;
   var CH=S.data.chauffeurs,SAL=S.data.salonis,VE=S.data.versements;
   var t=td(),vj=VE.filter(function(v){return v.date===t;});
-  var tt={vers:"Versement",ch:"Nouveau chauffeur",sal:"Nouveau saloni",dep:"Dépense",am:"PV",msg:"Message",av:"Avances",sup:"Confirmation",det:"Détails",rp:"Rapport",rst:"Réinitialiser",newCompte:"Nouveau sous-compte",editCompte:"Modifier sous-compte",chgMdp:"Modifier le code",chgMdpSelf:"Mon code / mot de passe"};
+  var tt={vers:"Versement",ch:"Nouveau chauffeur",editCh:"Modifier chauffeur",sal:"Nouveau saloni",dep:"Dépense",am:"PV",msg:"Message",av:"Avances",sup:"Confirmation",det:"Détails",rp:"Rapport",rst:"Réinitialiser",newCompte:"Nouveau sous-compte",editCompte:"Modifier sous-compte",chgMdp:"Modifier le code",chgMdpSelf:"Mon code / mot de passe"};
   var body="";
 
   if(M==="vers"){
@@ -2590,6 +2587,25 @@ function rModal(){
     +'<div id="refBlock" style="display:none;" class="mb"><label class="lbl" id="refLabel">Référence transaction</label><div style="position:relative;"><input id="vref" type="text" placeholder="Ex: TXN240407XXXXXX" style="padding-right:44px;"/><span id="refIcon" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:20px;">📱</span></div><div id="refHint" style="font-size:10px;color:#64748b;margin-top:4px;"></div></div>'
     +lbl("Note",'<input id="vn" type="text" placeholder="Optionnel"/>')
     +'<button onclick="saveVers()" class="bor" style="font-size:15px;padding:15px;">Enregistrer</button>';
+  }
+  else if(M==="editCh"){
+    var ce=CH.filter(function(x){return x.id===MD.id;})[0];if(!ce){fM();return;}
+    body=lbl("Nom complet",'<input id="cn" type="text" value="'+ce.nom+'"/>')
+    +lbl("Téléphone",'<input id="ct" type="tel" value="'+(ce.tel||'')+'" inputmode="tel"/>')
+    +'<div class="row2">'+lbl("N Saloni",'<input id="cs" type="text" value="'+(ce.saloniId||'')+'"/>')+lbl("Zone",sl("cz",ZONES,ce.zone))+'</div>'
+    +'<div class="mb"><label class="lbl">Fréquence paiement</label><select id="cfp" onchange="tglObj()"><option value="Journalier"'+(ce.freqPaiement!=="Hebdomadaire"?" selected":"")+'>Journalier</option><option value="Hebdomadaire"'+(ce.freqPaiement==="Hebdomadaire"?" selected":"")+'>Hebdomadaire</option></select></div>'
+    +'<div id="objJ" class="mb" style="display:'+(ce.freqPaiement==="Hebdomadaire"?"none":"block")+'">'+lbl("Objectif/jour (F)",'<input id="co" type="number" value="'+(ce.objectifJour||5000)+'" inputmode="numeric"/>')+'</div>'
+    +'<div id="objS" class="mb" style="display:'+(ce.freqPaiement==="Hebdomadaire"?"block":"none")+'">'+lbl("Objectif/semaine (F)",'<input id="cos" type="number" value="'+(ce.objectifSemaine||30000)+'" inputmode="numeric"/>')+'</div>'
+    +lbl("Statut",sl("cst",["actif","repos","suspendu"],ce.statut))
+    +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:11px;padding:12px;margin-bottom:12px;">'
+    +'<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">📋 DOCUMENTS & VALIDITÉS</div>'
+    +'<div class="row2">'+lbl("Permis — Expiration",'<input id="cPermis" type="date" value="'+(ce.permisExp||'')+'"/>')+lbl("Carte grise — Début",'<input id="cCgDebut" type="date" value="'+(ce.cgDebut||'')+'"/>')+'</div>'
+    +'<div class="row2">'+lbl("Carte grise — Fin",'<input id="cCgFin" type="date" value="'+(ce.cgFin||'')+'"/>')+lbl("Vignette — Expiration",'<input id="cVignette" type="date" value="'+(ce.vignetteExp||'')+'"/>')+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:9px;">'
+    +'<button onclick="saveEditCh('+MD.id+')" class="bor" style="flex:2;">💾 Enregistrer</button>'
+    +(hasPerm("supprimer")?'<button onclick="fM();oM(\'sup\',{id:'+MD.id+'})" style="flex:1;padding:13px;border-radius:12px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-weight:700;cursor:pointer;">🗑 Suppr.</button>':"")
+    +'</div>';
   }
   else if(M==="ch"){
     body=lbl("Nom complet",'<input id="cn" type="text"/>')
@@ -2709,6 +2725,7 @@ function suppCompte(id){if(!confirm("Supprimer ce sous-compte ?"))return;S.data.
 function sT(t){S.tab=t;if(t==="finances")S.seg="recettes";R();}
 function oM(m,d){S.modal=m;S.mdat=d||{};R();}
 function fM(){S.modal=null;S.mdat={};var r=document.getElementById("MR");if(r)r.remove();R();}
+function oEditCh(id){S.modal="editCh";S.mdat={id:id};R();}
 function oV(id){S.modal="vers";S.mdat={chauffeurId:id||""};R();}
 function oD(id){S.detCh=S.data.chauffeurs.filter(function(c){return c.id===id;})[0];S.modal="det";R();}
 function oRp(id){S.modal="rp";S.mdat={id:id,type:"semaine"};R();}
@@ -2719,6 +2736,25 @@ function suppVers(id){if(!hasPerm("supprimer")){alert("Accès refusé.");return;
 function updRefField(){var mode=gv("vmo");var block=document.getElementById("refBlock");var icon=document.getElementById("refIcon");var hint=document.getElementById("refHint");var label=document.getElementById("refLabel");if(!block)return;var mobileMap={"Wave":{icon:"🔵",color:"#1a9fff",hint:"Référence SMS Wave",label:"Référence Wave"},"Orange Money":{icon:"🟠",color:"#f97316",hint:"Code transaction Orange Money",label:"Référence Orange Money"},"MTN Money":{icon:"🟡",color:"#eab308",hint:"Code transaction MTN Money",label:"Référence MTN Money"},"Virement":{icon:"🏦",color:"#7c3aed",hint:"Numéro de virement",label:"Référence virement"}};var cfg=mobileMap[mode];if(cfg){block.style.display="block";if(icon)icon.textContent=cfg.icon;if(hint)hint.textContent=cfg.hint;if(label)label.textContent=cfg.label;var inp=document.getElementById("vref");if(inp)inp.style.borderColor=cfg.color;}else{block.style.display="none";var inp2=document.getElementById("vref");if(inp2)inp2.value="";}}
 function updRec(){var cid=parseInt(document.getElementById("vc")&&document.getElementById("vc").value);var c=S.data.chauffeurs.filter(function(x){return x.id===cid;})[0];var rec=document.getElementById("vrec");if(!rec)return;if(c){var isH=c.freqPaiement==="Hebdomadaire";var vj2=S.data.versements.filter(function(v){return v.date===td();});var val=isH?getVS(c,S.data.versements):getVJ(c,vj2);var obj=isH?getObjS(c):getObjJ(c);rec.style.display="grid";rec.innerHTML=[{l:"Versé",v:fc(val),c:"#1d4ed8"},{l:"Objectif",v:fc(obj),c:"#059669"},{l:"Reste",v:fc(Math.max(0,obj-val)),c:"#dc2626"}].map(function(it){return'<div style="text-align:center;"><div style="font-size:9px;color:#64748b;">'+it.l+'</div><div style="font-weight:800;color:'+it.c+';font-size:12px;">'+it.v+'</div></div>';}).join("");}else rec.style.display="none";}
 function saveVers(){var cid=parseInt(gv("vc")),m=parseFloat(gv("vm"))||0;if(!cid||!m)return;var mode=gv("vmo")||"Especes";var ref=gv("vref")||"";var item={id:Date.now(),chauffeurId:cid,montant:m,date:td(),heure:hr(),mode:mode,ref:ref,note:gv("vn")||""};S.data.versements.push(item);var c=S.data.chauffeurs.filter(function(x){return x.id===cid;})[0];if(c){c.solde=(c.solde||0)+m;fbSave("chauffeurs",c);}jLog("versement_ajout","Versement "+fc(m)+" — "+(c?c.nom:"?")+" ("+mode+(ref?" | Ref:"+ref:"")+")");fbSave("versements",item);fM();}
+function saveEditCh(id){
+  var nom=gv("cn").trim();if(!nom)return;
+  var c=S.data.chauffeurs.filter(function(x){return x.id===id;})[0];if(!c)return;
+  c.nom=nom;
+  c.tel=gv("ct");
+  c.saloniId=gv("cs");
+  c.zone=gv("cz")||"Abobo";
+  c.freqPaiement=gv("cfp")||"Journalier";
+  c.objectifJour=parseInt(gv("co"))||5000;
+  c.objectifSemaine=parseInt(gv("cos"))||30000;
+  c.statut=gv("cst")||"actif";
+  c.permisExp=gv("cPermis")||"";
+  c.cgDebut=gv("cCgDebut")||"";
+  c.cgFin=gv("cCgFin")||"";
+  c.vignetteExp=gv("cVignette")||"";
+  fbSave("chauffeurs",c);
+  jLog("chauffeur_ajout","Modification chauffeur: "+nom);
+  fM();
+}
 function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""}};S.data.chauffeurs.push(item);jLog("chauffeur_ajout","Nouveau chauffeur: "+nom+" ("+gv("cz")+")");fbSave("chauffeurs",item);fM();}
 function saveSal(){var id=gv("si").trim();if(!id)return;var item={id:id,marque:gv("sm"),immat:gv("sr"),km:parseInt(gv("sk"))||0,chauffeurId:parseInt(gv("sch"))||null,statut:"en service",prixAchat:parseFloat(gv("sprix"))||0,dateAchat:gv("sdateachat")||""};S.data.salonis.push(item);jLog("saloni_ajout","Nouveau saloni: "+id+" ("+gv("sm")+")");fbSave("salonis",item);fM();}
 function saveDep(){var m=parseFloat(gv("dm"))||0;if(!m)return;var item={id:Date.now(),categorie:gv("dc"),saloniId:gv("ds"),montant:m,date:td()};S.data.depenses.push(item);jLog("depense_ajout","Dépense "+gv("dc")+" : "+fc(m));fbSave("depenses",item);fM();}
