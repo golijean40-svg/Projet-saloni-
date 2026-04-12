@@ -175,7 +175,7 @@ function getMsgDefaut(c,manque){return "Bonjour "+c.nom+",\nVous n'avez pas effe
 function getMsgAlerte(c,manque){var cfg=getAlerteConfig();var tpl=cfg["msg_"+c.id]||cfg["msg_defaut"]||getMsgDefaut(c,manque);return tpl.replace(/\{nom\}/g,c.nom).replace(/\{manque\}/g,fc(manque)).replace(/\{date\}/g,td()).replace(/\{objectif\}/g,fc(getObjJ(c)));}
 function alerteDejaSent(cid){try{var sent=JSON.parse(localStorage.getItem(ALERTE_SENT_KEY)||"{}");return sent[cid]===td();}catch(e){return false;}}
 function marquerAlerteSent(cid){try{var sent=JSON.parse(localStorage.getItem(ALERTE_SENT_KEY)||"{}");sent[cid]=td();localStorage.setItem(ALERTE_SENT_KEY,JSON.stringify(sent));}catch(e){}}
-function envoyerAlerteNonPaiement(c,manque,forceWA){var msg=getMsgAlerte(c,manque);var item={id:Date.now(),de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};S.data.messages.push(item);fbSave("messages",item);jLog("versement_suppr","⚠️ Alerte non-paiement: "+c.nom+" (manque "+fc(manque)+")");var tel=c.tel?c.tel.replace(/\D/g,"").replace(/^0/,"225"):"";if(tel&&forceWA!==false)window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");marquerAlerteSent(c.id);}
+function envoyerAlerteNonPaiement(c,manque,forceWA){var msg=getMsgAlerte(c,manque);var item={id:Date.now(),de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};S.data.messages.push(item);fbSave("messages",item);jLog("versement_suppr","⚠️ Alerte non-paiement: "+c.nom+" (manque "+fc(manque)+")");pushVersementManquant(c,manque);;var tel=c.tel?c.tel.replace(/\D/g,"").replace(/^0/,"225"):"";if(tel&&forceWA!==false)window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");marquerAlerteSent(c.id);}
 function checkAlertesAuto(){var cfg=getAlerteConfig();if(!cfg.actif)return;var heure=new Date().getHours();var heureAlerte=parseInt(cfg.heure||"20");if(heure<heureAlerte)return;var t=td();var vj=S.data.versements.filter(function(v){return v.date===t;});S.data.chauffeurs.forEach(function(c){if(c.statut!=="actif")return;if(c.freqPaiement==="Hebdomadaire")return;if(alerteDejaSent(c.id))return;var paye=getVJ(c,vj);var obj=getObjJ(c);var manque=obj-paye;if(manque>0)envoyerAlerteNonPaiement(c,manque,false);});if(S.user)R();}
 setInterval(function(){if(S.user)checkAlertesAuto();},60000);
 
@@ -205,7 +205,7 @@ function activerPrime(cid,periode){
   if(!S.data.primes)S.data.primes=[];if(!S.data.entretiens)S.data.entretiens=[];if(!S.data.sanctions)S.data.sanctions=[];if(!S.data.positions)S.data.positions=[];
   S.data.primes.push(item);
   fbSave("primes",item);save();
-  jLog("versement_ajout","⭐ Prime attribuée: "+c.nom+" — "+fc(PRIME_MONTANT));
+  jLog("versement_ajout","⭐ Prime attribuée: "+c.nom+" — "+fc(PRIME_MONTANT));pushPrimeDisponible(c);
   alert("Prime de "+fc(PRIME_MONTANT)+" attribuée à "+c.nom+" !");
   R();
 }
@@ -458,7 +458,7 @@ function _pdfFinancier(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orienta
 
 // ══ FIREBASE ══
 var db=null,syncTimer=null;
-function initFirebase(){var s1=document.createElement("script");s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";s1.onload=function(){var s2=document.createElement("script");s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";s2.onload=function(){try{firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});db=firebase.firestore();if(S.user)startSync();loadMdpOverrides(function(){});}catch(e){console.log("FB:",e);}};document.head.appendChild(s2);};document.head.appendChild(s1);}
+function initFirebase(){var s1=document.createElement("script");s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";s1.onload=function(){var s2=document.createElement("script");s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";s2.onload=function(){try{firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});db=firebase.firestore();if(S.user){startSync();setTimeout(ecouterNotifications,2000);}loadMdpOverrides(function(){});}catch(e){console.log("FB:",e);}};document.head.appendChild(s2);};document.head.appendChild(s1);}
 function showSync(msg,col){var b=document.getElementById("syncBar");if(!b)return;b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";if(syncTimer)clearTimeout(syncTimer);if(col==="#10b981")syncTimer=setTimeout(function(){b.style.display="none";},2000);}
 var unsubs=[];
 var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports","sousComptes","chats","primes","entretiens","sanctions","positions"];
@@ -504,7 +504,7 @@ function getChatConvId(cid){return "conv_"+String(cid);}
 function getChatMsgs(cid){return(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(cid);}).sort(function(a,b){return a.ts-b.ts;});}
 function getNbChatNonLus(){if(!S.user)return 0;var estSC=estCompteChauf();return(S.data.chats||[]).filter(function(m){if(m.lu)return false;if(estSC)return m.convId===getChatConvId(S.user.chauffeurId)&&m.de==="admin";return m.de==="chauffeur";}).length;}
 function marquerChatLu(cid){var estSC=estCompteChauf();(S.data.chats||[]).forEach(function(m){if(m.lu)return;if(!estSC&&m.convId===getChatConvId(cid)&&m.de==="chauffeur"){m.lu=true;fbSave("chats",m);}if(estSC&&m.convId===getChatConvId(cid)&&m.de==="admin"){m.lu=true;fbSave("chats",m);}});}
-function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
+function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
 function msgBubble(m,moiDe){var moi=m.de===moiDe;return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:6px;"><div style="max-width:78%;background:'+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":"1px solid #dbeafe")+';">'+m.texte.replace(/</g,"&lt;")+'<div style="font-size:9px;opacity:.55;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div></div></div>";}
 function chatBox(cid,moiDe){var msgs=getChatMsgs(cid);marquerChatLu(cid);return'<div style="flex:1;overflow-y:auto;padding:12px 14px;" id="chatBox">'+(msgs.length===0?'<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">💬 Aucun message pour l\'instant</div>':msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))+"</div>";}
 function chatInput(cid){return'<div style="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;"><textarea id="chatInput" placeholder="Votre message..." rows="1" style="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea><button onclick="envoyerChat('+cid+')" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;">↑</button></div>';}
@@ -560,7 +560,7 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte"};
+  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
   var left=S.tab==="home"
   ?'<div style="display:flex;align-items:center;gap:9px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:17px;">🛺</div>'
   +'<div><div style="font-size:16px;font-weight:900;" class="grad">SALONI</div>'
@@ -1230,7 +1230,7 @@ function getMsgDefaut(c,manque){return "Bonjour "+c.nom+",\nVous n'avez pas effe
 function getMsgAlerte(c,manque){var cfg=getAlerteConfig();var tpl=cfg["msg_"+c.id]||cfg["msg_defaut"]||getMsgDefaut(c,manque);return tpl.replace(/\{nom\}/g,c.nom).replace(/\{manque\}/g,fc(manque)).replace(/\{date\}/g,td()).replace(/\{objectif\}/g,fc(getObjJ(c)));}
 function alerteDejaSent(cid){try{var sent=JSON.parse(localStorage.getItem(ALERTE_SENT_KEY)||"{}");return sent[cid]===td();}catch(e){return false;}}
 function marquerAlerteSent(cid){try{var sent=JSON.parse(localStorage.getItem(ALERTE_SENT_KEY)||"{}");sent[cid]=td();localStorage.setItem(ALERTE_SENT_KEY,JSON.stringify(sent));}catch(e){}}
-function envoyerAlerteNonPaiement(c,manque,forceWA){var msg=getMsgAlerte(c,manque);var item={id:Date.now(),de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};S.data.messages.push(item);fbSave("messages",item);jLog("versement_suppr","⚠️ Alerte non-paiement: "+c.nom+" (manque "+fc(manque)+")");var tel=c.tel?c.tel.replace(/\D/g,"").replace(/^0/,"225"):"";if(tel&&forceWA!==false)window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");marquerAlerteSent(c.id);}
+function envoyerAlerteNonPaiement(c,manque,forceWA){var msg=getMsgAlerte(c,manque);var item={id:Date.now(),de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};S.data.messages.push(item);fbSave("messages",item);jLog("versement_suppr","⚠️ Alerte non-paiement: "+c.nom+" (manque "+fc(manque)+")");pushVersementManquant(c,manque);;var tel=c.tel?c.tel.replace(/\D/g,"").replace(/^0/,"225"):"";if(tel&&forceWA!==false)window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");marquerAlerteSent(c.id);}
 function checkAlertesAuto(){var cfg=getAlerteConfig();if(!cfg.actif)return;var heure=new Date().getHours();var heureAlerte=parseInt(cfg.heure||"20");if(heure<heureAlerte)return;var t=td();var vj=S.data.versements.filter(function(v){return v.date===t;});S.data.chauffeurs.forEach(function(c){if(c.statut!=="actif")return;if(c.freqPaiement==="Hebdomadaire")return;if(alerteDejaSent(c.id))return;var paye=getVJ(c,vj);var obj=getObjJ(c);var manque=obj-paye;if(manque>0)envoyerAlerteNonPaiement(c,manque,false);});if(S.user)R();}
 setInterval(function(){if(S.user)checkAlertesAuto();},60000);
 
@@ -1260,7 +1260,7 @@ function activerPrime(cid,periode){
   if(!S.data.primes)S.data.primes=[];if(!S.data.entretiens)S.data.entretiens=[];if(!S.data.sanctions)S.data.sanctions=[];if(!S.data.positions)S.data.positions=[];
   S.data.primes.push(item);
   fbSave("primes",item);save();
-  jLog("versement_ajout","⭐ Prime attribuée: "+c.nom+" — "+fc(PRIME_MONTANT));
+  jLog("versement_ajout","⭐ Prime attribuée: "+c.nom+" — "+fc(PRIME_MONTANT));pushPrimeDisponible(c);
   alert("Prime de "+fc(PRIME_MONTANT)+" attribuée à "+c.nom+" !");
   R();
 }
@@ -1513,7 +1513,7 @@ function _pdfFinancier(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orienta
 
 // ══ FIREBASE ══
 var db=null,syncTimer=null;
-function initFirebase(){var s1=document.createElement("script");s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";s1.onload=function(){var s2=document.createElement("script");s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";s2.onload=function(){try{firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});db=firebase.firestore();if(S.user)startSync();loadMdpOverrides(function(){});}catch(e){console.log("FB:",e);}};document.head.appendChild(s2);};document.head.appendChild(s1);}
+function initFirebase(){var s1=document.createElement("script");s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";s1.onload=function(){var s2=document.createElement("script");s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";s2.onload=function(){try{firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});db=firebase.firestore();if(S.user){startSync();setTimeout(ecouterNotifications,2000);}loadMdpOverrides(function(){});}catch(e){console.log("FB:",e);}};document.head.appendChild(s2);};document.head.appendChild(s1);}
 function showSync(msg,col){var b=document.getElementById("syncBar");if(!b)return;b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";if(syncTimer)clearTimeout(syncTimer);if(col==="#10b981")syncTimer=setTimeout(function(){b.style.display="none";},2000);}
 var unsubs=[];
 var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports","sousComptes","chats","primes","entretiens","sanctions","positions"];
@@ -1559,7 +1559,7 @@ function getChatConvId(cid){return "conv_"+String(cid);}
 function getChatMsgs(cid){return(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(cid);}).sort(function(a,b){return a.ts-b.ts;});}
 function getNbChatNonLus(){if(!S.user)return 0;var estSC=estCompteChauf();return(S.data.chats||[]).filter(function(m){if(m.lu)return false;if(estSC)return m.convId===getChatConvId(S.user.chauffeurId)&&m.de==="admin";return m.de==="chauffeur";}).length;}
 function marquerChatLu(cid){var estSC=estCompteChauf();(S.data.chats||[]).forEach(function(m){if(m.lu)return;if(!estSC&&m.convId===getChatConvId(cid)&&m.de==="chauffeur"){m.lu=true;fbSave("chats",m);}if(estSC&&m.convId===getChatConvId(cid)&&m.de==="admin"){m.lu=true;fbSave("chats",m);}});}
-function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
+function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
 function msgBubble(m,moiDe){var moi=m.de===moiDe;return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:6px;"><div style="max-width:78%;background:'+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":"1px solid #dbeafe")+';">'+m.texte.replace(/</g,"&lt;")+'<div style="font-size:9px;opacity:.55;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div></div></div>";}
 function chatBox(cid,moiDe){var msgs=getChatMsgs(cid);marquerChatLu(cid);return'<div style="flex:1;overflow-y:auto;padding:12px 14px;" id="chatBox">'+(msgs.length===0?'<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">💬 Aucun message pour l\'instant</div>':msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))+"</div>";}
 function chatInput(cid){return'<div style="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;"><textarea id="chatInput" placeholder="Votre message..." rows="1" style="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea><button onclick="envoyerChat('+cid+')" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;">↑</button></div>';}
@@ -1615,7 +1615,7 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte"};
+  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
   var left=S.tab==="home"
   ?'<div style="display:flex;align-items:center;gap:9px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:17px;">🛺</div>'
   +'<div><div style="font-size:16px;font-weight:900;" class="grad">SALONI</div>'
@@ -2342,6 +2342,7 @@ function rScreenGlobal(sc){
       {ic:"📤",lb:"Message",sb:"Envoyer à un chauffeur",act:"oM('msg')"},
       {ic:"📊",lb:"Bilan PDF",sb:"Résumé financier complet",act:"exportPDF('financier')"},
       {ic:"🤖",lb:"Alertes automatiques",sb:cfg2.actif?"Actif — "+(cfg2.heure||"20")+"h00":"Désactivé",act:"sT('alertesAuto')"},
+      {ic:"🔔",lb:"Notifications push",sb:_fcmToken?"Token actif":"Non activé",act:"sT('pushConfig')"},
       {ic:"📒",lb:"Journal",sb:getJournal("tous").length+" action(s)",act:"sT('journal')"},
       {ic:"🔧",lb:"Entretiens",sb:(function(){var a=getAlerteEntretiens().filter(function(x){return x.urgent;});return a.length>0?a.length+" urgent(s)":getAlerteEntretiens().length+" alerte(s)";}()),act:"sT('entretiens')",badge:getAlerteEntretiens().filter(function(x){return x.urgent;}).length},
       {ic:"⚠️",lb:"Sanctions",sb:getNbSanctionsActives()+" active(s)",act:"sT('sanctions')",badge:getNbSanctionsActives()}
@@ -2554,6 +2555,60 @@ function rScreenGlobal(sc){
     +'<button onclick="iaEnvoyerInput()" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;'+(S.iaLoading?"opacity:.5;":"")+'">↑</button></div></div>';
     setTimeout(function(){var b=document.getElementById("iaBox");if(b)b.scrollTop=b.scrollHeight;},100);
     }
+  }
+
+  else if(S.tab==="pushConfig"){
+    var hasToken=!!_fcmToken;
+    var wrapper=document.createElement("div");
+    wrapper.className="sec";
+    wrapper.innerHTML='<div style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 6px 20px rgba(124,58,237,.3);">'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Notifications Push</div>'
+    +'<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px;">'+(hasToken?"✅ Actives":"❌ Non activées")+'</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.7);">Alertes meme quand app fermee</div>'
+    +'</div>'
+    +'<div class="card" style="margin-bottom:14px;">'
+    +'<div style="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:12px;">Comment ca fonctionne</div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;">'
+    +[["⚠️","Versement manquant","Le gérant est notifié si un chauffeur ne verse pas"],
+      ["💬","Nouveau message","Notification lors d'un message chat"],
+      ["⭐","Prime disponible","Le chauffeur est notifié quand sa prime est activée"],
+      ["🚨","Sanction auto","Notification gérant + chauffeur lors d'une sanction"]
+    ].map(function(x){return'<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border,#dbeafe);">'
+    +'<div style="font-size:22px;width:32px;text-align:center;">'+x[0]+'</div>'
+    +'<div><div style="font-size:13px;font-weight:700;color:var(--txt,#0f172a);">'+x[1]+'</div>'
+    +'<div style="font-size:11px;color:#64748b;">'+x[2]+'</div></div></div>';}).join("")
+    +'</div></div>'
+    +(hasToken
+    ?'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin-bottom:14px;">'
+    +'<div style="font-size:13px;font-weight:700;color:#059669;margin-bottom:6px;">✅ Notifications activees</div>'
+    +'<div style="font-size:11px;color:#64748b;word-break:break-all;">Token: '+(_fcmToken?_fcmToken.substring(0,30)+"...":"—")+'</div>'
+    +'</div>'
+    :'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px;margin-bottom:14px;">'
+    +'<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:6px;">❌ Pas encore activees</div>'
+    +'<div style="font-size:11px;color:#64748b;line-height:1.6;">Appuyez sur le bouton ci-dessous pour autoriser les notifications.</div>'
+    +'</div>');
+    
+    sc.innerHTML="";
+    sc.appendChild(wrapper);
+    
+    // Bouton activer
+    var btn=document.createElement("button");
+    btn.className="bor";
+    btn.style.margin="0 14px";
+    btn.style.width="calc(100% - 28px)";
+    btn.textContent=hasToken?"🔔 Notifications activees":"🔔 Activer les notifications";
+    btn.disabled=hasToken;
+    btn.onclick=function(){initFCM();};
+    sc.appendChild(btn);
+    
+    // Note iOS
+    var note=document.createElement("div");
+    note.style.cssText="margin:12px 14px;padding:11px;background:var(--bg4,#eff6ff);border-radius:11px;border:1px solid var(--border2,#bfdbfe);font-size:11px;color:#1d4ed8;line-height:1.6;";
+    note.innerHTML="<strong>iOS:</strong> Requiert iOS 16.4+ et l'app installee en PWA sur l'ecran d'accueil.<br>"
+    +"<strong>Android:</strong> Fonctionne directement depuis Chrome.";
+    sc.appendChild(note);
+    
+    html=null;
   }
 
   else if(S.tab==="bi"||S.tab==="rsi"){html='<div class="sec"><div class="card" style="text-align:center;padding:40px 20px;"><div style="font-size:44px;margin-bottom:12px;">📊</div><div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:8px;">Module disponible</div><div style="font-size:12px;color:#64748b;">Fonctionnalité avancée — accédez depuis l\'onglet Plus.</div></div></div>';}
@@ -2813,6 +2868,7 @@ function login(){
           S.user=c;show2FA(c,function(){secResetTimer();pingSession();checkRetards();load();jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+") — 2FA validée");R();setTimeout(initFirebase,200);});
         }else{
           S.user=c;secResetTimer();pingSession();checkRetards();load();
+          setTimeout(function(){if(db)initFCM();},1000);
           jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+(c.typeCompte==="chauffeur"?" — Chauffeur":"")+")"+(c.chauffeurId?" — chauffeur #"+c.chauffeurId:""));
           R();setTimeout(initFirebase,200);
         }
@@ -2903,6 +2959,158 @@ function showInstallBanner(){
 }
 
 // Lancer après connexion
+
+// ══ FIREBASE CLOUD MESSAGING (Push Notifications) ══
+var FCM_VAPID_KEY = ""; // À remplir depuis Firebase Console
+var _fcmToken = null;
+
+function initFCM(){
+  if(!("Notification" in window)){
+    console.log("Notifications non supportées");
+    return;
+  }
+  // Charger Firebase Messaging
+  var s = document.createElement("script");
+  s.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js";
+  s.onload = function(){
+    try{
+      var messaging = firebase.messaging();
+      
+      // Demander permission + obtenir token
+      Notification.requestPermission().then(function(permission){
+        if(permission === "granted"){
+          messaging.getToken({vapidKey: FCM_VAPID_KEY}).then(function(token){
+            if(token){
+              _fcmToken = token;
+              // Sauvegarder le token avec l'utilisateur dans Firebase
+              saveFCMToken(token);
+              console.log("FCM token:", token.substring(0,20)+"...");
+            }
+          }).catch(function(err){
+            console.log("FCM token error:", err);
+          });
+        }
+      });
+      
+      // Recevoir les notifications quand l'app est ouverte
+      messaging.onMessage(function(payload){
+        showPushNotification(payload.notification.title, payload.notification.body, payload.data);
+      });
+      
+    }catch(e){ console.log("FCM init error:", e); }
+  };
+  document.head.appendChild(s);
+}
+
+function saveFCMToken(token){
+  if(!db || !S.user) return;
+  try{
+    db.collection("sal_fcm_tokens").doc(S.user.pseudo).set({
+      token: token,
+      pseudo: S.user.pseudo,
+      role: S.user.role,
+      typeCompte: S.user.typeCompte || "normal",
+      chauffeurId: S.user.chauffeurId || null,
+      ts: Date.now()
+    });
+  }catch(e){}
+}
+
+function showPushNotification(title, body, data){
+  // Afficher une notif in-app quand l'app est ouverte
+  var old = document.getElementById("_pushNotif");
+  if(old) old.remove();
+  
+  var d = document.createElement("div");
+  d.id = "_pushNotif";
+  d.style.cssText = "position:fixed;top:70px;left:12px;right:12px;z-index:9500;background:#1e293b;border-radius:14px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.4);display:flex;gap:12px;align-items:center;animation:up .3s ease;cursor:pointer;";
+  
+  var icon = document.createElement("div");
+  icon.style.cssText = "width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;";
+  icon.textContent = "🛺";
+  
+  var txt = document.createElement("div");
+  txt.style.cssText = "flex:1;";
+  txt.innerHTML = "<div style='font-size:13px;font-weight:800;color:#fff;margin-bottom:2px;'>"+title+"</div>"
+    + "<div style='font-size:11px;color:#94a3b8;line-height:1.4;'>"+body+"</div>";
+  
+  var close = document.createElement("button");
+  close.textContent = "✕";
+  close.style.cssText = "background:rgba(255,255,255,.1);border:none;color:#94a3b8;font-size:14px;cursor:pointer;padding:5px 7px;border-radius:7px;flex-shrink:0;";
+  close.onclick = function(e){ e.stopPropagation(); d.remove(); };
+  
+  d.appendChild(icon);
+  d.appendChild(txt);
+  d.appendChild(close);
+  d.onclick = function(){ d.remove(); if(data&&data.tab)sT(data.tab); };
+  document.body.appendChild(d);
+  
+  // Auto-fermer après 5 secondes
+  setTimeout(function(){ if(d.parentNode) d.remove(); }, 5000);
+}
+
+// ══ ENVOYER UNE NOTIFICATION PUSH ══
+function envoyerPush(targetPseudo, title, body, data){
+  // Récupérer le token du destinataire et envoyer via Firebase Function
+  // (nécessite Firebase Functions côté serveur)
+  // Pour l'instant, on stocke dans sal_notifications pour affichage in-app
+  if(!db) return;
+  var notif = {
+    id: Date.now().toString(),
+    to: targetPseudo || "all",
+    title: title,
+    body: body,
+    data: data || {},
+    ts: Date.now(),
+    date: td(),
+    heure: hr(),
+    lu: false
+  };
+  try{
+    db.collection("sal_notifications").doc(notif.id).set(notif);
+  }catch(e){}
+}
+
+// Écouter les nouvelles notifications pour l'utilisateur connecté
+function ecouterNotifications(){
+  if(!db || !S.user) return;
+  db.collection("sal_notifications")
+    .where("to", "in", [S.user.pseudo, "all"])
+    .orderBy("ts", "desc")
+    .limit(1)
+    .onSnapshot(function(snap){
+      snap.docChanges().forEach(function(change){
+        if(change.type === "added"){
+          var n = change.doc.data();
+          // Ne pas afficher les notifs déjà lues ou trop vieilles
+          if(!n.lu && (Date.now() - n.ts) < 30000){
+            showPushNotification(n.title, n.body, n.data);
+          }
+        }
+      });
+    });
+}
+
+// Envoyer push automatiquement lors des événements clés
+function pushVersementManquant(chauffeur, manque){
+  // Notif interne au gérant
+  envoyerPush("gerant", "⚠️ Versement manquant", chauffeur.nom+" n'a pas versé. Manque: "+fc(manque), {tab:"chauffeurs"});
+}
+function pushNouveauMessage(destinataire, expediteur){
+  envoyerPush(destinataire, "💬 Nouveau message", "Message de "+expediteur, {tab:"chat"});
+}
+function pushSanctionAuto(chauffeur){
+  envoyerPush(chauffeur.pseudo||"all", "⚠️ Sanction automatique", chauffeur.nom+": 2 jours sans versement", {tab:"sanctions"});
+  // Notifier aussi le gérant
+  envoyerPush("gerant", "⚠️ Sanction déclenchée", "Sanction auto: "+chauffeur.nom, {tab:"sanctions"});
+}
+function pushPrimeDisponible(chauffeur){
+  // Notifier le chauffeur que sa prime est disponible
+  var sc = (S.data.sousComptes||[]).filter(function(c){return String(c.chauffeurId)===String(chauffeur.id);})[0];
+  if(sc) envoyerPush(sc.pseudo, "⭐ Prime disponible !", "Votre prime de "+fc(PRIME_MONTANT)+" est disponible", {tab:"primes"});
+  envoyerPush("gerant", "⭐ Prime à payer", chauffeur.nom+": prime en attente", {tab:"primes"});
+}
+
 load();checkEtAppliquerSanctions();R();showInstallBanner();setTimeout(chargerPositions,2000);
 
 </script>
