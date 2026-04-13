@@ -163,7 +163,10 @@ function show2FA(user,onSuccess){var old=document.getElementById("tfa_screen");i
 var JOURNAL_KEY="sal_journal";var JOURNAL_MAX=200;
 var JOURNAL_ICONS={connexion:"🔑",deconnexion:"🚪",versement_ajout:"💵",versement_suppr:"🗑",chauffeur_ajout:"👤",chauffeur_suppr:"❌",saloni_ajout:"🛺",saloni_suppr:"❌",depense_ajout:"📋",amende_ajout:"🚔"};
 var JOURNAL_COLORS={connexion:"#059669",deconnexion:"#64748b",versement_ajout:"#1d4ed8",versement_suppr:"#dc2626",chauffeur_ajout:"#7c3aed",chauffeur_suppr:"#dc2626",saloni_ajout:"#0891b2",saloni_suppr:"#dc2626",depense_ajout:"#d97706",amende_ajout:"#dc2626"};
-function jLog(type,detail){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");var entry={id:Date.now(),type:type,detail:detail||"",user:S.user?S.user.pseudo:"—",role:S.user?S.user.role:"—",date:td(),heure:hr(),ts:Date.now()};logs.unshift(entry);if(logs.length>JOURNAL_MAX)logs=logs.slice(0,JOURNAL_MAX);localStorage.setItem(JOURNAL_KEY,JSON.stringify(logs));}catch(e){}}
+function jLog(type,detail){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");var entry={id:Date.now(),type:type,detail:detail||"",user:S.user?S.user.pseudo:"—",role:S.user?S.user.role:"—",date:td(),heure:hr(),ts:Date.now()};logs.unshift(entry);if(logs.length>JOURNAL_MAX)logs=logs.slice(0,JOURNAL_MAX);localStorage.setItem(JOURNAL_KEY,JSON.stringify(logs));
+  // Connexions/déconnexions → Firebase pour visibilité gérant
+  if(db&&(type==="connexion"||type==="deconnexion")){try{var fe=Object.assign({},entry,{id:entry.id.toString()});db.collection("sal_journal").doc(fe.id).set(fe);}catch(e){}}
+}catch(e){}}
 function getJournal(filtre){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");if(filtre&&filtre!=="tous")logs=logs.filter(function(l){if(filtre==="versements")return l.type.indexOf("versement")>=0;if(filtre==="acces")return l.type==="connexion"||l.type==="deconnexion";if(filtre==="donnees")return l.type.indexOf("chauffeur")>=0||l.type.indexOf("saloni")>=0||l.type.indexOf("depense")>=0||l.type.indexOf("amende")>=0;return true;});return logs;}catch(e){return[];}}
 function clearJournal(){if(!confirm("Effacer tout le journal ?"))return;try{localStorage.removeItem(JOURNAL_KEY);}catch(e){}rScreen();}
 
@@ -272,7 +275,8 @@ function validerEntretien(entId){
 function closeME(){var m=document.getElementById("_modalEnt");if(m)m.remove();}
 
 function modalEntretien(cid){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];if(!c)return;
+  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];
+  if(!c)return;
   var isCh=estCompteChauf();
   var old=document.getElementById("_modalEnt");if(old)old.remove();
   var typeKeys=["vidange","pneus","freins","revision","autre"];
@@ -281,94 +285,180 @@ function modalEntretien(cid){
   var ents=getEntretiensChauffeur(cid).slice(0,5);
   var statut=isCh?"demande":"fait";
 
-  var cardsHtml=typeKeys.map(function(t){
-    var last=getEntretiensChauffeur(cid).filter(function(e){return e.type===t&&e.statut==="fait";})[0];
-    var badge=last?'<div style="font-size:9px;color:#059669;margin-top:2px;">'+last.dateFait+'</div>'
-      :'<div style="font-size:9px;color:#dc2626;margin-top:2px;">Non enregistre</div>';
-    return'<div data-se="'+c.id+','+type+'" style="background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);border-radius:12px;padding:13px 8px;text-align:center;cursor:pointer">'
-    +'<div style="font-size:18px;margin-bottom:4px;">'+typeIcons[t]+'</div>'
-    +'<div style="font-size:11px;font-weight:700;color:var(--txt,#0f172a);">'+typeLabels[t]+'</div>'
-    +badge+'</button>';
-  }).join("");
-
-  var histHtml=ents.length>0
-  ?'<div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:8px;">Historique recent</div>'
-  +'<div style="background:var(--bg3,#f8faff);border:1px solid var(--border,#dbeafe);border-radius:12px;padding:4px 0;">'
-  +ents.map(function(e){
-    var sCol=e.statut==="fait"?"#059669":e.statut==="demande"?"#d97706":"#64748b";
-    return'<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border,#dbeafe);">'
-    +'<div style="font-size:18px;">'+({vidange:"🛢",pneus:"🔵",freins:"🔴",revision:"🔧",autre:"⚙️"}[e.type]||"⚙️")+'</div>'
-    +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);">'+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div>'
-    +'<div style="font-size:10px;color:#64748b;">'+e.date+'</div></div>'
-    +'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+sCol+'18;color:'+sCol+';border:1px solid '+sCol+'33;font-weight:700;">'+e.statut+'</span>'
-    +'</div>';
-  }).join("")+'</div>'
-  :"";
-
+  // Overlay
   var d=document.createElement("div");
   d.id="_modalEnt";
-  d.style.cssText="position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.6);display:flex;align-items:flex-end;";
-  d.innerHTML='<div style="background:var(--sheet-bg,#fff);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;">'
-  +'<div style="width:36px;height:4px;background:#dbeafe;border-radius:2px;margin:10px auto;"></div>'
-  +'<div style="padding:12px 18px;border-bottom:1px solid var(--border,#dbeafe);display:flex;justify-content:space-between;align-items:center;">'
-  +'<div style="font-size:16px;font-weight:800;color:var(--txt,#0f172a);">Entretien — '+c.nom+'</div>'
-  +'<button onclick="closeME()" style="background:#f8faff;border:1px solid #dbeafe;border-radius:9px;padding:7px 12px;color:#64748b;cursor:pointer;">X</button>'
-  +'</div>'
-  +'<div style="padding:16px 18px 32px;">'
-  +'<div style="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;">'
-  +(isCh?"Signaler une panne / besoin":"Marquer comme effectue")
-  +'</div>'
-  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'+cardsHtml+'</div>'
-  +histHtml
-  +'</div></div>';
+  d.style.cssText="position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.6);display:flex;align-items:flex-end;";
+  d.onclick=function(ev){if(ev.target===d)closeME();};
+
+  // Sheet
+  var sheet=document.createElement("div");
+  sheet.style.cssText="background:var(--sheet-bg,#fff);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;";
+
+  // Handle bar
+  var bar=document.createElement("div");
+  bar.style.cssText="width:36px;height:4px;background:#dbeafe;border-radius:2px;margin:10px auto;";
+  sheet.appendChild(bar);
+
+  // Header
+  var hdr=document.createElement("div");
+  hdr.style.cssText="padding:12px 18px;border-bottom:1px solid var(--border,#dbeafe);display:flex;justify-content:space-between;align-items:center;";
+  var hdrTxt=document.createElement("div");
+  hdrTxt.style.cssText="font-size:16px;font-weight:800;color:var(--txt,#0f172a);";
+  hdrTxt.textContent="Entretien — "+c.nom;
+  var closeBtn=document.createElement("button");
+  closeBtn.textContent="X";
+  closeBtn.style.cssText="background:#f8faff;border:1px solid #dbeafe;border-radius:9px;padding:7px 12px;color:#64748b;cursor:pointer;";
+  closeBtn.onclick=closeME;
+  hdr.appendChild(hdrTxt);hdr.appendChild(closeBtn);
+  sheet.appendChild(hdr);
+
+  // Body
+  var body=document.createElement("div");
+  body.style.cssText="padding:16px 18px 32px;";
+
+  var bodyTitle=document.createElement("div");
+  bodyTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+  bodyTitle.textContent=isCh?"Signaler une panne / besoin":"Marquer comme effectue";
+  body.appendChild(bodyTitle);
+
+  // Grid boutons types
+  var grid=document.createElement("div");
+  grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;";
+  typeKeys.forEach(function(t){
+    var last=getEntretiensChauffeur(cid).filter(function(e){return e.type===t&&e.statut==="fait";})[0];
+    var btn=document.createElement("div");
+    btn.style.cssText="background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);border-radius:12px;padding:13px 8px;text-align:center;cursor:pointer;";
+    var ico=document.createElement("div");ico.style.cssText="font-size:18px;margin-bottom:4px;";ico.textContent=typeIcons[t];
+    var lbl=document.createElement("div");lbl.style.cssText="font-size:11px;font-weight:700;color:var(--txt,#0f172a);";lbl.textContent=typeLabels[t];
+    var st=document.createElement("div");st.style.cssText="font-size:9px;margin-top:2px;color:"+(last?"#059669":"#dc2626")+";";
+    st.textContent=last?last.dateFait:"Non enregistre";
+    btn.appendChild(ico);btn.appendChild(lbl);btn.appendChild(st);
+    (function(type,s){
+      btn.onclick=function(){signalerEntretien(cid,type,s);closeME();};
+    })(t,statut);
+    grid.appendChild(btn);
+  });
+  body.appendChild(grid);
+
+  // Historique
+  if(ents.length>0){
+    var histTitle=document.createElement("div");
+    histTitle.style.cssText="font-size:12px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:8px;";
+    histTitle.textContent="Historique recent";
+    body.appendChild(histTitle);
+    var histCard=document.createElement("div");
+    histCard.style.cssText="background:var(--bg3,#f8faff);border:1px solid var(--border,#dbeafe);border-radius:12px;padding:4px 0;";
+    ents.forEach(function(e){
+      var sCol=e.statut==="fait"?"#059669":e.statut==="demande"?"#d97706":"#64748b";
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border,#dbeafe);";
+      row.innerHTML='<div style="font-size:18px;">'+(typeIcons[e.type]||"⚙️")+'</div>'
+        +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);">'+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div>'
+        +'<div style="font-size:10px;color:#64748b;">'+e.date+'</div></div>'
+        +'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+sCol+'18;color:'+sCol+';border:1px solid '+sCol+'33;font-weight:700;">'+e.statut+'</span>';
+      histCard.appendChild(row);
+    });
+    body.appendChild(histCard);
+  }
+
+  sheet.appendChild(body);
+  d.appendChild(sheet);
   document.body.appendChild(d);
-  d.addEventListener("click",function(ev){if(ev.target===d)closeME();});
 }
 
-function signalerEntretienCh(cid,type,statut){
-  signalerEntretien(cid,type,statut);
-  closeME();
-}
+function signalerEntretienCh(cid,type,statut){signalerEntretien(cid,type,statut);}
+
 
 // ══ SANCTIONS ══
 function getSanctionsChauffeur(cid){return(S.data.sanctions||[]).filter(function(s){return String(s.chauffeurId)===String(cid);}).sort(function(a,b){return b.ts-a.ts;});}
 function checkEtAppliquerSanctions(){
-  // Vérifier les non-versements consécutifs sans notification de panne
+  if(!S.data.sanctions)S.data.sanctions=[];
+  if(!S.data.entretiens)S.data.entretiens=[];
+
   S.data.chauffeurs.forEach(function(c){
     if(c.statut!=="actif")return;
-    // Récupérer les 2 derniers jours ouvrables (excl. dimanche)
-    var jours=[];var d=new Date();
-    for(var i=1;i<=7&&jours.length<2;i++){
-      d=new Date();d.setDate(d.getDate()-i);
-      if(d.getDay()!==0)jours.push(d.toLocaleDateString("fr-FR"));
+    var isHebdo=c.freqPaiement==="Hebdomadaire";
+
+    if(isHebdo){
+      // ══ CHAUFFEUR HEBDOMADAIRE : sanction si 1 semaine sans verser ══
+      // Récupérer les 7 derniers jours
+      var jours7=[];
+      for(var i=1;i<=7;i++){
+        var d=new Date();d.setDate(d.getDate()-i);
+        jours7.push(d.toLocaleDateString("fr-FR"));
+      }
+      // Aucun versement sur toute la semaine ?
+      var aVerseHebdo=S.data.versements.some(function(v){
+        return String(v.chauffeurId)===String(c.id)&&jours7.indexOf(v.date)>=0;
+      });
+      if(aVerseHebdo)return;
+
+      // Panne signalée cette semaine ?
+      var panneSemaine=S.data.entretiens.some(function(e){
+        return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&jours7.indexOf(e.date)>=0;
+      });
+      if(panneSemaine)return;
+
+      // Déjà sanctionné cette semaine ?
+      var dejaSanctHebdo=S.data.sanctions.some(function(s){
+        return String(s.chauffeurId)===String(c.id)&&s.type==="non_versement_hebdo"
+          &&(Date.now()-s.ts)<7*24*60*60*1000;
+      });
+      if(dejaSanctHebdo)return;
+
+      // Appliquer sanction hebdo
+      var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,
+        type:"non_versement_hebdo",frequence:"Hebdomadaire",
+        montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
+        description:"1 semaine sans versement sans notification de panne"};
+      S.data.sanctions.push(item);
+      fbSave("sanctions",item);save();
+      var msg="Sanction HEBDO: "+c.nom+" - 1 semaine sans versement sans panne signalee. Contactez votre gerant. — Saloni Manager";
+      var mi={id:Date.now()+1,de:"Systeme",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
+      S.data.messages.push(mi);fbSave("messages",mi);
+      jLog("versement_suppr","Sanction hebdo auto: "+c.nom);
+      pushSanctionAuto(c);
+
+    }else{
+      // ══ CHAUFFEUR JOURNALIER : sanction si 2 jours consécutifs sans verser ══
+      var jours=[];
+      for(var i=1;i<=7&&jours.length<2;i++){
+        var d=new Date();d.setDate(d.getDate()-i);
+        if(d.getDay()!==0)jours.push(d.toLocaleDateString("fr-FR"));
+      }
+      var nonVerses=jours.filter(function(j){
+        return !S.data.versements.some(function(v){
+          return String(v.chauffeurId)===String(c.id)&&v.date===j;
+        });
+      });
+      if(nonVerses.length<2)return;
+
+      // Panne signalée ces 2 jours ?
+      var panneJour=S.data.entretiens.some(function(e){
+        return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&nonVerses.indexOf(e.date)>=0;
+      });
+      if(panneJour)return;
+
+      // Déjà sanctionné aujourd'hui ?
+      var dejaSanctJour=S.data.sanctions.some(function(s){
+        return String(s.chauffeurId)===String(c.id)&&s.date===td()&&s.type==="non_versement_journalier";
+      });
+      if(dejaSanctJour)return;
+
+      // Appliquer sanction journalière
+      var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,
+        type:"non_versement_journalier",frequence:"Journalier",
+        montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
+        description:"2 jours sans versement sans notification de panne ("+nonVerses.join(", ")+")"};
+      S.data.sanctions.push(item);
+      fbSave("sanctions",item);save();
+      var msg="Sanction: "+c.nom+" - 2 jours sans versement ("+nonVerses.join(" et ")+") sans panne signalee. Contactez votre gerant. — Saloni Manager";
+      var mi={id:Date.now()+1,de:"Systeme",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
+      S.data.messages.push(mi);fbSave("messages",mi);
+      jLog("versement_suppr","Sanction journalier auto: "+c.nom+" ("+nonVerses.join(", ")+")");
+      pushSanctionAuto(c);
     }
-    // Vérifier si le chauffeur a versé sur ces 2 jours
-    var nonVerses=jours.filter(function(j){
-      return !S.data.versements.some(function(v){return String(v.chauffeurId)===String(c.id)&&v.date===j;});
-    });
-    if(nonVerses.length<2)return;
-    // Vérifier si une panne a été signalée récemment (dans les 2 derniers jours)
-    var panneSignalee=S.data.entretiens.some(function(e){
-      return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&nonVerses.indexOf(e.date)>=0;
-    });
-    if(panneSignalee)return;
-    // Vérifier si une sanction a déjà été appliquée aujourd'hui pour ces jours
-    var dejaSanctionne=S.data.sanctions.some(function(s){
-      return String(s.chauffeurId)===String(c.id)&&s.date===td()&&s.type==="non_versement";
-    });
-    if(dejaSanctionne)return;
-    // Appliquer la sanction
-    var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,type:"non_versement",
-      jours:nonVerses.join(" et "),montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
-      description:"2 non-versements consécutifs sans notification de panne ("+nonVerses.join(", ")+")"};
-    if(!S.data.sanctions)S.data.sanctions=[];
-    S.data.sanctions.push(item);
-    fbSave("sanctions",item);save();
-    // Envoyer message interne + WhatsApp
-    var msg="⚠️ SANCTION — "+c.nom+"\n\nVous n'avez pas versé pendant 2 jours consécutifs ("+nonVerses.join(" et ")+") sans signaler de panne.\nVeuillez contacter votre gérant immédiatement.\n— Saloni Manager";
-    var msg_item={id:Date.now()+1,de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
-    S.data.messages.push(msg_item);fbSave("messages",msg_item);
-    jLog("versement_suppr","⚠️ Sanction auto: "+c.nom+" ("+nonVerses.join(", ")+")");
   });
 }
 function getNbSanctionsActives(){return(S.data.sanctions||[]).filter(function(s){return s.statut==="active";}).length;}
@@ -584,7 +674,7 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
+  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"📊 Tableau de bord",historique:"Historique presence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
   var left=S.tab==="home"
   ?'<div style="display:flex;align-items:center;gap:9px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:17px;">🛺</div>'
   +'<div><div style="font-size:16px;font-weight:900;" class="grad">SALONI</div>'
@@ -931,6 +1021,7 @@ function rScreen(){
   }
   // Écrans normaux
   if(S.tab==="carte"){renderCarte(sc);var oldF=document.getElementById("fab");if(oldF)oldF.remove();return;}
+  if(S.tab==="historique"&&S.detCh){renderHistoriquePresence(sc,S.detCh);var oldF2=document.getElementById("fab");if(oldF2)oldF2.remove();return;}
   rScreenGlobal(sc);
 }
 
@@ -1242,7 +1333,10 @@ function show2FA(user,onSuccess){var old=document.getElementById("tfa_screen");i
 var JOURNAL_KEY="sal_journal";var JOURNAL_MAX=200;
 var JOURNAL_ICONS={connexion:"🔑",deconnexion:"🚪",versement_ajout:"💵",versement_suppr:"🗑",chauffeur_ajout:"👤",chauffeur_suppr:"❌",saloni_ajout:"🛺",saloni_suppr:"❌",depense_ajout:"📋",amende_ajout:"🚔"};
 var JOURNAL_COLORS={connexion:"#059669",deconnexion:"#64748b",versement_ajout:"#1d4ed8",versement_suppr:"#dc2626",chauffeur_ajout:"#7c3aed",chauffeur_suppr:"#dc2626",saloni_ajout:"#0891b2",saloni_suppr:"#dc2626",depense_ajout:"#d97706",amende_ajout:"#dc2626"};
-function jLog(type,detail){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");var entry={id:Date.now(),type:type,detail:detail||"",user:S.user?S.user.pseudo:"—",role:S.user?S.user.role:"—",date:td(),heure:hr(),ts:Date.now()};logs.unshift(entry);if(logs.length>JOURNAL_MAX)logs=logs.slice(0,JOURNAL_MAX);localStorage.setItem(JOURNAL_KEY,JSON.stringify(logs));}catch(e){}}
+function jLog(type,detail){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");var entry={id:Date.now(),type:type,detail:detail||"",user:S.user?S.user.pseudo:"—",role:S.user?S.user.role:"—",date:td(),heure:hr(),ts:Date.now()};logs.unshift(entry);if(logs.length>JOURNAL_MAX)logs=logs.slice(0,JOURNAL_MAX);localStorage.setItem(JOURNAL_KEY,JSON.stringify(logs));
+  // Connexions/déconnexions → Firebase pour visibilité gérant
+  if(db&&(type==="connexion"||type==="deconnexion")){try{var fe=Object.assign({},entry,{id:entry.id.toString()});db.collection("sal_journal").doc(fe.id).set(fe);}catch(e){}}
+}catch(e){}}
 function getJournal(filtre){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");if(filtre&&filtre!=="tous")logs=logs.filter(function(l){if(filtre==="versements")return l.type.indexOf("versement")>=0;if(filtre==="acces")return l.type==="connexion"||l.type==="deconnexion";if(filtre==="donnees")return l.type.indexOf("chauffeur")>=0||l.type.indexOf("saloni")>=0||l.type.indexOf("depense")>=0||l.type.indexOf("amende")>=0;return true;});return logs;}catch(e){return[];}}
 function clearJournal(){if(!confirm("Effacer tout le journal ?"))return;try{localStorage.removeItem(JOURNAL_KEY);}catch(e){}rScreen();}
 
@@ -1351,7 +1445,8 @@ function validerEntretien(entId){
 function closeME(){var m=document.getElementById("_modalEnt");if(m)m.remove();}
 
 function modalEntretien(cid){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];if(!c)return;
+  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];
+  if(!c)return;
   var isCh=estCompteChauf();
   var old=document.getElementById("_modalEnt");if(old)old.remove();
   var typeKeys=["vidange","pneus","freins","revision","autre"];
@@ -1360,94 +1455,180 @@ function modalEntretien(cid){
   var ents=getEntretiensChauffeur(cid).slice(0,5);
   var statut=isCh?"demande":"fait";
 
-  var cardsHtml=typeKeys.map(function(t){
-    var last=getEntretiensChauffeur(cid).filter(function(e){return e.type===t&&e.statut==="fait";})[0];
-    var badge=last?'<div style="font-size:9px;color:#059669;margin-top:2px;">'+last.dateFait+'</div>'
-      :'<div style="font-size:9px;color:#dc2626;margin-top:2px;">Non enregistre</div>';
-    return'<div data-se="'+c.id+','+type+'" style="background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);border-radius:12px;padding:13px 8px;text-align:center;cursor:pointer">'
-    +'<div style="font-size:18px;margin-bottom:4px;">'+typeIcons[t]+'</div>'
-    +'<div style="font-size:11px;font-weight:700;color:var(--txt,#0f172a);">'+typeLabels[t]+'</div>'
-    +badge+'</button>';
-  }).join("");
-
-  var histHtml=ents.length>0
-  ?'<div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:8px;">Historique recent</div>'
-  +'<div style="background:var(--bg3,#f8faff);border:1px solid var(--border,#dbeafe);border-radius:12px;padding:4px 0;">'
-  +ents.map(function(e){
-    var sCol=e.statut==="fait"?"#059669":e.statut==="demande"?"#d97706":"#64748b";
-    return'<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border,#dbeafe);">'
-    +'<div style="font-size:18px;">'+({vidange:"🛢",pneus:"🔵",freins:"🔴",revision:"🔧",autre:"⚙️"}[e.type]||"⚙️")+'</div>'
-    +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);">'+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div>'
-    +'<div style="font-size:10px;color:#64748b;">'+e.date+'</div></div>'
-    +'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+sCol+'18;color:'+sCol+';border:1px solid '+sCol+'33;font-weight:700;">'+e.statut+'</span>'
-    +'</div>';
-  }).join("")+'</div>'
-  :"";
-
+  // Overlay
   var d=document.createElement("div");
   d.id="_modalEnt";
-  d.style.cssText="position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.6);display:flex;align-items:flex-end;";
-  d.innerHTML='<div style="background:var(--sheet-bg,#fff);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;">'
-  +'<div style="width:36px;height:4px;background:#dbeafe;border-radius:2px;margin:10px auto;"></div>'
-  +'<div style="padding:12px 18px;border-bottom:1px solid var(--border,#dbeafe);display:flex;justify-content:space-between;align-items:center;">'
-  +'<div style="font-size:16px;font-weight:800;color:var(--txt,#0f172a);">Entretien — '+c.nom+'</div>'
-  +'<button onclick="closeME()" style="background:#f8faff;border:1px solid #dbeafe;border-radius:9px;padding:7px 12px;color:#64748b;cursor:pointer;">X</button>'
-  +'</div>'
-  +'<div style="padding:16px 18px 32px;">'
-  +'<div style="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;">'
-  +(isCh?"Signaler une panne / besoin":"Marquer comme effectue")
-  +'</div>'
-  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'+cardsHtml+'</div>'
-  +histHtml
-  +'</div></div>';
+  d.style.cssText="position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.6);display:flex;align-items:flex-end;";
+  d.onclick=function(ev){if(ev.target===d)closeME();};
+
+  // Sheet
+  var sheet=document.createElement("div");
+  sheet.style.cssText="background:var(--sheet-bg,#fff);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;";
+
+  // Handle bar
+  var bar=document.createElement("div");
+  bar.style.cssText="width:36px;height:4px;background:#dbeafe;border-radius:2px;margin:10px auto;";
+  sheet.appendChild(bar);
+
+  // Header
+  var hdr=document.createElement("div");
+  hdr.style.cssText="padding:12px 18px;border-bottom:1px solid var(--border,#dbeafe);display:flex;justify-content:space-between;align-items:center;";
+  var hdrTxt=document.createElement("div");
+  hdrTxt.style.cssText="font-size:16px;font-weight:800;color:var(--txt,#0f172a);";
+  hdrTxt.textContent="Entretien — "+c.nom;
+  var closeBtn=document.createElement("button");
+  closeBtn.textContent="X";
+  closeBtn.style.cssText="background:#f8faff;border:1px solid #dbeafe;border-radius:9px;padding:7px 12px;color:#64748b;cursor:pointer;";
+  closeBtn.onclick=closeME;
+  hdr.appendChild(hdrTxt);hdr.appendChild(closeBtn);
+  sheet.appendChild(hdr);
+
+  // Body
+  var body=document.createElement("div");
+  body.style.cssText="padding:16px 18px 32px;";
+
+  var bodyTitle=document.createElement("div");
+  bodyTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+  bodyTitle.textContent=isCh?"Signaler une panne / besoin":"Marquer comme effectue";
+  body.appendChild(bodyTitle);
+
+  // Grid boutons types
+  var grid=document.createElement("div");
+  grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;";
+  typeKeys.forEach(function(t){
+    var last=getEntretiensChauffeur(cid).filter(function(e){return e.type===t&&e.statut==="fait";})[0];
+    var btn=document.createElement("div");
+    btn.style.cssText="background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);border-radius:12px;padding:13px 8px;text-align:center;cursor:pointer;";
+    var ico=document.createElement("div");ico.style.cssText="font-size:18px;margin-bottom:4px;";ico.textContent=typeIcons[t];
+    var lbl=document.createElement("div");lbl.style.cssText="font-size:11px;font-weight:700;color:var(--txt,#0f172a);";lbl.textContent=typeLabels[t];
+    var st=document.createElement("div");st.style.cssText="font-size:9px;margin-top:2px;color:"+(last?"#059669":"#dc2626")+";";
+    st.textContent=last?last.dateFait:"Non enregistre";
+    btn.appendChild(ico);btn.appendChild(lbl);btn.appendChild(st);
+    (function(type,s){
+      btn.onclick=function(){signalerEntretien(cid,type,s);closeME();};
+    })(t,statut);
+    grid.appendChild(btn);
+  });
+  body.appendChild(grid);
+
+  // Historique
+  if(ents.length>0){
+    var histTitle=document.createElement("div");
+    histTitle.style.cssText="font-size:12px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:8px;";
+    histTitle.textContent="Historique recent";
+    body.appendChild(histTitle);
+    var histCard=document.createElement("div");
+    histCard.style.cssText="background:var(--bg3,#f8faff);border:1px solid var(--border,#dbeafe);border-radius:12px;padding:4px 0;";
+    ents.forEach(function(e){
+      var sCol=e.statut==="fait"?"#059669":e.statut==="demande"?"#d97706":"#64748b";
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border,#dbeafe);";
+      row.innerHTML='<div style="font-size:18px;">'+(typeIcons[e.type]||"⚙️")+'</div>'
+        +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);">'+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div>'
+        +'<div style="font-size:10px;color:#64748b;">'+e.date+'</div></div>'
+        +'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+sCol+'18;color:'+sCol+';border:1px solid '+sCol+'33;font-weight:700;">'+e.statut+'</span>';
+      histCard.appendChild(row);
+    });
+    body.appendChild(histCard);
+  }
+
+  sheet.appendChild(body);
+  d.appendChild(sheet);
   document.body.appendChild(d);
-  d.addEventListener("click",function(ev){if(ev.target===d)closeME();});
 }
 
-function signalerEntretienCh(cid,type,statut){
-  signalerEntretien(cid,type,statut);
-  closeME();
-}
+function signalerEntretienCh(cid,type,statut){signalerEntretien(cid,type,statut);}
+
 
 // ══ SANCTIONS ══
 function getSanctionsChauffeur(cid){return(S.data.sanctions||[]).filter(function(s){return String(s.chauffeurId)===String(cid);}).sort(function(a,b){return b.ts-a.ts;});}
 function checkEtAppliquerSanctions(){
-  // Vérifier les non-versements consécutifs sans notification de panne
+  if(!S.data.sanctions)S.data.sanctions=[];
+  if(!S.data.entretiens)S.data.entretiens=[];
+
   S.data.chauffeurs.forEach(function(c){
     if(c.statut!=="actif")return;
-    // Récupérer les 2 derniers jours ouvrables (excl. dimanche)
-    var jours=[];var d=new Date();
-    for(var i=1;i<=7&&jours.length<2;i++){
-      d=new Date();d.setDate(d.getDate()-i);
-      if(d.getDay()!==0)jours.push(d.toLocaleDateString("fr-FR"));
+    var isHebdo=c.freqPaiement==="Hebdomadaire";
+
+    if(isHebdo){
+      // ══ CHAUFFEUR HEBDOMADAIRE : sanction si 1 semaine sans verser ══
+      // Récupérer les 7 derniers jours
+      var jours7=[];
+      for(var i=1;i<=7;i++){
+        var d=new Date();d.setDate(d.getDate()-i);
+        jours7.push(d.toLocaleDateString("fr-FR"));
+      }
+      // Aucun versement sur toute la semaine ?
+      var aVerseHebdo=S.data.versements.some(function(v){
+        return String(v.chauffeurId)===String(c.id)&&jours7.indexOf(v.date)>=0;
+      });
+      if(aVerseHebdo)return;
+
+      // Panne signalée cette semaine ?
+      var panneSemaine=S.data.entretiens.some(function(e){
+        return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&jours7.indexOf(e.date)>=0;
+      });
+      if(panneSemaine)return;
+
+      // Déjà sanctionné cette semaine ?
+      var dejaSanctHebdo=S.data.sanctions.some(function(s){
+        return String(s.chauffeurId)===String(c.id)&&s.type==="non_versement_hebdo"
+          &&(Date.now()-s.ts)<7*24*60*60*1000;
+      });
+      if(dejaSanctHebdo)return;
+
+      // Appliquer sanction hebdo
+      var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,
+        type:"non_versement_hebdo",frequence:"Hebdomadaire",
+        montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
+        description:"1 semaine sans versement sans notification de panne"};
+      S.data.sanctions.push(item);
+      fbSave("sanctions",item);save();
+      var msg="Sanction HEBDO: "+c.nom+" - 1 semaine sans versement sans panne signalee. Contactez votre gerant. — Saloni Manager";
+      var mi={id:Date.now()+1,de:"Systeme",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
+      S.data.messages.push(mi);fbSave("messages",mi);
+      jLog("versement_suppr","Sanction hebdo auto: "+c.nom);
+      pushSanctionAuto(c);
+
+    }else{
+      // ══ CHAUFFEUR JOURNALIER : sanction si 2 jours consécutifs sans verser ══
+      var jours=[];
+      for(var i=1;i<=7&&jours.length<2;i++){
+        var d=new Date();d.setDate(d.getDate()-i);
+        if(d.getDay()!==0)jours.push(d.toLocaleDateString("fr-FR"));
+      }
+      var nonVerses=jours.filter(function(j){
+        return !S.data.versements.some(function(v){
+          return String(v.chauffeurId)===String(c.id)&&v.date===j;
+        });
+      });
+      if(nonVerses.length<2)return;
+
+      // Panne signalée ces 2 jours ?
+      var panneJour=S.data.entretiens.some(function(e){
+        return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&nonVerses.indexOf(e.date)>=0;
+      });
+      if(panneJour)return;
+
+      // Déjà sanctionné aujourd'hui ?
+      var dejaSanctJour=S.data.sanctions.some(function(s){
+        return String(s.chauffeurId)===String(c.id)&&s.date===td()&&s.type==="non_versement_journalier";
+      });
+      if(dejaSanctJour)return;
+
+      // Appliquer sanction journalière
+      var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,
+        type:"non_versement_journalier",frequence:"Journalier",
+        montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
+        description:"2 jours sans versement sans notification de panne ("+nonVerses.join(", ")+")"};
+      S.data.sanctions.push(item);
+      fbSave("sanctions",item);save();
+      var msg="Sanction: "+c.nom+" - 2 jours sans versement ("+nonVerses.join(" et ")+") sans panne signalee. Contactez votre gerant. — Saloni Manager";
+      var mi={id:Date.now()+1,de:"Systeme",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
+      S.data.messages.push(mi);fbSave("messages",mi);
+      jLog("versement_suppr","Sanction journalier auto: "+c.nom+" ("+nonVerses.join(", ")+")");
+      pushSanctionAuto(c);
     }
-    // Vérifier si le chauffeur a versé sur ces 2 jours
-    var nonVerses=jours.filter(function(j){
-      return !S.data.versements.some(function(v){return String(v.chauffeurId)===String(c.id)&&v.date===j;});
-    });
-    if(nonVerses.length<2)return;
-    // Vérifier si une panne a été signalée récemment (dans les 2 derniers jours)
-    var panneSignalee=S.data.entretiens.some(function(e){
-      return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&nonVerses.indexOf(e.date)>=0;
-    });
-    if(panneSignalee)return;
-    // Vérifier si une sanction a déjà été appliquée aujourd'hui pour ces jours
-    var dejaSanctionne=S.data.sanctions.some(function(s){
-      return String(s.chauffeurId)===String(c.id)&&s.date===td()&&s.type==="non_versement";
-    });
-    if(dejaSanctionne)return;
-    // Appliquer la sanction
-    var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,type:"non_versement",
-      jours:nonVerses.join(" et "),montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
-      description:"2 non-versements consécutifs sans notification de panne ("+nonVerses.join(", ")+")"};
-    if(!S.data.sanctions)S.data.sanctions=[];
-    S.data.sanctions.push(item);
-    fbSave("sanctions",item);save();
-    // Envoyer message interne + WhatsApp
-    var msg="⚠️ SANCTION — "+c.nom+"\n\nVous n'avez pas versé pendant 2 jours consécutifs ("+nonVerses.join(" et ")+") sans signaler de panne.\nVeuillez contacter votre gérant immédiatement.\n— Saloni Manager";
-    var msg_item={id:Date.now()+1,de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
-    S.data.messages.push(msg_item);fbSave("messages",msg_item);
-    jLog("versement_suppr","⚠️ Sanction auto: "+c.nom+" ("+nonVerses.join(", ")+")");
   });
 }
 function getNbSanctionsActives(){return(S.data.sanctions||[]).filter(function(s){return s.statut==="active";}).length;}
@@ -1663,7 +1844,7 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
+  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"📊 Tableau de bord",historique:"Historique presence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
   var left=S.tab==="home"
   ?'<div style="display:flex;align-items:center;gap:9px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:17px;">🛺</div>'
   +'<div><div style="font-size:16px;font-weight:900;" class="grad">SALONI</div>'
@@ -2010,6 +2191,7 @@ function rScreen(){
   }
   // Écrans normaux
   if(S.tab==="carte"){renderCarte(sc);var oldF=document.getElementById("fab");if(oldF)oldF.remove();return;}
+  if(S.tab==="historique"&&S.detCh){renderHistoriquePresence(sc,S.detCh);var oldF2=document.getElementById("fab");if(oldF2)oldF2.remove();return;}
   rScreenGlobal(sc);
 }
 
@@ -2235,6 +2417,150 @@ function renderEntretienChauf(sc,c){
 
 
 
+
+function renderHistoriquePresence(sc, c){
+  // Générer les 28 derniers jours (4 semaines complètes)
+  var days=[];
+  for(var i=27;i>=0;i--){
+    var d=new Date();d.setDate(d.getDate()-i);
+    days.push({date:d.toLocaleDateString("fr-FR"),dow:d.getDay(),d:d});
+  }
+  var VE=S.data.versements;
+  var versC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+
+  // Stats mois
+  var versesDays=days.filter(function(d){
+    return d.dow!==0&&versC.some(function(v){return v.date===d.date;});
+  });
+  var ouvrables=days.filter(function(d){return d.dow!==0;});
+  var tauxPres=ouvrables.length>0?Math.round(versesDays.length/ouvrables.length*100):0;
+  var totalMois=versC.filter(function(v){return days.some(function(d){return d.date===v.date;});}).reduce(function(s,v){return s+v.montant;},0);
+
+  var wrap=document.createElement("div");
+  wrap.className="sec";
+
+  // Header chauffeur
+  var hdr=document.createElement("div");
+  hdr.style.cssText="background:linear-gradient(135deg,#1d4ed8,#3b82f6);border-radius:16px;padding:16px;margin-bottom:14px;";
+  hdr.innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;margin-bottom:4px;">Historique presence</div>'
+    +'<div style="font-size:20px;font-weight:900;color:#fff;">'+c.nom+'</div>'
+    +'<div style="display:flex;gap:14px;margin-top:8px;">'
+    +'<div style="text-align:center;"><div style="font-size:18px;font-weight:900;color:#fff;">'+tauxPres+'%</div><div style="font-size:9px;color:rgba(255,255,255,.7);">Présence</div></div>'
+    +'<div style="text-align:center;"><div style="font-size:18px;font-weight:900;color:#fff;">'+versesDays.length+'</div><div style="font-size:9px;color:rgba(255,255,255,.7);">Jours</div></div>'
+    +'<div style="text-align:center;"><div style="font-size:15px;font-weight:900;color:#fff;">'+fc(totalMois)+'</div><div style="font-size:9px;color:rgba(255,255,255,.7);">Total mois</div></div>'
+    +'</div>';
+  wrap.appendChild(hdr);
+
+  // Calendrier 4 semaines
+  var calTitle=document.createElement("div");
+  calTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:8px;";
+  calTitle.textContent="28 derniers jours";
+  wrap.appendChild(calTitle);
+
+  var calCard=document.createElement("div");
+  calCard.className="card";
+  calCard.style.cssText="padding:12px;margin-bottom:14px;";
+
+  // En-tête jours
+  var calHdr=document.createElement("div");
+  calHdr.style.cssText="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;";
+  ["L","M","M","J","V","S","D"].forEach(function(l){
+    var cell=document.createElement("div");
+    cell.style.cssText="text-align:center;font-size:9px;font-weight:700;color:#94a3b8;";
+    cell.textContent=l;
+    calHdr.appendChild(cell);
+  });
+  calCard.appendChild(calHdr);
+
+  // Grille des jours
+  // Trouver le premier lundi
+  var firstDay=days[0];
+  var startDow=firstDay.dow===0?6:firstDay.dow-1; // 0=lundi
+  var grid=document.createElement("div");
+  grid.style.cssText="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;";
+
+  // Cellules vides pour aligner
+  for(var pad=0;pad<startDow;pad++){
+    var empty=document.createElement("div");
+    grid.appendChild(empty);
+  }
+
+  days.forEach(function(day){
+    var aVerse=versC.some(function(v){return v.date===day.date;});
+    var isDim=day.dow===0;
+    var isToday=day.date===td();
+    var montantJ=versC.filter(function(v){return v.date===day.date;}).reduce(function(s,v){return s+v.montant;},0);
+
+    var cell=document.createElement("div");
+    cell.style.cssText="aspect-ratio:1;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;"
+      +"background:"+(isDim?"#f1f5f9":aVerse?"#10b981":"#fef2f2")+";"
+      +"border:"+(isToday?"2px solid #1d4ed8":"1px solid "+(isDim?"#e2e8f0":aVerse?"#bbf7d0":"#fecaca"))+";";
+    
+    var dayNum=document.createElement("div");
+    dayNum.style.cssText="font-size:10px;font-weight:700;color:"+(isDim?"#94a3b8":aVerse?"#fff":"#dc2626")+";";
+    dayNum.textContent=day.d.getDate();
+    cell.appendChild(dayNum);
+
+    if(aVerse&&!isDim){
+      var amt=document.createElement("div");
+      amt.style.cssText="font-size:7px;color:rgba(255,255,255,.9);font-weight:600;";
+      amt.textContent=montantJ>=1000?Math.round(montantJ/1000)+"k":"";
+      cell.appendChild(amt);
+    }
+    grid.appendChild(cell);
+  });
+
+  calCard.appendChild(grid);
+
+  // Légende
+  var leg=document.createElement("div");
+  leg.style.cssText="display:flex;gap:10px;margin-top:10px;font-size:10px;color:#64748b;flex-wrap:wrap;";
+  leg.innerHTML='<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#10b981;"></div>Versé</div>'
+    +'<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca;"></div>Absent</div>'
+    +'<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#f1f5f9;"></div>Dimanche</div>';
+  calCard.appendChild(leg);
+  wrap.appendChild(calCard);
+
+  sc.innerHTML="";
+  sc.appendChild(wrap);
+}
+
+// ══ DASHBOARD FONCTIONS GLOBALES ══
+function getLast30Days(){
+  var days=[];
+  for(var i=29;i>=0;i--){
+    var d=new Date();d.setDate(d.getDate()-i);
+    days.push(d.toLocaleDateString("fr-FR"));
+  }
+  return days;
+}
+
+function getStatsChaufSem(){
+  var CH=S.data.chauffeurs;
+  var VE=S.data.versements;
+  var sem=getSem();
+  return CH.map(function(c){
+    var isH=c.freqPaiement==="Hebdomadaire";
+    var versC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id)&&sem.indexOf(v.date)>=0;});
+    var total=versC.reduce(function(s,v){return s+v.montant;},0);
+    var obj=isH?getObjS(c):getObjJ(c)*6;
+    var pct=obj>0?Math.round(total/obj*100):0;
+    var joursOuvr=sem.filter(function(j){var d=new Date(j.split("/").reverse().join("-"));return d.getDay()!==0;});
+    var joursVerses=joursOuvr.filter(function(j){return versC.some(function(v){return v.date===j;});});
+    var presence=joursOuvr.length>0?Math.round(joursVerses.length/joursOuvr.length*100):0;
+    var totalAll=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);
+    var niveau=totalAll>=500000?"Or":totalAll>=200000?"Argent":"Bronze";
+    var niveauCol=niveau==="Or"?"#f59e0b":niveau==="Argent"?"#94a3b8":"#cd7c2f";
+    var niveauIc=niveau==="Or"?"🥇":niveau==="Argent"?"🥈":"🥉";
+    return{c:c,total:total,obj:obj,pct:pct,presence:presence,niveau:niveau,niveauCol:niveauCol,niveauIc:niveauIc,totalAll:totalAll};
+  }).sort(function(a,b){return b.pct-a.pct;});
+}
+
+function getNiveauSuivant(niveau){
+  if(niveau==="Bronze")return{n:"Argent",seuil:200000};
+  if(niveau==="Argent")return{n:"Or",seuil:500000};
+  return null;
+}
 // ══ ÉCRANS GÉRANT/ADMIN ══
 function rScreenGlobal(sc){
   var CH=S.data.chauffeurs,VE=S.data.versements,DE=S.data.depenses,AM=S.data.amendes,SAL=S.data.salonis,MS=S.data.messages;
@@ -2397,6 +2723,7 @@ function rScreenGlobal(sc){
     ];
     if(S.user.niveau>=3)items.push({ic:"🔐",lb:"Sécurité",sb:"Logs & paramètres",act:"sT('securite')"});
     if(S.user.niveau>=2)items.push({ic:"🤖",lb:"Assistant IA",sb:"Analyse & conseils",act:"sT('ia')"});
+    if(S.user.niveau>=2)items.push({ic:"📊",lb:"Tableau de bord",sb:"Analytique & performances",act:"sT('dashboard')"});
     if(S.user.niveau>=2)items.push({ic:"📉",lb:"Business Intelligence",sb:"Graphiques & prévisions",act:"sT('bi')"});
     if(S.user.niveau>=3)items.push({ic:"📈",lb:"RSI",sb:"Retour sur investissement",act:"sT('rsi')"});
     if(!estSC)items.push({ic:"🔑",lb:"Mon mot de passe",sb:"Modifier mon mot de passe",act:"oM('chgMdpSelf')"});
@@ -2439,11 +2766,26 @@ function rScreenGlobal(sc){
     +'</div>';
   }
 
-  else if(S.tab==="alertes"){var al3=getAl();html='<div class="sec">'+(al3.vis.length===0?'<div style="text-align:center;padding:50px 20px;"><div style="font-size:44px;margin-bottom:10px;">✅</div><div style="font-size:15px;color:#059669;font-weight:700;">Aucune alerte</div></div>':al3.vis.map(function(a){return'<div style="background:#fff;border-left:3px solid #dc2626;border-radius:0 12px 12px 0;padding:11px 13px;margin-bottom:8px;display:flex;gap:9px;align-items:center;"><span style="font-size:18px;">'+a.icon+'</span><div style="flex:1;font-size:12px;color:#0f172a;">'+a.msg+'</div><button onclick="ignAl(\''+a.id+'\')" style="background:#f8faff;border:1px solid #dbeafe;border-radius:6px;padding:4px 9px;color:#64748b;font-size:11px;cursor:pointer;">X</button></div>';}).join(""))+'</div>';}
+  else if(S.tab==="alertes"){var al3=getAl();html='<div class="sec">'+(al3.vis.length===0?'<div style="text-align:center;padding:50px 20px;"><div style="font-size:44px;margin-bottom:10px;">✅</div><div style="font-size:15px;color:#059669;font-weight:700;">Aucune alerte</div></div>':al3.vis.map(function(a){return'<div style="background:#fff;border-left:3px solid #dc2626;border-radius:0 12px 12px 0;padding:11px 13px;margin-bottom:8px;display:flex;gap:9px;align-items:center;"><span style="font-size:18px;">'+a.icon+'</span><div style="flex:1;font-size:12px;color:#0f172a;">'+a.msg+'</div><button onclick="ignAl(\''+a.id+'\')" style="background:#f8faff;border:1px solid #dbeafe;border-radius:6px;padding:4px 9px;color:#64748b;font-size:11px;cursor:pointer;">X</button></div>';}).join(""))+'</div></div>';}
 
   else if(S.tab==="messages"){html='<div class="sec">'+(hasPerm("message")?'<button onclick="oM(\'msg\')" class="bor" style="margin-bottom:12px;">+ Nouveau message</button>':"")+(MS.length===0?'<div class="card" style="text-align:center;padding:30px;color:#64748b;">Aucun message</div>':[].concat(MS).reverse().map(function(m){var dest=m.pour?CH.filter(function(c){return c.id===m.pour;})[0]:null;var destNom=dest?dest.nom:"Tous les chauffeurs";return'<div onclick="mkLu('+m.id+')" style="background:#fff;border:1px solid '+(m.lu===false?"#93c5fd":"#dbeafe")+';border-radius:14px;padding:13px;margin-bottom:9px;cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:#1d4ed8;">✉️ '+(m.de||"Système")+'</div><div style="font-size:10px;color:#94a3b8;font-weight:600;">→</div><div style="background:'+(dest?"#f0fdf4":"#fffbeb")+';border:1px solid '+(dest?"#bbf7d0":"#fde68a")+';border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:'+(dest?"#059669":"#d97706")+';">'+destNom+'</div>'+(m.auto?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:700;color:#dc2626;">🤖 Auto</div>':"")+'</div>'+(m.lu===false?pill("Nouveau","#1d4ed8"):"")+'</div><div style="font-size:9px;color:#94a3b8;margin-bottom:6px;">'+m.date+(m.heure?" à "+m.heure:"")+'</div><div style="font-size:12px;color:#334155;line-height:1.6;background:#f8faff;border-radius:9px;padding:9px 11px;">'+m.texte+'</div></div>';}).join(""))+'</div>';}
 
-  else if(S.tab==="journal"){var jFil=S.jFil||"tous";var logs=getJournal(jFil);var filtres=[{id:"tous",l:"Tout"},{id:"versements",l:"Versements"},{id:"acces",l:"Accès"},{id:"donnees",l:"Données"}];html='<div class="sec"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:12px;color:#64748b;font-weight:600;">'+logs.length+' entrée(s)</div>'+(S.user&&S.user.niveau>=3?'<button onclick="clearJournal()" style="padding:6px 12px;border-radius:9px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;">🗑 Effacer</button>':"")+'</div><div style="display:flex;gap:5px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;">'+filtres.map(function(f){return'<button onclick="S.jFil=\''+f.id+'\';rScreen();" style="padding:6px 12px;border-radius:20px;border:none;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;background:'+(jFil===f.id?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(jFil===f.id?"#fff":"#64748b")+';border:1px solid '+(jFil===f.id?"transparent":"#dbeafe")+';">'+f.l+'</button>';}).join("")+'</div>'+(logs.length===0?'<div style="text-align:center;padding:40px 20px;"><div style="font-size:40px;margin-bottom:10px;">📭</div><div style="color:#64748b;font-size:13px;">Aucune activité enregistrée</div></div>':logs.map(function(l){var ic=JOURNAL_ICONS[l.type]||"📌";var col=JOURNAL_COLORS[l.type]||"#64748b";return'<div style="background:#fff;border:1px solid #dbeafe;border-radius:13px;padding:11px 13px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start;"><div style="width:36px;height:36px;border-radius:10px;background:'+col+'18;border:1px solid '+col+'33;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">'+ic+'</div><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">'+l.detail+'</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:10px;color:#64748b;">'+l.date+' à '+l.heure+'</span><span style="font-size:9px;padding:1px 7px;border-radius:20px;background:'+col+'18;color:'+col+';border:1px solid '+col+'22;font-weight:700;">'+l.role+'</span></div></div></div>';}).join(""))+'</div>';}
+  else if(S.tab==="journal"){var jFil=S.jFil||"tous";var logs=getJournal(jFil);var filtres=[{id:"tous",l:"Tout"},{id:"versements",l:"Versements"},{id:"acces",l:"Accès"},{id:"donnees",l:"Données"},{id:"global",l:"🌐 Global"}];// Charger logs Firebase si filtre global
+  if(jFil==="global"&&db){
+    db.collection("sal_journal").orderBy("date","desc").limit(50).get().then(function(snap){
+      var fbLogs=snap.docs.map(function(d){var x=d.data();delete x._t;return x;});
+      var sc=document.getElementById("screen");
+      if(sc&&S.tab==="journal"){
+        var existing=sc.querySelector("._journal_list");
+        if(existing){
+          existing.innerHTML=fbLogs.length===0
+          ?'<div style="text-align:center;padding:40px;color:#64748b;">Aucun log global</div>'
+          :fbLogs.map(function(l){var ic=JOURNAL_ICONS[l.type]||"📌";var col=JOURNAL_COLORS[l.type]||"#64748b";return'<div style="background:#fff;border:1px solid #dbeafe;border-radius:13px;padding:11px 13px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start;"><div style="width:36px;height:36px;border-radius:10px;background:'+col+'18;border:1px solid '+col+'33;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">'+ic+'</div><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">'+l.detail+'</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:10px;color:#64748b;">'+l.date+' à '+l.heure+'</span><span style="font-size:9px;padding:1px 7px;border-radius:20px;background:'+col+'18;color:'+col+';border:1px solid '+col+'22;font-weight:700;">'+(l.pseudo||l.role)+'</span></div></div></div>';}).join("");
+        }
+      }
+    }).catch(function(){});
+  }
+  html='<div class="sec"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:12px;color:#64748b;font-weight:600;">'+logs.length+' entrée(s)</div>'+(S.user&&S.user.niveau>=3?'<button onclick="clearJournal()" style="padding:6px 12px;border-radius:9px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;">🗑 Effacer</button>':"")+'</div><div style="display:flex;gap:5px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;">'+filtres.map(function(f){return'<button onclick="S.jFil=\''+f.id+'\';rScreen();" style="padding:6px 12px;border-radius:20px;border:none;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;background:'+(jFil===f.id?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(jFil===f.id?"#fff":"#64748b")+';border:1px solid '+(jFil===f.id?"transparent":"#dbeafe")+';">'+f.l+'</button>';}).join("")+'</div>'+'<div class="_journal_list">'+(logs.length===0?'<div style="text-align:center;padding:40px 20px;"><div style="font-size:40px;margin-bottom:10px;">📭</div><div style="color:#64748b;font-size:13px;">Aucune activité enregistrée</div></div>':logs.map(function(l){var ic=JOURNAL_ICONS[l.type]||"📌";var col=JOURNAL_COLORS[l.type]||"#64748b";return'<div style="background:#fff;border:1px solid #dbeafe;border-radius:13px;padding:11px 13px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start;"><div style="width:36px;height:36px;border-radius:10px;background:'+col+'18;border:1px solid '+col+'33;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">'+ic+'</div><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">'+l.detail+'</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:10px;color:#64748b;">'+l.date+' à '+l.heure+'</span><span style="font-size:9px;padding:1px 7px;border-radius:20px;background:'+col+'18;color:'+col+';border:1px solid '+col+'22;font-weight:700;">'+l.role+'</span></div></div></div>';}).join(""))+'</div>';}
 
   else if(S.tab==="alertesAuto"){var cfg=getAlerteConfig();var actif=cfg.actif||false;var heureA=cfg.heure||"20";var msgDef=cfg.msg_defaut||"Bonjour {nom},\nVous n'avez pas effectué votre versement d'aujourd'hui.\nMontant manquant: {manque}.\nMerci de régulariser au plus vite.\n— Saloni Manager";var t2=td();var vj2=S.data.versements.filter(function(v){return v.date===t2;});var nonPayeurs=S.data.chauffeurs.filter(function(c){if(c.statut!=="actif"||c.freqPaiement==="Hebdomadaire")return false;return getVJ(c,vj2)<getObjJ(c);});html='<div class="sec"><div class="card" style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:14px;font-weight:800;color:#0f172a;">Alertes automatiques</div><div style="font-size:11px;color:#64748b;margin-top:2px;">Message auto si pas de versement</div></div><button class="tog'+(actif?" on":"")+'" id="togAuto" onclick="toggleAlerteAuto()"></button></div><div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><label class="lbl">Heure d\'envoi</label><select id="heureAlerte" onchange="saveAlerteHeure(this.value)" style="font-size:13px;">'+["17","18","19","20","21","22"].map(function(h){return'<option value="'+h+'"'+(heureA===h?" selected":"")+'>'+h+'h00</option>';}).join("")+'</select></div><div style="flex:1;background:'+(actif?"#eff6ff":"#f8faff")+';border:1px solid '+(actif?"#bfdbfe":"#e2e8f0")+';border-radius:10px;padding:10px;text-align:center;"><div style="font-size:9px;color:#64748b;">STATUT</div><div style="font-size:12px;font-weight:800;color:'+(actif?"#1d4ed8":"#94a3b8")+';margin-top:2px;">'+(actif?"✅ Actif":"⏸ Inactif")+'</div></div></div></div><div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Non-payeurs aujourd\'hui ('+nonPayeurs.length+')</div>'+(nonPayeurs.length===0?'<div class="card" style="text-align:center;padding:20px;color:#059669;margin-bottom:12px;">✅ Tous ont payé aujourd\'hui !</div>':'<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">'+nonPayeurs.map(function(c){var manque=getObjJ(c)-getVJ(c,vj2);var deja=alerteDejaSent(c.id);return'<div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid #eff6ff;"><div style="flex:1;"><div style="font-weight:700;font-size:13px;color:#0f172a;">'+c.nom+'</div><div style="font-size:10px;color:#dc2626;">Manque: '+fc(manque)+'</div></div>'+(deja?'<span style="font-size:10px;color:#059669;font-weight:700;">✅ Envoyé</span>':'<button onclick="envoyerAlerteManuel('+c.id+')" style="padding:7px 10px;border-radius:9px;background:linear-gradient(135deg,#25d366,#128c7e);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📲 Envoyer</button>')+'</div>';}).join("")+'</div>')+'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Message par défaut</div><div class="card" style="margin-bottom:12px;"><div style="font-size:11px;color:#64748b;margin-bottom:8px;">Variables: <code style="background:#eff6ff;padding:1px 5px;border-radius:4px;">{nom}</code> <code style="background:#eff6ff;padding:1px 5px;border-radius:4px;">{manque}</code> <code style="background:#eff6ff;padding:1px 5px;border-radius:4px;">{objectif}</code></div><textarea id="msgDefaut" style="min-height:100px;resize:none;font-size:13px;line-height:1.5;">'+msgDef+'</textarea><button onclick="saveMsgDefaut()" class="bor" style="margin-top:10px;font-size:13px;padding:11px;">💾 Sauvegarder</button></div></div>';}
 
@@ -2463,29 +2805,143 @@ function rScreenGlobal(sc){
     var aertes=getAlerteEntretiens();
     var entsAll=[].concat(S.data.entretiens||[]).sort(function(a,b){return b.ts-a.ts;});
     var entsEnAttente=entsAll.filter(function(e){return e.statut==="demande";});
-    html='<div class="sec">'
-    +'<div style="display:flex;gap:8px;margin-bottom:12px;">'
-    +'<div class="card" style="flex:1;text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;">ALERTES</div><div style="font-size:18px;font-weight:900;color:#d97706;margin-top:4px;">'+aertes.length+'</div></div>'
-    +'<div class="card" style="flex:1;text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;">EN ATTENTE</div><div style="font-size:18px;font-weight:900;color:#dc2626;margin-top:4px;">'+entsEnAttente.length+'</div></div>'
-    +'<div class="card" style="flex:1;text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;">TOTAL</div><div style="font-size:18px;font-weight:900;color:#1d4ed8;margin-top:4px;">'+entsAll.length+'</div></div>'
-    +'</div>'
+    
+    var wrapper=document.createElement("div");
+    wrapper.className="sec";
+    
+    // Stats header
+    var statsDiv=document.createElement("div");
+    statsDiv.style.cssText="display:flex;gap:8px;margin-bottom:12px;";
+    [{l:"ALERTES",v:aertes.length,c:"#d97706"},{l:"EN ATTENTE",v:entsEnAttente.length,c:"#dc2626"},{l:"TOTAL",v:entsAll.length,c:"#1d4ed8"}].forEach(function(s){
+      var card=document.createElement("div");
+      card.className="card";
+      card.style.cssText="flex:1;text-align:center;";
+      card.innerHTML='<div style="font-size:9px;color:#64748b;font-weight:700;">'+s.l+'</div><div style="font-size:18px;font-weight:900;color:'+s.c+';margin-top:4px;">'+s.v+'</div>';
+      statsDiv.appendChild(card);
+    });
+    wrapper.appendChild(statsDiv);
+    
     // Demandes en attente
-    +(entsEnAttente.length>0
-    ?'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">⏳ Demandes en attente</div>'
-    +'<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
-    +entsEnAttente.map(function(e){var icons={vidange:"🛢",pneus:"🔵",freins:"🔴",revision:"🔧",autre:"⚙️"};return'<div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid #eff6ff;"><div style="font-size:22px;">'+( icons[e.type]||"⚙️")+'</div><div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#0f172a;">'+e.nomChauffeur+' — '+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div><div style="font-size:10px;color:#64748b;">'+e.date+(e.note?" — "+e.note:"")+'</div></div><button onclick="validerEntretien('+e.id+')" style="padding:7px 11px;border-radius:9px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">✅ Fait</button></div>';}).join("")
-    +'</div>':"")
+    if(entsEnAttente.length>0){
+      var t1=document.createElement("div");
+      t1.style.cssText="font-size:13px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:9px;";
+      t1.textContent="⏳ Demandes en attente";
+      wrapper.appendChild(t1);
+      
+      var c1=document.createElement("div");
+      c1.className="card";
+      c1.style.cssText="padding:0;overflow:hidden;margin-bottom:14px;";
+      entsEnAttente.forEach(function(e){
+        var icons={vidange:"🛢",pneus:"🔵",freins:"🔴",revision:"🔧",autre:"⚙️"};
+        var row=document.createElement("div");
+        row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid #eff6ff;";
+        row.innerHTML='<div style="font-size:22px;">'+(icons[e.type]||"⚙️")+'</div>'
+          +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);">'+e.nomChauffeur+' — '+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div>'
+          +'<div style="font-size:10px;color:#64748b;">'+e.date+'</div></div>';
+        var valBtn=document.createElement("button");
+        valBtn.textContent="✅ Fait";
+        valBtn.style.cssText="padding:7px 11px;border-radius:9px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;";
+        (function(entId){valBtn.onclick=function(){validerEntretien(entId);};})(e.id);
+        row.appendChild(valBtn);
+        c1.appendChild(row);
+      });
+      wrapper.appendChild(c1);
+    }
+    
     // Alertes entretien
-    +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">🔔 Alertes entretien</div>'
-    +(aertes.length===0?'<div class="card" style="text-align:center;padding:20px;color:#059669;">✅ Tous les entretiens sont à jour !</div>'
-    :'<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'
-    +aertes.map(function(a){return'<div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid #eff6ff;background:'+(a.urgent?"#fef2f2":"#fff")+'"><div style="font-size:18px;">🔧</div><div style="flex:1;"><div style="font-size:12px;font-weight:700;color:'+(a.urgent?"#dc2626":"#0f172a")+';">'+a.msg+'</div></div><button onclick="modalEntretien('+a.cid+')" style="padding:6px 10px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;">Gérer</button></div>';}).join("")+'</div>')
-    // Historique complet par chauffeur
-    +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">📋 Par chauffeur</div>'
-    +'<div class="card" style="padding:0;overflow:hidden;">'
-    +S.data.chauffeurs.map(function(c){var entsC=getEntretiensChauffeur(c.id);var alertesC=getAlerteEntretiens().filter(function(a){return a.cid===c.id;});return'<div style="padding:11px 14px;border-bottom:1px solid #eff6ff;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-weight:700;font-size:13px;color:#0f172a;">'+c.nom+'</div><div style="display:flex;gap:5px;"><button onclick="modalEntretien('+c.id+')" style="padding:5px 9px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#d97706;font-size:10px;font-weight:700;cursor:pointer;">🔧 Gérer</button><button onclick="envoyerGPS(S.data.chauffeurs.filter(function(x){return x.id==='+c.id+';})[0])" style="padding:5px 9px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:10px;font-weight:700;cursor:pointer;">📍 GPS</button></div></div>'+(alertesC.length>0?'<div style="display:flex;flex-wrap:wrap;gap:4px;">'+alertesC.map(function(a){return'<span style="font-size:9px;padding:2px 7px;border-radius:20px;background:'+(a.urgent?"#fef2f2":"#fffbeb")+';color:'+(a.urgent?"#dc2626":"#d97706")+';border:1px solid '+(a.urgent?"#fecaca":"#fde68a")+';font-weight:700;">'+a.msg.split("—")[1]+'</span>';}).join("")+'</div>':'<span style="font-size:10px;color:#059669;">✅ À jour</span>')+'</div>';}).join("")
-    +'</div>'
-    +'</div>';
+    var t2=document.createElement("div");
+    t2.style.cssText="font-size:13px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:9px;";
+    t2.textContent="🔔 Alertes entretien";
+    wrapper.appendChild(t2);
+    
+    if(aertes.length===0){
+      var ok=document.createElement("div");
+      ok.className="card";
+      ok.style.cssText="text-align:center;padding:20px;color:#059669;margin-bottom:14px;";
+      ok.textContent="✅ Tous les entretiens sont à jour !";
+      wrapper.appendChild(ok);
+    }else{
+      var c2=document.createElement("div");
+      c2.className="card";
+      c2.style.cssText="padding:0;overflow:hidden;margin-bottom:14px;";
+      aertes.forEach(function(a){
+        var row=document.createElement("div");
+        row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid #eff6ff;background:"+(a.urgent?"#fef2f2":"#fff")+";";
+        row.innerHTML='<div style="font-size:18px;">🔧</div>'
+          +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:'+(a.urgent?"#dc2626":"var(--txt,#0f172a)")+';">'+a.msg+'</div></div>';
+        var gerBtn=document.createElement("button");
+        gerBtn.textContent="Gérer";
+        gerBtn.style.cssText="padding:6px 10px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;";
+        (function(cid){gerBtn.onclick=function(){modalEntretien(cid);};})(a.cid);
+        row.appendChild(gerBtn);
+        c2.appendChild(row);
+      });
+      wrapper.appendChild(c2);
+    }
+    
+    // Par chauffeur
+    var t3=document.createElement("div");
+    t3.style.cssText="font-size:13px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:9px;";
+    t3.textContent="📋 Par chauffeur";
+    wrapper.appendChild(t3);
+    
+    var c3=document.createElement("div");
+    c3.className="card";
+    c3.style.cssText="padding:0;overflow:hidden;";
+    S.data.chauffeurs.forEach(function(c){
+      var alertesC=getAlerteEntretiens().filter(function(a){return a.cid===c.id;});
+      var row=document.createElement("div");
+      row.style.cssText="padding:11px 14px;border-bottom:1px solid #eff6ff;";
+      
+      var topDiv=document.createElement("div");
+      topDiv.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;";
+      
+      var nom=document.createElement("div");
+      nom.style.cssText="font-weight:700;font-size:13px;color:var(--txt,#0f172a);";
+      nom.textContent=c.nom;
+      topDiv.appendChild(nom);
+      
+      var btns=document.createElement("div");
+      btns.style.cssText="display:flex;gap:5px;";
+      
+      var gerBtn=document.createElement("button");
+      gerBtn.textContent="🔧 Gérer";
+      gerBtn.style.cssText="padding:5px 9px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#d97706;font-size:10px;font-weight:700;cursor:pointer;";
+      (function(cid){gerBtn.onclick=function(){modalEntretien(cid);};})(c.id);
+      btns.appendChild(gerBtn);
+      
+      var gpsBtn=document.createElement("button");
+      gpsBtn.textContent="📍 GPS";
+      gpsBtn.style.cssText="padding:5px 9px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:10px;font-weight:700;cursor:pointer;";
+      (function(ch){gpsBtn.onclick=function(){envoyerGPS(ch);};})(c);
+      btns.appendChild(gpsBtn);
+      
+      topDiv.appendChild(btns);
+      row.appendChild(topDiv);
+      
+      if(alertesC.length>0){
+        var tagsDiv=document.createElement("div");
+        tagsDiv.style.cssText="display:flex;flex-wrap:wrap;gap:4px;";
+        alertesC.forEach(function(a){
+          var tag=document.createElement("span");
+          tag.style.cssText="font-size:9px;padding:2px 7px;border-radius:20px;background:"+(a.urgent?"#fef2f2":"#fffbeb")+";color:"+(a.urgent?"#dc2626":"#d97706")+";border:1px solid "+(a.urgent?"#fecaca":"#fde68a")+";font-weight:700;";
+          tag.textContent=(a.msg.split("—")[1]||a.msg).trim();
+          tagsDiv.appendChild(tag);
+        });
+        row.appendChild(tagsDiv);
+      }else{
+        var ok2=document.createElement("span");
+        ok2.style.cssText="font-size:10px;color:#059669;";
+        ok2.textContent="✅ À jour";
+        row.appendChild(ok2);
+      }
+      c3.appendChild(row);
+    });
+    wrapper.appendChild(c3);
+    
+    sc.innerHTML="";
+    sc.appendChild(wrapper);
+    html=null;
   }
 
   else if(S.tab==="sanctions"){
@@ -2502,7 +2958,10 @@ function rScreenGlobal(sc){
     hdr.style.cssText="background:linear-gradient(135deg,#dc2626,#b91c1c);border-radius:16px;padding:16px;margin-bottom:14px;";
     hdr.innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Sanctions automatiques</div>'
     +'<div style="font-size:30px;font-weight:900;color:#fff;">'+sActives.length+' active(s)</div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:3px;">2 non-versements consecutifs sans panne signalee</div>';
+    +'<div style="display:flex;gap:10px;margin-top:8px;">'
+    +'<div style="background:rgba(255,255,255,.15);border-radius:9px;padding:6px 12px;text-align:center;"><div style="font-size:18px;">📅</div><div style="font-size:10px;color:rgba(255,255,255,.8);font-weight:700;">'+sActives.filter(function(s){return s.type==="non_versement_journalier";}).length+' Journalier</div></div>'
+    +'<div style="background:rgba(255,255,255,.15);border-radius:9px;padding:6px 12px;text-align:center;"><div style="font-size:18px;">📆</div><div style="font-size:10px;color:rgba(255,255,255,.8);font-weight:700;">'+sActives.filter(function(s){return s.type==="non_versement_hebdo";}).length+' Hebdomadaire</div></div>'
+    +'</div>';
     wrapper.appendChild(hdr);
     
     // Sanctions actives
@@ -2522,6 +2981,10 @@ function rScreenGlobal(sc){
         var nom=document.createElement("div");
         nom.style.cssText="font-weight:800;font-size:13px;color:#dc2626;margin-bottom:3px;";
         nom.textContent=s.nomChauffeur;
+        var typeBadge=document.createElement("span");
+        typeBadge.style.cssText="font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700;margin-left:7px;background:"+(s.type==="non_versement_hebdo"?"#7c3aed18":"#dc262618")+";color:"+(s.type==="non_versement_hebdo"?"#7c3aed":"#dc2626")+";border:1px solid "+(s.type==="non_versement_hebdo"?"#7c3aed33":"#fecaca")+";";
+        typeBadge.textContent=s.type==="non_versement_hebdo"?"📆 Hebdo":"📅 Journalier";
+        nom.appendChild(typeBadge);
         row.appendChild(nom);
         
         var desc=document.createElement("div");
@@ -2659,6 +3122,265 @@ function rScreenGlobal(sc){
     html=null;
   }
 
+
+  else if(S.tab==="dashboard"){
+    // ══ DONNÉES ══
+    var CH=S.data.chauffeurs;
+    var VE=S.data.versements;
+    var sem=getSem();
+    var days30=getLast30Days();
+    var recettesParJour=days30.map(function(j){
+      return VE.filter(function(v){return v.date===j;}).reduce(function(s,v){return s+v.montant;},0);
+    });
+    var maxRecette=Math.max.apply(null,recettesParJour)||1;
+    var totalSem=VE.filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+    var statsChauf=getStatsChaufSem();
+    var meilleur=statsChauf[0];
+    var pire=statsChauf[statsChauf.length-1];
+    var tauxPresenceGlobal=statsChauf.length>0?Math.round(statsChauf.reduce(function(s,x){return s+x.presence;},0)/statsChauf.length):0;
+
+    // ══ RENDU DOM ══
+    var wrap=document.createElement("div");
+    wrap.className="sec";
+
+    // ── HEADER ──
+    var hdr=document.createElement("div");
+    hdr.style.cssText="background:linear-gradient(135deg,#1d4ed8,#3b82f6);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 6px 20px rgba(29,78,216,.3);";
+    hdr.innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Tableau de bord</div>'
+      +'<div style="font-size:28px;font-weight:900;color:#fff;">'+fc(totalSem)+'</div>'
+      +'<div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;">Recettes cette semaine - '+tauxPresenceGlobal+'% presence</div>';
+    wrap.appendChild(hdr);
+
+    // ── MEILLEUR / PIRE ──
+    if(statsChauf.length>=2){
+      var podiumDiv=document.createElement("div");
+      podiumDiv.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;";
+
+      [
+        {label:"🏆 Meilleur",data:meilleur,bg:"linear-gradient(135deg,#059669,#10b981)",bdr:"#bbf7d0"},
+        {label:"⚠️ À suivre",data:pire,bg:"linear-gradient(135deg,#dc2626,#ef4444)",bdr:"#fecaca"}
+      ].forEach(function(item){
+        var card=document.createElement("div");
+        card.style.cssText="border-radius:14px;padding:13px;color:#fff;background:"+item.bg+";";
+        card.innerHTML='<div style="font-size:10px;font-weight:800;opacity:.8;margin-bottom:4px;">'+item.label+'</div>'
+          +'<div style="font-size:14px;font-weight:900;">'+item.data.c.nom+'</div>'
+          +'<div style="font-size:11px;opacity:.9;margin-top:4px;">'+fc(item.data.total)+'</div>'
+          +'<div style="font-size:10px;opacity:.8;">'+item.data.pct+'% objectif - '+item.data.presence+'% presence</div>';
+        podiumDiv.appendChild(card);
+      });
+      wrap.appendChild(podiumDiv);
+    }
+
+    // ── COURBE RECETTES 30 JOURS ──
+    var chartTitle=document.createElement("div");
+    chartTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+    chartTitle.textContent="📈 Recettes — 30 derniers jours";
+    wrap.appendChild(chartTitle);
+
+    var chartCard=document.createElement("div");
+    chartCard.className="card";
+    chartCard.style.cssText="padding:14px;margin-bottom:14px;overflow:hidden;";
+
+    // SVG chart
+    var W=320,H=80,pad=4;
+    var pts=recettesParJour.map(function(v,i){
+      var x=pad+(i/(days30.length-1))*(W-pad*2);
+      var y=H-pad-(v/maxRecette)*(H-pad*2);
+      return{x:x,y:y,v:v,d:days30[i]};
+    });
+    var pathD=pts.map(function(p,i){return(i===0?"M":"L")+p.x.toFixed(1)+","+p.y.toFixed(1);}).join(" ");
+    var areaD=pathD+" L"+(W-pad).toFixed(1)+","+(H-pad)+" L"+pad+","+(H-pad)+" Z";
+
+    // Trouver max et sa position
+    var maxIdx=recettesParJour.indexOf(maxRecette);
+    var maxPt=pts[maxIdx];
+
+    var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="display:block;">'
+      +'<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6" stop-opacity=".3"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs>'
+      +'<path d="'+areaD+'" fill="url(#cg)"/>'
+      +'<path d="'+pathD+'" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+      // Point max
+      +'<circle cx="'+maxPt.x.toFixed(1)+'" cy="'+maxPt.y.toFixed(1)+'" r="4" fill="#1d4ed8"/>'
+      +'<text x="'+maxPt.x.toFixed(1)+'" y="'+(maxPt.y-8).toFixed(1)+'" text-anchor="middle" font-size="8" fill="#1d4ed8" font-weight="700">'+fc(maxPt.v)+'</text>'
+      +'</svg>';
+
+    // Labels jours (début, milieu, fin)
+    var labelsHtml='<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:#94a3b8;">'
+      +'<span>'+days30[0].slice(0,5)+'</span>'
+      +'<span>'+days30[14].slice(0,5)+'</span>'
+      +'<span>'+days30[29].slice(0,5)+'</span>'
+      +'</div>';
+
+    chartCard.innerHTML=svg+labelsHtml;
+    wrap.appendChild(chartCard);
+
+    // ── CLASSEMENT CHAUFFEURS ──
+    var rankTitle=document.createElement("div");
+    rankTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+    rankTitle.textContent="🏅 Classement cette semaine";
+    wrap.appendChild(rankTitle);
+
+    var rankCard=document.createElement("div");
+    rankCard.className="card";
+    rankCard.style.cssText="padding:0;overflow:hidden;margin-bottom:14px;";
+
+    statsChauf.forEach(function(s,idx){
+      var rankIc=idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":"#"+(idx+1);
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border,#dbeafe);";
+
+      // Rang
+      var rang=document.createElement("div");
+      rang.style.cssText="font-size:18px;width:28px;text-align:center;flex-shrink:0;";
+      rang.textContent=rankIc;
+
+      // Infos
+      var info=document.createElement("div");
+      info.style.cssText="flex:1;min-width:0;";
+
+      var nomLine=document.createElement("div");
+      nomLine.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:3px;";
+      var nomSpan=document.createElement("span");
+      nomSpan.style.cssText="font-size:13px;font-weight:700;color:var(--txt,#0f172a);";
+      nomSpan.textContent=s.c.nom;
+      var niveauBadge=document.createElement("span");
+      niveauBadge.style.cssText="font-size:9px;padding:1px 6px;border-radius:20px;font-weight:700;background:"+s.niveauCol+"22;color:"+s.niveauCol+";border:1px solid "+s.niveauCol+"44;";
+      niveauBadge.textContent=s.niveauIc+" "+s.niveau;
+      nomLine.appendChild(nomSpan);
+      nomLine.appendChild(niveauBadge);
+
+      // Barre progression
+      var barWrap=document.createElement("div");
+      barWrap.style.cssText="background:#e2e8f0;border-radius:4px;height:5px;margin-top:4px;overflow:hidden;";
+      var barFill=document.createElement("div");
+      var barCol=s.pct>=100?"#059669":s.pct>=60?"#d97706":"#dc2626";
+      barFill.style.cssText="height:100%;border-radius:4px;background:"+barCol+";width:"+Math.min(s.pct,100)+"%;transition:width .5s;";
+      barWrap.appendChild(barFill);
+
+      info.appendChild(nomLine);
+      info.appendChild(barWrap);
+
+      // Stats droite
+      var stats=document.createElement("div");
+      stats.style.cssText="text-align:right;flex-shrink:0;";
+      stats.innerHTML='<div style="font-size:13px;font-weight:800;color:'+barCol+';">'+fc(s.total)+'</div>'
+        +'<div style="font-size:9px;color:#64748b;">'+s.pct+'% · '+s.presence+'% prés.</div>';
+
+      row.appendChild(rang);
+      row.appendChild(info);
+      row.appendChild(stats);
+      rankCard.appendChild(row);
+    });
+    wrap.appendChild(rankCard);
+
+    // ── CALENDRIER PRÉSENCE (semaine) ──
+    var presTitle=document.createElement("div");
+    presTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+    presTitle.textContent="Presence cette semaine";
+    wrap.appendChild(presTitle);
+
+    var presCard=document.createElement("div");
+    presCard.className="card";
+    presCard.style.cssText="padding:12px;margin-bottom:14px;";
+
+    // Jours de la semaine
+    var joursLabels=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+    var headerRow=document.createElement("div");
+    headerRow.style.cssText="display:grid;grid-template-columns:80px repeat(7,1fr);gap:3px;margin-bottom:6px;";
+    var emptyCell=document.createElement("div");
+    headerRow.appendChild(emptyCell);
+    joursLabels.forEach(function(j,i){
+      var cell=document.createElement("div");
+      cell.style.cssText="text-align:center;font-size:9px;font-weight:700;color:#64748b;";
+      cell.textContent=j;
+      headerRow.appendChild(cell);
+    });
+    presCard.appendChild(headerRow);
+
+    CH.slice(0,8).forEach(function(c){
+      var row=document.createElement("div");
+      row.style.cssText="display:grid;grid-template-columns:80px repeat(7,1fr);gap:3px;margin-bottom:4px;align-items:center;";
+
+      var nomCell=document.createElement("div");
+      nomCell.style.cssText="font-size:10px;font-weight:600;color:var(--txt,#0f172a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+      nomCell.textContent=c.nom.split(" ")[0];
+      row.appendChild(nomCell);
+
+      sem.forEach(function(jour){
+        var aVerse=VE.some(function(v){return String(v.chauffeurId)===String(c.id)&&v.date===jour;});
+        var d=new Date(jour.split("/").reverse().join("-"));
+        var isDim=d.getDay()===0;
+        var isToday=jour===td();
+        var cell=document.createElement("div");
+        cell.style.cssText="height:22px;border-radius:5px;background:"+(isDim?"#f1f5f9":aVerse?"#10b981":"#fef2f2")+";border:"+(isToday?"2px solid #1d4ed8":"1px solid "+(aVerse?"#bbf7d0":"#fecaca"))+";";
+        if(aVerse&&!isDim){
+          cell.title="Versé";
+        }
+        row.appendChild(cell);
+      });
+      presCard.appendChild(row);
+    });
+
+    // Légende
+    var legend=document.createElement("div");
+    legend.style.cssText="display:flex;gap:12px;margin-top:8px;font-size:10px;color:#64748b;";
+    legend.innerHTML='<div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:14px;border-radius:3px;background:#10b981;"></div>Versé</div>'
+      +'<div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:14px;border-radius:3px;background:#fef2f2;border:1px solid #fecaca;"></div>Absent</div>'
+      +'<div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:14px;border-radius:3px;background:#f1f5f9;"></div>Dimanche</div>';
+    presCard.appendChild(legend);
+    wrap.appendChild(presCard);
+
+    // ── NIVEAUX FIDÉLITÉ ──
+    var niveauTitle=document.createElement("div");
+    niveauTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+    niveauTitle.textContent="Niveaux et objectifs";
+    wrap.appendChild(niveauTitle);
+
+    var niveauCard=document.createElement("div");
+    niveauCard.className="card";
+    niveauCard.style.cssText="padding:0;overflow:hidden;margin-bottom:14px;";
+
+    statsChauf.forEach(function(s){
+      var nextLevel=getNiveauSuivant(s.niveau);
+      var row=document.createElement("div");
+      row.style.cssText="padding:12px 14px;border-bottom:1px solid var(--border,#dbeafe);";
+
+      var top=document.createElement("div");
+      top.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;";
+      top.innerHTML='<div style="display:flex;align-items:center;gap:8px;">'
+        +'<span style="font-size:20px;">'+s.niveauIc+'</span>'
+        +'<div><div style="font-size:13px;font-weight:700;color:var(--txt,#0f172a);">'+s.c.nom+'</div>'
+        +'<div style="font-size:10px;font-weight:700;color:'+s.niveauCol+';">Niveau '+s.niveau+'</div></div></div>'
+        +'<div style="text-align:right;font-size:11px;color:#64748b;">Total: '+fc(s.totalAll)+'</div>';
+      row.appendChild(top);
+
+      if(nextLevel){
+        var progress=Math.min(Math.round(s.totalAll/nextLevel.seuil*100),100);
+        var barWrap2=document.createElement("div");
+        barWrap2.style.cssText="background:#e2e8f0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px;";
+        var barFill2=document.createElement("div");
+        barFill2.style.cssText="height:100%;border-radius:6px;background:"+s.niveauCol+";width:"+progress+"%;";
+        barWrap2.appendChild(barFill2);
+        var barLabel=document.createElement("div");
+        barLabel.style.cssText="font-size:9px;color:#64748b;";
+        barLabel.textContent=progress+"% vers "+nextLevel.n+" ("+fc(nextLevel.seuil-s.totalAll)+" restants)";
+        row.appendChild(barWrap2);
+        row.appendChild(barLabel);
+      }else{
+        var maxLabel=document.createElement("div");
+        maxLabel.style.cssText="font-size:10px;color:#f59e0b;font-weight:700;";
+        maxLabel.textContent="🏆 Niveau maximum atteint !";
+        row.appendChild(maxLabel);
+      }
+      niveauCard.appendChild(row);
+    });
+    wrap.appendChild(niveauCard);
+
+    sc.innerHTML="";
+    sc.appendChild(wrap);
+    html=null;
+  }
+
   else if(S.tab==="bi"||S.tab==="rsi"){html='<div class="sec"><div class="card" style="text-align:center;padding:40px 20px;"><div style="font-size:44px;margin-bottom:12px;">📊</div><div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:8px;">Module disponible</div><div style="font-size:12px;color:#64748b;">Fonctionnalité avancée — accédez depuis l\'onglet Plus.</div></div></div>';}
 
   else{html='<div class="sec"><div class="card" style="text-align:center;padding:40px 20px;color:#64748b;">Onglet en cours de développement</div></div>';}
@@ -2745,7 +3467,25 @@ function rModal(){
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;">'+[{l:"Total",v:fc(tC2),c:"#059669"},{l:"Solde",v:fc(cd.solde),c:cd.solde>=0?"#1d4ed8":"#dc2626"},{l:"Dette",v:cd.dette>0?fc(cd.dette):"—",c:cd.dette>0?"#dc2626":"#64748b"}].map(function(it){return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:9px;text-align:center;"><div style="font-size:9px;color:#64748b;">'+it.l+'</div><div style="font-size:12px;font-weight:800;color:'+it.c+';margin-top:3px;">'+it.v+'</div></div>';}).join("")+'</div>'
     +(docAl.length>0?'<div style="margin-bottom:12px;">'+docAl.map(function(d){var col=d.sev==="expire"?"#dc2626":"#d97706";return'<div style="background:'+(d.sev==="expire"?"#fef2f2":"#fffbeb")+';border:1px solid '+(d.sev==="expire"?"#fecaca":"#fde68a")+';border-radius:9px;padding:8px 11px;margin-bottom:5px;font-size:11px;font-weight:700;color:'+col+';">'+(d.sev==="expire"?"🚨":"⚠️")+" "+d.msg+'</div>';}).join("")+'</div>':"")
     +'<div style="max-height:120px;overflow-y:auto;margin-bottom:12px;">'+ders.map(function(v){var mc={"Wave":"#1a9fff","Orange Money":"#f97316","MTN Money":"#eab308","Virement":"#7c3aed","Especes":"#059669"};var col2=mc[v.mode]||"#64748b";return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #dbeafe;"><div><span style="font-size:11px;color:#64748b;">'+v.date+'</span>'+(v.ref?'<div style="font-size:9px;color:'+col2+';font-weight:700;">🔖 '+v.ref+'</div>':"")+'</div><div style="text-align:right;"><span style="font-weight:800;font-size:13px;color:#059669;">'+fc(v.montant)+'</span><div style="font-size:9px;color:'+col2+';font-weight:700;">'+(v.mode||"")+'</div></div></div>';}).join("")+'</div>'
-    +'<div style="display:flex;gap:7px;">'+(hasPerm("supprimer")?'<button onclick="oM(\'sup\',{id:'+cd.id+'})" style="padding:11px;border-radius:11px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;">Suppr.</button>':"")+(hasPerm("rapport")?'<button onclick="oRp('+cd.id+')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:12px;font-weight:700;cursor:pointer;">Rapport</button>':"")+(hasPerm("versement")?'<button onclick="oV('+cd.id+')" class="bor" style="flex:1;padding:11px;font-size:12px;">+Versement</button>':"")+'</div>';
+    +'<div style="margin-bottom:12px;">'
+    +'<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:8px;">📎 DOCUMENTS</div>'
+    +'<div style="display:flex;flex-direction:column;gap:7px;">'
+    +[{key:"permis",label:"Permis de conduire",ic:"🪪"},{key:"identite",label:"Pièce d\'identité",ic:"🪪"},{key:"contrat",label:"Contrat",ic:"📄"}].map(function(doc){
+      var hasDoc=cd.docs&&cd.docs[doc.key];
+      return'<div style="display:flex;align-items:center;justify-content:space-between;background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:9px 12px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;">'
+      +'<span style="font-size:18px;">'+doc.ic+'</span>'
+      +'<div><div style="font-size:12px;font-weight:700;color:#0f172a;">'+doc.label+'</div>'
+      +'<div style="font-size:10px;color:'+(hasDoc?"#059669":"#dc2626")+';">'+(hasDoc?"✅ Déposé":"❌ Manquant")+'</div></div></div>'
+      +(hasPerm("chauffeur")?'<label style="background:'+(hasDoc?"#eff6ff":"linear-gradient(135deg,#1d4ed8,#3b82f6)")+';border:'+(hasDoc?"1px solid #bfdbfe":"none")+';color:'+(hasDoc?"#1d4ed8":"#fff")+';border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">'
+      +(hasDoc?"Modifier":"+ Ajouter")
+      +'<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="uploadDoc('+cd.id+',\''+doc.key+'\',this)"/></label>':"")
+      +(hasDoc?'<button onclick="voirDoc('+cd.id+',\''+doc.key+'\')" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:5px;">👁</button>':"")
+      +'</div>';
+    }).join("")
+    +'</div></div>'
+    +'<div style="display:flex;gap:7px;">'+(hasPerm("supprimer")?'<button onclick="oM(\'sup\',{id:'+cd.id+'})" style="padding:11px;border-radius:11px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;">Suppr.</button>':"")+(hasPerm("rapport")?'<button onclick="oRp('+cd.id+')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:12px;font-weight:700;cursor:pointer;">Rapport</button>':"")
+    +'<button onclick="S.detCh=S.data.chauffeurs.filter(function(x){return x.id==='+cd.id+';})[0];fM();sT(\'historique\')" style="flex:1;padding:11px;border-radius:11px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:700;cursor:pointer;">📅</button>'+(hasPerm("versement")?'<button onclick="oV('+cd.id+')" class="bor" style="flex:1;padding:11px;font-size:12px;">+Versement</button>':"")+'</div>';
   }
   else if(M==="rp"){var cr=CH.filter(function(x){return x.id===MD.id;})[0];if(!cr){fM();return;}var msg=txtRap(cr,MD.type||"semaine");var tel=cr.tel?cr.tel.replace(/\s/g,"").replace(/^0/,"225"):"";window._rm=msg;body='<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:11px;padding:11px;margin-bottom:13px;max-height:190px;overflow-y:auto;font-size:11px;line-height:1.8;white-space:pre-line;color:#0f172a;">'+msg+'</div>'+(!cr.tel?'<div style="background:#fef2f2;border-radius:10px;padding:9px;font-size:12px;color:#dc2626;margin-bottom:11px;">Aucun numéro</div>':"")+'<a href="https://wa.me/'+tel+'?text='+encodeURIComponent(msg)+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border-radius:13px;padding:14px;text-decoration:none;font-weight:800;font-size:14px;margin-bottom:9px;">WhatsApp</a><button onclick="if(navigator.clipboard)navigator.clipboard.writeText(window._rm)" class="bgr" style="width:100%;margin-bottom:9px;">Copier</button><button onclick="fM()" class="bgr" style="width:100%;">Fermer</button>';}
   else if(M==="rst"){body='<div style="text-align:center;padding:10px 0;"><div style="font-size:44px;margin-bottom:10px;">⚠️</div><p style="color:#64748b;font-size:14px;line-height:1.6;margin-bottom:20px;">Toutes les données seront effacées.</p><div style="display:flex;gap:10px;"><button onclick="fM()" class="bgr" style="flex:1;padding:13px;">Annuler</button><button onclick="rstAll()" style="flex:1;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border-radius:12px;padding:13px;font-weight:800;border:none;cursor:pointer;">Effacer</button></div></div>';}
@@ -2830,6 +3570,59 @@ function oM(m,d){S.modal=m;S.mdat=d||{};R();}
 function fM(){S.modal=null;S.mdat={};var r=document.getElementById("MR");if(r)r.remove();R();}
 function oEditCh(id){S.modal="editCh";S.mdat={id:id};R();}
 function oV(id){S.modal="vers";S.mdat={chauffeurId:id||""};R();}
+function uploadDoc(cid, docKey, input){
+  var file = input.files[0];
+  if(!file) return;
+  var c = S.data.chauffeurs.filter(function(x){return x.id===cid;})[0];
+  if(!c) return;
+  
+  var reader = new FileReader();
+  reader.onload = function(e){
+    if(!c.docs) c.docs = {};
+    c.docs[docKey] = e.target.result;
+    fbSave("chauffeurs", c);
+    save();
+    jLog("chauffeur_ajout", "Document "+docKey+" ajouté pour "+c.nom);
+    // Rafraîchir le modal
+    oD(cid);
+  };
+  reader.readAsDataURL(file);
+}
+
+function voirDoc(cid, docKey){
+  var c = S.data.chauffeurs.filter(function(x){return x.id===cid;})[0];
+  if(!c || !c.docs || !c.docs[docKey]) return;
+  
+  var d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;";
+  
+  var closeBtn = document.createElement("button");
+  closeBtn.textContent = "✕ Fermer";
+  closeBtn.style.cssText = "position:absolute;top:20px;right:20px;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:14px;font-weight:700;padding:8px 14px;border-radius:9px;cursor:pointer;";
+  closeBtn.onclick = function(){ d.remove(); };
+  
+  var docData = c.docs[docKey];
+  if(docData.startsWith("data:image")){
+    var img = document.createElement("img");
+    img.src = docData;
+    img.style.cssText = "max-width:100%;max-height:80vh;border-radius:12px;object-fit:contain;";
+    d.appendChild(closeBtn);
+    d.appendChild(img);
+  } else {
+    // PDF ou autre
+    var link = document.createElement("a");
+    link.href = docData;
+    link.download = c.nom+"_"+docKey+".pdf";
+    link.textContent = "📥 Télécharger le document";
+    link.style.cssText = "color:#fff;font-size:16px;font-weight:700;text-decoration:none;background:#1d4ed8;padding:14px 20px;border-radius:12px;";
+    d.appendChild(closeBtn);
+    d.appendChild(link);
+  }
+  
+  d.onclick = function(ev){ if(ev.target===d) d.remove(); };
+  document.body.appendChild(d);
+}
+
 function oD(id){S.detCh=S.data.chauffeurs.filter(function(c){return c.id===id;})[0];S.modal="det";R();}
 function oRp(id){S.modal="rp";S.mdat={id:id,type:"semaine"};R();}
 function oRapWA(id,type){S.modal="rp";S.mdat={id:id,type:type};R();}
