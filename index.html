@@ -784,6 +784,12 @@ function R(){
   if(estCompteChauf()&&!_gpsActif){
     try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
   }
+  // Restaurer notifications push si déjà autorisées
+  try{
+    if(localStorage.getItem("sal_notif_perm")==="granted" && "Notification" in window && Notification.permission==="granted"){
+      if(!_fcmToken) _fcmToken = "native_restored_"+Date.now();
+    }
+  }catch(e){}
 }
 
 function rLogin(){
@@ -2255,6 +2261,12 @@ function R(){
   if(estCompteChauf()&&!_gpsActif){
     try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
   }
+  // Restaurer notifications push si déjà autorisées
+  try{
+    if(localStorage.getItem("sal_notif_perm")==="granted" && "Notification" in window && Notification.permission==="granted"){
+      if(!_fcmToken) _fcmToken = "native_restored_"+Date.now();
+    }
+  }catch(e){}
 }
 
 function rLogin(){
@@ -4475,7 +4487,7 @@ function initFCM(){
   Notification.requestPermission().then(function(permission){
     if(permission === "granted"){
       _fcmToken = "native_"+Date.now();
-      try{localStorage.setItem("sal_notif_ok","1");}catch(e){}
+      try{localStorage.setItem("sal_notif_ok","1");localStorage.setItem("sal_notif_perm","granted");}catch(e){}
       // Afficher une notification de test
       try{
         new Notification("Saloni Manager", {
@@ -4602,7 +4614,21 @@ function pushPrimeDisponible(chauffeur){
   envoyerPush("gerant", "⭐ Prime à payer", chauffeur.nom+": prime en attente", {tab:"primes"});
 }
 
-load();checkEtAppliquerSanctions();R();showInstallBanner();setTimeout(chargerPositions,2000);
+load();checkEtAppliquerSanctions();R();showInstallBanner();
+// Restaurer notifications push au démarrage
+setTimeout(function(){
+  try{
+    if(localStorage.getItem("sal_notif_perm")==="granted" && "Notification" in window){
+      if(Notification.permission==="granted"){
+        _fcmToken = "native_active";
+        console.log("Notifications restaurees");
+      } else if(Notification.permission==="denied"){
+        localStorage.removeItem("sal_notif_perm");
+        localStorage.removeItem("sal_notif_ok");
+      }
+    }
+  }catch(e){}
+}, 500);setTimeout(chargerPositions,2000);
 
 </script>
 </body>
