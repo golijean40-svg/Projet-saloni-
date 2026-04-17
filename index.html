@@ -236,7 +236,7 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
 /* ══════════════════════════════════
    DESKTOP LAYOUT (≥ 900px)
 ══════════════════════════════════ */
-@media (min-width: 900px) {
+@media (min-width: 860px) {
 
   /* Structure principale desktop */
   body { overflow: auto; }
@@ -952,7 +952,7 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var isDesktop=window.innerWidth>=900;
+  var isDesktop=window.innerWidth>=860;
   var tt={home:"Accueil",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes auto",chat:"Chat",rsi:"RSI — Rentabilité",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
   var pageTitle=tt[S.tab]||"Accueil";
   var hdEl=document.getElementById("hd");
@@ -5015,7 +5015,7 @@ load();checkEtAppliquerSanctions();R();showInstallBanner();
 var _lastW = window.innerWidth;
 window.addEventListener('resize', function(){
   var w = window.innerWidth;
-  if((w >= 900) !== (_lastW >= 900)){
+  if((w >= 860) !== (_lastW >= 860)){
     _lastW = w;
     R();
   }
