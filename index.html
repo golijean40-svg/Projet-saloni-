@@ -232,6 +232,140 @@ body.dark [style*="color:#64748b"]{color:var(--txt2) !important;}
 body.dark [style*="border:1px solid #dbeafe"]{border-color:var(--border) !important;}
 body.dark [style*="border-bottom:1px solid #dbeafe"]{border-color:var(--border) !important;}
 body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) !important;}
+
+/* ══════════════════════════════════
+   DESKTOP LAYOUT (≥ 900px)
+══════════════════════════════════ */
+@media (min-width: 900px) {
+
+  /* Structure principale desktop */
+  body { overflow: auto; }
+
+  #app {
+    display: grid;
+    grid-template-areas:
+      "topbar topbar"
+      "sidebar main";
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Header desktop = topbar pleine largeur */
+  #hd {
+    grid-area: topbar;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  /* Screen = zone principale */
+  #screen {
+    grid-area: main;
+    overflow-y: auto;
+    padding-bottom: 20px;
+  }
+
+  /* Nav mobile → sidebar desktop */
+  #nav {
+    grid-area: sidebar;
+    position: static;
+    flex-direction: column;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    padding: 12px 0;
+    height: 100%;
+    overflow-y: auto;
+    box-shadow: none;
+  }
+
+  .nb {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    margin: 1px 8px;
+    border-top: none;
+    gap: 10px;
+    color: var(--txt2);
+  }
+
+  .nb span:first-child {
+    font-size: 17px;
+    width: 22px;
+    text-align: center;
+  }
+
+  .nb.on {
+    background: var(--accent-light, #ebf0ff);
+    color: var(--accent, #1a56db);
+    font-weight: 700;
+  }
+
+  .nb:not(.on):hover {
+    background: var(--bg4);
+    color: var(--txt);
+  }
+
+  /* Header desktop style */
+  .hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 56px;
+    background: var(--surface, #fff);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+
+  /* Section principale avec padding desktop */
+  .sec {
+    padding: 24px 28px;
+    max-width: 1400px;
+  }
+
+  /* Cards en grille sur desktop */
+  .kpi-desktop-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  /* FAB caché sur desktop */
+  .fab {
+    display: none;
+  }
+
+  /* Tableaux desktop */
+  .card {
+    border-radius: 10px;
+  }
+
+  /* Bannière Netlify sidebar */
+  #nav::before {
+    content: '🛺 SALONI';
+    display: block;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--accent, #1a56db);
+    padding: 8px 16px 16px;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+}
+
+/* Très grand écran */
+@media (min-width: 1200px) {
+  #app {
+    grid-template-columns: 260px 1fr;
+  }
+}
 </style>
 </head>
 <body>
@@ -818,28 +952,102 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var tt={home:"",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique presence",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
-  
-  var pageTitle=S.tab==="home"?"Accueil":(tt[S.tab]||S.tab);
-  
-  var left=S.tab==="home"
-  ?'<div style="display:flex;align-items:center;gap:10px;">'
-  +'<div style="width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;">🛺</div>'
-  +'<div><div style="font-size:15px;font-weight:900;color:#fff;letter-spacing:.5px;">SALONI MANAGER</div>'
-  +'<div style="font-size:10px;color:rgba(255,255,255,.7);">'+(isCh?"Espace chauffeur · "+S.user.pseudo:S.user.role+" · "+conx.length+" en ligne")+'</div>'
-  +'</div></div>'
-  :'<div style="display:flex;align-items:center;gap:10px;">'
-  +'<button onclick="sT(\'home\')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:5px;padding:5px 9px;font-size:12px;cursor:pointer;">Accueil</button>'
-  +'<div style="font-size:14px;font-weight:800;color:#fff;">'+pageTitle+'</div>'
-  +'</div>';
-  
-  var right='<div style="display:flex;gap:6px;align-items:center;">'
-  +(!isCh&&al.vis.length>0?'<button onclick="sT(\'alertes\')" style="background:rgba(220,38,38,.3);border:1px solid rgba(220,38,38,.5);border-radius:5px;padding:4px 9px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">🚨 '+al.vis.length+'</button>':"")
-  +'<button onclick="toggleDark()" style="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 8px;font-size:14px;cursor:pointer;">'+(S.darkMode?"☀️":"🌙")+'</button>'
-  +'<button onclick="jLog(\'deconnexion\',\'Deconnexion\');S.user=null;R();" style="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 9px;color:#fff;font-size:11px;cursor:pointer;">Quitter</button>'
-  +'</div>';
-  
-  document.getElementById("hd").innerHTML='<div class="hd"><div style="display:flex;align-items:center;justify-content:space-between;">'+left+right+'</div></div>';
+  var isDesktop=window.innerWidth>=900;
+  var tt={home:"Accueil",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes auto",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
+  var pageTitle=tt[S.tab]||"Accueil";
+  var hdEl=document.getElementById("hd");
+  hdEl.innerHTML="";
+
+  var wrap=document.createElement("div");
+  wrap.className="hd";
+
+  if(isDesktop){
+    wrap.style.cssText="display:flex;align-items:center;justify-content:space-between;";
+    var left=document.createElement("div");
+    left.style.cssText="display:flex;align-items:center;gap:10px;";
+    if(S.tab!=="home"){
+      var backBtn=document.createElement("button");
+      backBtn.textContent="← Retour";
+      backBtn.style.cssText="background:var(--bg4);border:1px solid var(--border2);color:var(--accent);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;";
+      backBtn.onclick=function(){sT("home");};
+      left.appendChild(backBtn);
+    }
+    var titleEl=document.createElement("div");
+    titleEl.style.cssText="font-size:16px;font-weight:800;color:var(--txt);";
+    titleEl.textContent=pageTitle;
+    left.appendChild(titleEl);
+    var right=document.createElement("div");
+    right.style.cssText="display:flex;align-items:center;gap:8px;";
+    if(!isCh&&al.vis.length>0){
+      var alertBtn=document.createElement("button");
+      alertBtn.textContent="🚨 "+al.vis.length+" alerte(s)";
+      alertBtn.style.cssText="background:#fde8e8;border:1px solid #fecaca;color:#c81e1e;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;";
+      alertBtn.onclick=function(){sT("alertes");};
+      right.appendChild(alertBtn);
+    }
+    var roleEl=document.createElement("span");
+    roleEl.style.cssText="font-size:12px;color:var(--txt2);padding:0 8px;";
+    roleEl.textContent=S.user.role+" · "+conx.length+" en ligne";
+    right.appendChild(roleEl);
+    var darkBtn=document.createElement("button");
+    darkBtn.textContent=S.darkMode?"☀️":"🌙";
+    darkBtn.style.cssText="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:14px;cursor:pointer;";
+    darkBtn.onclick=function(){toggleDark();};
+    right.appendChild(darkBtn);
+    var logoutBtn=document.createElement("button");
+    logoutBtn.textContent="Quitter";
+    logoutBtn.style.cssText="background:#fde8e8;border:1px solid #fecaca;color:#c81e1e;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;";
+    logoutBtn.onclick=function(){jLog("deconnexion","Deconnexion");S.user=null;R();};
+    right.appendChild(logoutBtn);
+    wrap.appendChild(left);
+    wrap.appendChild(right);
+
+  } else {
+    // Mobile
+    var row=document.createElement("div");
+    row.style.cssText="display:flex;align-items:center;justify-content:space-between;";
+    var mLeft=document.createElement("div");
+    mLeft.style.cssText="display:flex;align-items:center;gap:10px;";
+    if(S.tab==="home"){
+      mLeft.innerHTML="<div style='width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;'>🛺</div>"
+        +"<div><div style='font-size:15px;font-weight:900;color:#fff;'>SALONI</div>"
+        +"<div style='font-size:10px;color:rgba(255,255,255,.65);'>"+(isCh?"Chauffeur · "+S.user.pseudo:S.user.role+" · "+conx.length+" en ligne")+"</div></div>";
+    } else {
+      var mBack=document.createElement("button");
+      mBack.textContent="←";
+      mBack.style.cssText="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:5px;padding:5px 9px;font-size:14px;cursor:pointer;";
+      mBack.onclick=function(){sT("home");};
+      mLeft.appendChild(mBack);
+      var mTitle=document.createElement("div");
+      mTitle.style.cssText="font-size:14px;font-weight:800;color:#fff;";
+      mTitle.textContent=pageTitle;
+      mLeft.appendChild(mTitle);
+    }
+    var mRight=document.createElement("div");
+    mRight.style.cssText="display:flex;gap:6px;align-items:center;";
+    if(!isCh&&al.vis.length>0){
+      var mAlert=document.createElement("button");
+      mAlert.textContent="🚨 "+al.vis.length;
+      mAlert.style.cssText="background:rgba(220,38,38,.3);border:1px solid rgba(220,38,38,.5);border-radius:5px;padding:4px 9px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;";
+      mAlert.onclick=function(){sT("alertes");};
+      mRight.appendChild(mAlert);
+    }
+    var mDark=document.createElement("button");
+    mDark.textContent=S.darkMode?"☀️":"🌙";
+    mDark.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 8px;font-size:14px;cursor:pointer;";
+    mDark.onclick=function(){toggleDark();};
+    mRight.appendChild(mDark);
+    var mLogout=document.createElement("button");
+    mLogout.textContent="🚪";
+    mLogout.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 9px;color:#fff;font-size:14px;cursor:pointer;";
+    mLogout.onclick=function(){jLog("deconnexion","Deconnexion");S.user=null;R();};
+    mRight.appendChild(mLogout);
+    row.appendChild(mLeft);
+    row.appendChild(mRight);
+    wrap.appendChild(row);
+  }
+
+  hdEl.appendChild(wrap);
 }
 
 function rNAV(){
@@ -4615,6 +4823,15 @@ function pushPrimeDisponible(chauffeur){
 }
 
 load();checkEtAppliquerSanctions();R();showInstallBanner();
+// Re-render sur resize (mobile <-> desktop)
+var _lastW = window.innerWidth;
+window.addEventListener('resize', function(){
+  var w = window.innerWidth;
+  if((w >= 900) !== (_lastW >= 900)){
+    _lastW = w;
+    R();
+  }
+});
 // Restaurer notifications push au démarrage
 setTimeout(function(){
   try{
