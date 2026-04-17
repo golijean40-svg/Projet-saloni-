@@ -380,8 +380,8 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
 <div id="pdfLoader"><div class="spin"></div><p>Génération PDF...</p></div>
 <div id="app">
   <div id="hd"></div>
-  <div id="screen"></div>
   <nav id="nav"></nav>
+  <div id="screen"></div>
 </div>
 <script>
 // ══ DONNÉES DE BASE ══
@@ -923,7 +923,6 @@ function R(){
   if(!S.user){rLogin();return;}
   pingSession();rHD();rNAV();rScreen();
   if(S.modal)rModal();
-  setTimeout(applyDesktopLayout, 30);
   // Reprendre GPS si chauffeur et GPS était actif
   if(estCompteChauf()&&!_gpsActif){
     try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
@@ -2344,33 +2343,11 @@ function getPhoto(cid){var ch=S.data.chauffeurs.filter(function(c){return String
 
 // ══ RENDU PRINCIPAL ══
 
-function applyDesktopLayout(){
-  var isD = window.innerWidth >= 768;
-  var app = document.getElementById("app");
-  var nav = document.getElementById("nav");
-  var hd = document.getElementById("hd");
-  var screen = document.getElementById("screen");
-  if(!app||!nav||!hd||!screen) return;
-  if(isD){
-    app.style.cssText = "display:grid;grid-template-areas:'h h' 'n s';grid-template-columns:220px 1fr;grid-template-rows:52px calc(100vh - 52px);height:100vh;overflow:hidden;";
-    hd.style.cssText = "grid-area:h;background:var(--bg2,#fff);border-bottom:1px solid #dde3ec;";
-    nav.style.cssText = "grid-area:n;position:static;display:flex;flex-direction:column;border-top:none;border-right:1px solid #dde3ec;padding:10px 8px;overflow-y:auto;height:100%;background:var(--bg2,#fff);box-shadow:none;";
-    screen.style.cssText = "grid-area:s;overflow-y:auto;padding-bottom:0;background:var(--bg,#f4f6f9);";
-    var fab = document.getElementById("fab");
-    if(fab) fab.style.display = "none";
-  } else {
-    app.style.cssText = "display:flex;flex-direction:column;height:100%;";
-    hd.style.cssText = "";
-    nav.style.cssText = "";
-    screen.style.cssText = "flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:75px;";
-  }
-}
 
 function R(){
   if(!S.user){rLogin();return;}
   pingSession();rHD();rNAV();rScreen();
   if(S.modal)rModal();
-  setTimeout(applyDesktopLayout, 30);
   // Reprendre GPS si chauffeur et GPS était actif
   if(estCompteChauf()&&!_gpsActif){
     try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
@@ -2446,21 +2423,12 @@ function rNAV(){
       {id:"plus",ic:"⋯",lb:"Plus"}
     ];
   }
-  var navEl = document.getElementById("nav");
-  var isD = window.innerWidth >= 768;
-  navEl.innerHTML=T.map(function(t){
-    var bd=(t.badge&&t.badge>0)?'<span style="position:absolute;top:2px;right:4px;background:#dc2626;color:#fff;border-radius:8px;min-width:14px;padding:0 3px;font-size:8px;font-weight:800;line-height:14px;text-align:center;">'+t.badge+'</span>':"";
-    if(isD){
-      return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;display:flex;flex-direction:row;justify-content:flex-start;align-items:center;padding:9px 12px;font-size:13px;font-weight:'+(S.tab===t.id?"700":"500")+';border-radius:7px;margin:1px 0;border-top:none;gap:10px;width:100%;background:'+(S.tab===t.id?"rgba(26,86,219,.1)":"transparent")+';color:'+(S.tab===t.id?"#1a56db":"#555")+';border:none;cursor:pointer;text-align:left;">'+bd+'<span style="font-size:17px;width:22px;text-align:center;flex-shrink:0;">'+t.ic+'</span><span>'+t.lb+'</span></button>';
-    } else {
-      return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;">'+bd+'<span>'+t.ic+'</span><span>'+t.lb+'</span></button>';
-    }
+  document.getElementById("nav").innerHTML=T.map(function(t){
+    var bd=(t.badge&&t.badge>0)?'<span style="position:absolute;top:2px;right:6px;background:#dc2626;color:#fff;border-radius:8px;min-width:14px;padding:0 3px;font-size:8px;font-weight:800;line-height:14px;text-align:center;">'+t.badge+'</span>':"";
+    return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(''+t.id+'')" style="position:relative;">'+bd+'<span>'+t.ic+'</span><span>'+t.lb+'</span></button>';
   }).join("");
-  // Réappliquer styles desktop sur le nav lui-même
-  if(isD){
-    navEl.style.cssText = "grid-area:n;position:static;display:flex;flex-direction:column;border-top:none;border-right:1px solid #dde3ec;padding:10px 8px;overflow-y:auto;height:100%;background:var(--bg2,#fff);box-shadow:none;";
-  }
 }
+
 
 
 
@@ -4927,17 +4895,6 @@ function pushPrimeDisponible(chauffeur){
 }
 
 load();checkEtAppliquerSanctions();R();showInstallBanner();
-// Re-render sur resize
-var _lastW = window.innerWidth;
-window.addEventListener('resize', function(){
-  var w = window.innerWidth;
-  if((w >= 768) !== (_lastW >= 768)){
-    _lastW = w;
-    R();
-  } else {
-    applyDesktopLayout();
-  }
-});
 // Restaurer notifications push au démarrage
 setTimeout(function(){
   try{
