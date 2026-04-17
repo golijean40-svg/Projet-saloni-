@@ -233,15 +233,7 @@ body.dark [style*="border:1px solid #dbeafe"]{border-color:var(--border) !import
 body.dark [style*="border-bottom:1px solid #dbeafe"]{border-color:var(--border) !important;}
 body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) !important;}
 
-/* ══════════════════════════════════
-   DESKTOP LAYOUT (≥ 900px)
-══════════════════════════════════ */
-@media (min-width: 860px) {
-
-  /* Structure principale desktop */
-  body { overflow: auto; }
-
-  #app {
+#app {
     display: grid;
     grid-template-areas:
       "topbar topbar"
@@ -366,6 +358,21 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
     grid-template-columns: 260px 1fr;
   }
 }
+
+/* ── DESKTOP BASE ── */
+.desktop-app{display:grid !important;grid-template-areas:"topbar topbar" "sidebar main";grid-template-columns:220px 1fr;grid-template-rows:52px calc(100vh - 52px);height:100vh;overflow:hidden;}
+.desktop-topbar{grid-area:topbar;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:static !important;}
+.desktop-sidebar{grid-area:sidebar;background:var(--bg2);border-right:1px solid var(--border);padding:10px 8px;overflow-y:auto;display:flex !important;flex-direction:column !important;position:static !important;border-top:none !important;box-shadow:none !important;height:100% !important;}
+.desktop-sidebar::before{content:"🛺 SALONI";display:block;font-size:13px;font-weight:800;color:var(--accent,#0066cc);padding:6px 10px 12px;border-bottom:1px solid var(--border);margin-bottom:8px;letter-spacing:.5px;}
+.desktop-sidebar .nb{flex-direction:row !important;justify-content:flex-start !important;padding:8px 10px !important;font-size:13px !important;font-weight:500 !important;border-radius:6px !important;margin:1px 0 !important;border-top:none !important;gap:10px !important;width:100% !important;color:var(--txt2) !important;}
+.desktop-sidebar .nb span:first-child{font-size:16px !important;width:22px;text-align:center;}
+.desktop-sidebar .nb.on{background:var(--accent-light,#ebf0ff) !important;color:var(--accent,#0066cc) !important;font-weight:700 !important;}
+.desktop-sidebar .nb:hover:not(.on){background:var(--bg4) !important;color:var(--txt) !important;}
+.desktop-main{grid-area:main;overflow-y:auto !important;padding-bottom:20px;background:var(--bg,#f4f6f9);}
+.desktop-main .sec{padding:20px 24px;max-width:1400px;}
+.desktop-main .fab{display:none !important;}
+.desktop-hd{display:none !important;}
+
 </style>
 </head>
 <body>
@@ -910,10 +917,13 @@ function envRetard(cid){var r=null;for(var i=0;i<S.retards.length;i++){if(S.reta
 function getPhoto(cid){var ch=S.data.chauffeurs.filter(function(c){return String(c.id)===String(cid);})[0];if(ch&&ch.photo&&ch.photo.length>10)return ch.photo;try{return localStorage.getItem("photo_"+cid)||"";}catch(e){return "";}}
 
 // ══ RENDU PRINCIPAL ══
+
+
 function R(){
   if(!S.user){rLogin();return;}
   pingSession();rHD();rNAV();rScreen();
   if(S.modal)rModal();
+  setTimeout(applyDesktopLayout, 30);
   // Reprendre GPS si chauffeur et GPS était actif
   if(estCompteChauf()&&!_gpsActif){
     try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
@@ -949,135 +959,7 @@ function rLogin(){
   var lm=document.getElementById("lm");if(lm)lm.onkeydown=function(e){if(e.key==="Enter")login();};
 }
 
-function rHD(){
-  var al=getAl();var conx=getConx();
-  var isCh=estCompteChauf();
-  var isDesktop=window.innerWidth>=860;
-  var tt={home:"Accueil",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes auto",chat:"Chat",rsi:"RSI — Rentabilité",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
-  var pageTitle=tt[S.tab]||"Accueil";
-  var hdEl=document.getElementById("hd");
-  hdEl.innerHTML="";
 
-  var wrap=document.createElement("div");
-  wrap.className="hd";
-
-  if(isDesktop){
-    wrap.style.cssText="display:flex;align-items:center;justify-content:space-between;";
-    var left=document.createElement("div");
-    left.style.cssText="display:flex;align-items:center;gap:10px;";
-    if(S.tab!=="home"){
-      var backBtn=document.createElement("button");
-      backBtn.textContent="← Retour";
-      backBtn.style.cssText="background:var(--bg4);border:1px solid var(--border2);color:var(--accent);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;";
-      backBtn.onclick=function(){sT("home");};
-      left.appendChild(backBtn);
-    }
-    var titleEl=document.createElement("div");
-    titleEl.style.cssText="font-size:16px;font-weight:800;color:var(--txt);";
-    titleEl.textContent=pageTitle;
-    left.appendChild(titleEl);
-    var right=document.createElement("div");
-    right.style.cssText="display:flex;align-items:center;gap:8px;";
-    if(!isCh&&al.vis.length>0){
-      var alertBtn=document.createElement("button");
-      alertBtn.textContent="🚨 "+al.vis.length+" alerte(s)";
-      alertBtn.style.cssText="background:#fde8e8;border:1px solid #fecaca;color:#c81e1e;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;";
-      alertBtn.onclick=function(){sT("alertes");};
-      right.appendChild(alertBtn);
-    }
-    var roleEl=document.createElement("span");
-    roleEl.style.cssText="font-size:12px;color:var(--txt2);padding:0 8px;";
-    roleEl.textContent=S.user.role+" · "+conx.length+" en ligne";
-    right.appendChild(roleEl);
-    var darkBtn=document.createElement("button");
-    darkBtn.textContent=S.darkMode?"☀️":"🌙";
-    darkBtn.style.cssText="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:14px;cursor:pointer;";
-    darkBtn.onclick=function(){toggleDark();};
-    right.appendChild(darkBtn);
-    var logoutBtn=document.createElement("button");
-    logoutBtn.textContent="Quitter";
-    logoutBtn.style.cssText="background:#fde8e8;border:1px solid #fecaca;color:#c81e1e;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;";
-    logoutBtn.onclick=function(){jLog("deconnexion","Deconnexion");S.user=null;R();};
-    right.appendChild(logoutBtn);
-    wrap.appendChild(left);
-    wrap.appendChild(right);
-
-  } else {
-    // Mobile
-    var row=document.createElement("div");
-    row.style.cssText="display:flex;align-items:center;justify-content:space-between;";
-    var mLeft=document.createElement("div");
-    mLeft.style.cssText="display:flex;align-items:center;gap:10px;";
-    if(S.tab==="home"){
-      mLeft.innerHTML="<div style='width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;'>🛺</div>"
-        +"<div><div style='font-size:15px;font-weight:900;color:#fff;'>SALONI</div>"
-        +"<div style='font-size:10px;color:rgba(255,255,255,.65);'>"+(isCh?"Chauffeur · "+S.user.pseudo:S.user.role+" · "+conx.length+" en ligne")+"</div></div>";
-    } else {
-      var mBack=document.createElement("button");
-      mBack.textContent="←";
-      mBack.style.cssText="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:5px;padding:5px 9px;font-size:14px;cursor:pointer;";
-      mBack.onclick=function(){sT("home");};
-      mLeft.appendChild(mBack);
-      var mTitle=document.createElement("div");
-      mTitle.style.cssText="font-size:14px;font-weight:800;color:#fff;";
-      mTitle.textContent=pageTitle;
-      mLeft.appendChild(mTitle);
-    }
-    var mRight=document.createElement("div");
-    mRight.style.cssText="display:flex;gap:6px;align-items:center;";
-    if(!isCh&&al.vis.length>0){
-      var mAlert=document.createElement("button");
-      mAlert.textContent="🚨 "+al.vis.length;
-      mAlert.style.cssText="background:rgba(220,38,38,.3);border:1px solid rgba(220,38,38,.5);border-radius:5px;padding:4px 9px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;";
-      mAlert.onclick=function(){sT("alertes");};
-      mRight.appendChild(mAlert);
-    }
-    var mDark=document.createElement("button");
-    mDark.textContent=S.darkMode?"☀️":"🌙";
-    mDark.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 8px;font-size:14px;cursor:pointer;";
-    mDark.onclick=function(){toggleDark();};
-    mRight.appendChild(mDark);
-    var mLogout=document.createElement("button");
-    mLogout.textContent="🚪";
-    mLogout.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 9px;color:#fff;font-size:14px;cursor:pointer;";
-    mLogout.onclick=function(){jLog("deconnexion","Deconnexion");S.user=null;R();};
-    mRight.appendChild(mLogout);
-    row.appendChild(mLeft);
-    row.appendChild(mRight);
-    wrap.appendChild(row);
-  }
-
-  hdEl.appendChild(wrap);
-}
-
-function rNAV(){
-  var isCh=estCompteChauf();
-  var nbChat=getNbChatNonLus();
-  var T;
-  if(isCh){
-    var nbPrimes=getPrimeActive(S.user.chauffeurId).length;
-    T=[
-      {id:"home",ic:"⊞",lb:"Accueil"},
-      {id:"monversements",ic:"💵",lb:"Versements"},
-      {id:"chat",ic:"💬",lb:"Chat",badge:nbChat},
-      {id:"primes",ic:"⭐",lb:"Primes",badge:nbPrimes},
-      {id:"entretien",ic:"🔧",lb:"Entretien"},
-      {id:"monprofil",ic:"👤",lb:"Profil"}
-    ];
-  }else{
-    T=[
-      {id:"home",ic:"⊞",lb:"Accueil"},
-      {id:"chauffeurs",ic:"👥",lb:"Équipe"},
-      {id:"versements",ic:"💵",lb:"Versements"},
-      {id:"chat",ic:"💬",lb:"Chat",badge:nbChat},
-      {id:"plus",ic:"⋯",lb:"Plus"}
-    ];
-  }
-  document.getElementById("nav").innerHTML=T.map(function(t){
-    var bd=(t.badge&&t.badge>0)?'<span style="position:absolute;top:2px;right:6px;background:#dc2626;color:#fff;border-radius:8px;min-width:14px;padding:0 3px;font-size:8px;font-weight:800;line-height:14px;text-align:center;">'+t.badge+'</span>':"";
-    return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;">'+bd+'<span>'+t.ic+'</span><span>'+t.lb+'</span></button>';
-  }).join("");
-}
 
 
 
@@ -2461,10 +2343,34 @@ function envRetard(cid){var r=null;for(var i=0;i<S.retards.length;i++){if(S.reta
 function getPhoto(cid){var ch=S.data.chauffeurs.filter(function(c){return String(c.id)===String(cid);})[0];if(ch&&ch.photo&&ch.photo.length>10)return ch.photo;try{return localStorage.getItem("photo_"+cid)||"";}catch(e){return "";}}
 
 // ══ RENDU PRINCIPAL ══
+
+function applyDesktopLayout(){
+  var isD = window.innerWidth >= 768;
+  var app = document.getElementById("app");
+  var nav = document.getElementById("nav");
+  var hd = document.getElementById("hd");
+  var screen = document.getElementById("screen");
+  if(!app||!nav||!hd||!screen) return;
+  if(isD){
+    app.style.cssText = "display:grid;grid-template-areas:'h h' 'n s';grid-template-columns:220px 1fr;grid-template-rows:52px calc(100vh - 52px);height:100vh;overflow:hidden;";
+    hd.style.cssText = "grid-area:h;background:var(--bg2,#fff);border-bottom:1px solid #dde3ec;";
+    nav.style.cssText = "grid-area:n;position:static;display:flex;flex-direction:column;border-top:none;border-right:1px solid #dde3ec;padding:10px 8px;overflow-y:auto;height:100%;background:var(--bg2,#fff);box-shadow:none;";
+    screen.style.cssText = "grid-area:s;overflow-y:auto;padding-bottom:0;background:var(--bg,#f4f6f9);";
+    var fab = document.getElementById("fab");
+    if(fab) fab.style.display = "none";
+  } else {
+    app.style.cssText = "display:flex;flex-direction:column;height:100%;";
+    hd.style.cssText = "";
+    nav.style.cssText = "";
+    screen.style.cssText = "flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:75px;";
+  }
+}
+
 function R(){
   if(!S.user){rLogin();return;}
   pingSession();rHD();rNAV();rScreen();
   if(S.modal)rModal();
+  setTimeout(applyDesktopLayout, 30);
   // Reprendre GPS si chauffeur et GPS était actif
   if(estCompteChauf()&&!_gpsActif){
     try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
@@ -2540,10 +2446,20 @@ function rNAV(){
       {id:"plus",ic:"⋯",lb:"Plus"}
     ];
   }
-  document.getElementById("nav").innerHTML=T.map(function(t){
-    var bd=(t.badge&&t.badge>0)?'<span style="position:absolute;top:2px;right:6px;background:#dc2626;color:#fff;border-radius:8px;min-width:14px;padding:0 3px;font-size:8px;font-weight:800;line-height:14px;text-align:center;">'+t.badge+'</span>':"";
-    return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;">'+bd+'<span>'+t.ic+'</span><span>'+t.lb+'</span></button>';
+  var navEl = document.getElementById("nav");
+  var isD = window.innerWidth >= 768;
+  navEl.innerHTML=T.map(function(t){
+    var bd=(t.badge&&t.badge>0)?'<span style="position:absolute;top:2px;right:4px;background:#dc2626;color:#fff;border-radius:8px;min-width:14px;padding:0 3px;font-size:8px;font-weight:800;line-height:14px;text-align:center;">'+t.badge+'</span>':"";
+    if(isD){
+      return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;display:flex;flex-direction:row;justify-content:flex-start;align-items:center;padding:9px 12px;font-size:13px;font-weight:'+(S.tab===t.id?"700":"500")+';border-radius:7px;margin:1px 0;border-top:none;gap:10px;width:100%;background:'+(S.tab===t.id?"rgba(26,86,219,.1)":"transparent")+';color:'+(S.tab===t.id?"#1a56db":"#555")+';border:none;cursor:pointer;text-align:left;">'+bd+'<span style="font-size:17px;width:22px;text-align:center;flex-shrink:0;">'+t.ic+'</span><span>'+t.lb+'</span></button>';
+    } else {
+      return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;">'+bd+'<span>'+t.ic+'</span><span>'+t.lb+'</span></button>';
+    }
   }).join("");
+  // Réappliquer styles desktop sur le nav lui-même
+  if(isD){
+    navEl.style.cssText = "grid-area:n;position:static;display:flex;flex-direction:column;border-top:none;border-right:1px solid #dde3ec;padding:10px 8px;overflow-y:auto;height:100%;background:var(--bg2,#fff);box-shadow:none;";
+  }
 }
 
 
@@ -5011,13 +4927,15 @@ function pushPrimeDisponible(chauffeur){
 }
 
 load();checkEtAppliquerSanctions();R();showInstallBanner();
-// Re-render sur resize (mobile <-> desktop)
+// Re-render sur resize
 var _lastW = window.innerWidth;
 window.addEventListener('resize', function(){
   var w = window.innerWidth;
-  if((w >= 860) !== (_lastW >= 860)){
+  if((w >= 768) !== (_lastW >= 768)){
     _lastW = w;
     R();
+  } else {
+    applyDesktopLayout();
   }
 });
 // Restaurer notifications push au démarrage
