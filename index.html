@@ -953,7 +953,7 @@ function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
   var isDesktop=window.innerWidth>=900;
-  var tt={home:"Accueil",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes auto",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
+  var tt={home:"Accueil",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes auto",chat:"Chat",rsi:"RSI — Rentabilité",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
   var pageTitle=tt[S.tab]||"Accueil";
   var hdEl=document.getElementById("hd");
   hdEl.innerHTML="";
@@ -2503,7 +2503,7 @@ function rLogin(){
 function rHD(){
   var al=getAl();var conx=getConx();
   var isCh=estCompteChauf();
-  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"📊 Tableau de bord",historique:"Historique presence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
+  var tt={home:"",chauffeurs:"Mon équipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes automatiques",chat:"Chat",rsi:"RSI — Rentabilité",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"📊 Tableau de bord",historique:"Historique presence",securite:"Sécurité",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation Flotte",pushConfig:"Notifications Push"};
   var left=S.tab==="home"
   ?'<div style="display:flex;align-items:center;gap:9px;"><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:17px;">🛺</div>'
   +'<div><div style="font-size:16px;font-weight:900;" class="grad">SALONI</div>'
@@ -3437,6 +3437,189 @@ function renderBI(sc){
   sc.appendChild(wrap);
 }
 
+
+// ══ RSI — RETOUR SUR INVESTISSEMENT ══
+function renderRSI(sc){
+  var SAL = S.data.salonis || [];
+  var VE = S.data.versements || [];
+  var DE = S.data.depenses || [];
+  var CH = S.data.chauffeurs || [];
+
+  // Pour chaque saloni: calculer recettes totales, depenses liées, RSI
+  var rsiData = SAL.map(function(sal){
+    // Chauffeur(s) assigné(s) à ce saloni
+    var chauffeursS = CH.filter(function(c){ return String(c.saloniId)===String(sal.id)||String(c.saloni)===String(sal.id); });
+    var chIds = chauffeursS.map(function(c){ return String(c.id); });
+
+    // Recettes totales générées par ce saloni
+    var recettes = VE.filter(function(v){ return chIds.indexOf(String(v.chauffeurId))>=0; }).reduce(function(s,v){ return s+v.montant; },0);
+
+    // Depenses liées à ce saloni
+    var depensesSal = DE.filter(function(d){ return String(d.saloniId)===String(sal.id)||String(d.saloni)===String(sal.id); }).reduce(function(s,d){ return s+d.montant; },0);
+
+    // Investissement initial (prix d'achat si renseigné)
+    var prixAchat = sal.prixAchat || sal.prix || 0;
+    var totalInvesti = prixAchat + depensesSal;
+
+    // RSI = (recettes - depenses) / investissement * 100
+    var benefice = recettes - depensesSal;
+    var rsi = totalInvesti > 0 ? Math.round(benefice / totalInvesti * 100) : null;
+
+    // Recettes ce mois
+    var joursMois = [];
+    var now = new Date();
+    for(var i=1;i<=now.getDate();i++){
+      var d=new Date(now.getFullYear(),now.getMonth(),i);
+      joursMois.push(d.toLocaleDateString("fr-FR"));
+    }
+    var recettesMois = VE.filter(function(v){ return chIds.indexOf(String(v.chauffeurId))>=0 && joursMois.indexOf(v.date)>=0; }).reduce(function(s,v){ return s+v.montant; },0);
+
+    return {
+      sal: sal,
+      chauffeurs: chauffeursS,
+      recettes: recettes,
+      depenses: depensesSal,
+      prixAchat: prixAchat,
+      totalInvesti: totalInvesti,
+      benefice: benefice,
+      rsi: rsi,
+      recettesMois: recettesMois
+    };
+  }).sort(function(a,b){ return b.recettes - a.recettes; });
+
+  var totalRecettes = rsiData.reduce(function(s,r){ return s+r.recettes; },0);
+  var totalDepenses = rsiData.reduce(function(s,r){ return s+r.depenses; },0);
+  var totalBenefice = totalRecettes - totalDepenses;
+
+  // ── DOM ──
+  var wrap = document.createElement("div");
+  wrap.className = "sec";
+
+  // Header
+  var hdr = document.createElement("div");
+  hdr.style.cssText = "background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(124,58,237,.25);";
+  hdr.innerHTML = "<div style='font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;'>Retour sur investissement</div>"
+    +"<div style='font-size:26px;font-weight:900;color:#fff;'>"+fc(totalBenefice)+"</div>"
+    +"<div style='font-size:11px;color:rgba(255,255,255,.7);margin-top:3px;'>Benefice total · "+SAL.length+" saloni(s)</div>";
+  wrap.appendChild(hdr);
+
+  // KPIs globaux
+  var kpiRow = document.createElement("div");
+  kpiRow.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px;";
+  [
+    {l:"Recettes totales", v:fc(totalRecettes), c:"#059669"},
+    {l:"Depenses totales", v:fc(totalDepenses), c:"#dc2626"},
+    {l:"Marge globale", v:totalRecettes>0?Math.round(totalBenefice/totalRecettes*100)+"%":"—", c:totalBenefice>=0?"#059669":"#dc2626"}
+  ].forEach(function(k){
+    var card = document.createElement("div");
+    card.className = "card";
+    card.style.cssText = "padding:11px;text-align:center;";
+    card.innerHTML = "<div style='font-size:8px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px;'>"+k.l+"</div>"
+      +"<div style='font-size:15px;font-weight:900;color:"+k.c+";'>"+k.v+"</div>";
+    kpiRow.appendChild(card);
+  });
+  wrap.appendChild(kpiRow);
+
+  // Titre
+  var secTitle = document.createElement("div");
+  secTitle.style.cssText = "font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
+  secTitle.textContent = "Analyse par saloni";
+  wrap.appendChild(secTitle);
+
+  // Pas de salonis
+  if(SAL.length === 0){
+    var empty = document.createElement("div");
+    empty.className = "card";
+    empty.style.cssText = "text-align:center;padding:30px;color:#64748b;";
+    empty.innerHTML = "<div style='font-size:36px;margin-bottom:8px;'>🛺</div><div style='font-weight:700;'>Aucun saloni enregistré</div><div style='font-size:12px;margin-top:4px;'>Ajoutez vos salonis dans l'onglet Ma flotte</div>";
+    wrap.appendChild(empty);
+    sc.innerHTML="";sc.appendChild(wrap);return;
+  }
+
+  // Carte par saloni
+  rsiData.forEach(function(r, idx){
+    var card = document.createElement("div");
+    card.className = "card";
+    card.style.cssText = "padding:0;overflow:hidden;margin-bottom:10px;";
+
+    // Header saloni
+    var salHdr = document.createElement("div");
+    var rsiCol = r.rsi===null?"#64748b":r.rsi>=50?"#059669":r.rsi>=0?"#d97706":"#dc2626";
+    salHdr.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#dbeafe);";
+
+    var salLeft = document.createElement("div");
+    salLeft.innerHTML = "<div style='font-size:14px;font-weight:800;color:var(--txt,#0f172a);'>🛺 "+(r.sal.nom||r.sal.immatriculation||"Saloni "+(idx+1))+"</div>"
+      +"<div style='font-size:11px;color:#64748b;margin-top:2px;'>"+(r.sal.immatriculation||"")+(r.chauffeurs.length>0?" · "+r.chauffeurs.map(function(c){return c.nom;}).join(", "):" · Non assigné")+"</div>";
+
+    var salRight = document.createElement("div");
+    salRight.style.cssText = "text-align:right;";
+    if(r.rsi !== null){
+      salRight.innerHTML = "<div style='font-size:18px;font-weight:900;color:"+rsiCol+";'>"+r.rsi+"%</div><div style='font-size:9px;color:#64748b;'>RSI</div>";
+    } else {
+      salRight.innerHTML = "<div style='font-size:12px;color:#64748b;font-weight:600;'>Prix non<br>renseigné</div>";
+    }
+
+    salHdr.appendChild(salLeft);
+    salHdr.appendChild(salRight);
+    card.appendChild(salHdr);
+
+    // Détails financiers
+    var details = document.createElement("div");
+    details.style.cssText = "padding:12px 14px;";
+
+    // Ligne recettes/depenses/benefice
+    var financRow = document.createElement("div");
+    financRow.style.cssText = "display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;";
+    [
+      {l:"Recettes", v:fc(r.recettes), c:"#059669"},
+      {l:"Depenses", v:fc(r.depenses), c:"#dc2626"},
+      {l:"Benefice", v:fc(r.benefice), c:r.benefice>=0?"#059669":"#dc2626"}
+    ].forEach(function(f){
+      var cell = document.createElement("div");
+      cell.style.cssText = "background:var(--bg3,#f8faff);border-radius:8px;padding:8px;text-align:center;";
+      cell.innerHTML = "<div style='font-size:8px;color:#64748b;font-weight:700;text-transform:uppercase;'>"+f.l+"</div>"
+        +"<div style='font-size:12px;font-weight:800;color:"+f.c+";margin-top:2px;'>"+f.v+"</div>";
+      financRow.appendChild(cell);
+    });
+    details.appendChild(financRow);
+
+    // Barre progression RSI
+    if(r.rsi !== null){
+      var barLabel = document.createElement("div");
+      barLabel.style.cssText = "font-size:10px;color:#64748b;margin-bottom:4px;";
+      barLabel.textContent = "RSI: "+r.rsi+"% — "+(r.rsi>=100?"Investissement remboursé !":r.rsi>=50?"Bonne rentabilité":r.rsi>=0?"En cours de rentabilisation":"Déficitaire");
+      details.appendChild(barLabel);
+
+      var barWrap = document.createElement("div");
+      barWrap.style.cssText = "background:#e2e8f0;border-radius:4px;height:7px;overflow:hidden;";
+      var barFill = document.createElement("div");
+      barFill.style.cssText = "height:100%;border-radius:4px;background:"+rsiCol+";width:"+Math.min(Math.abs(r.rsi),100)+"%;";
+      barWrap.appendChild(barFill);
+      details.appendChild(barWrap);
+    }
+
+    // Prix achat si renseigné
+    if(r.prixAchat > 0){
+      var prixLine = document.createElement("div");
+      prixLine.style.cssText = "font-size:10px;color:#64748b;margin-top:8px;";
+      prixLine.textContent = "Prix achat: "+fc(r.prixAchat)+" · Ce mois: "+fc(r.recettesMois);
+      details.appendChild(prixLine);
+    } else {
+      var addPrix = document.createElement("div");
+      addPrix.style.cssText = "margin-top:8px;padding:7px 10px;background:#f5f3ff;border-radius:7px;font-size:11px;color:#7c3aed;cursor:pointer;font-weight:600;";
+      addPrix.textContent = "💡 Renseignez le prix d'achat pour calculer le RSI";
+      addPrix.onclick = (function(salId){ return function(){ oM("editSal",{id:salId}); }; })(r.sal.id);
+      details.appendChild(addPrix);
+    }
+
+    card.appendChild(details);
+    wrap.appendChild(card);
+  });
+
+  sc.innerHTML="";
+  sc.appendChild(wrap);
+}
+
 // ══ ÉCRANS GÉRANT/ADMIN ══
 function rScreenGlobal(sc){
   var CH=S.data.chauffeurs,VE=S.data.versements,DE=S.data.depenses,AM=S.data.amendes,SAL=S.data.salonis,MS=S.data.messages;
@@ -4260,8 +4443,13 @@ function rScreenGlobal(sc){
     html=null;
   }
 
-  else if(S.tab==="bi"||S.tab==="rsi"){
+  else if(S.tab==="bi"){
     renderBI(sc);
+    html=null;
+  }
+
+  else if(S.tab==="rsi"){
+    renderRSI(sc);
     html=null;
   }
 
