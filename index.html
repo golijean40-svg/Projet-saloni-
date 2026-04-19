@@ -379,7 +379,7 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
 <script>
 // ══ DONNÉES DE BASE ══
 var COMPTES_BASE=[
-  {pseudo:"gerant",mdp:"saloni2026",role:"Gerant",niveau:3},
+  {pseudo:"gerant",mdp:"Cedric10@",role:"Gerant",niveau:3},
   {pseudo:"admin",mdp:"admin123",role:"Admin",niveau:2},
   {pseudo:"abidjan",mdp:"saloni123",role:"Abidjan",niveau:1}
 ];
@@ -400,6 +400,9 @@ var CHC={actif:"#059669",repos:"#d97706",suspendu:"#dc2626"};
 var JOURS=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 var PRIME_MONTANT=15000;
 
+// ══ SONS MESSAGES ══
+
+
 var S={
 user:null,tab:"home",seg:"recettes",rapSeg:"semaine",
 filtreCh:"",filtreDate:"",
@@ -411,673 +414,175 @@ newPerms:{},chatConvOuverte:null,iaHist:[],iaLoading:false,darkMode:false,biSeg:
 // ══ SÉCURITÉ ══
 var SEC_INACTIVITY=5*60*1000;var SEC_MAX_ATTEMPTS=5;var SEC_BLOCK_DURATION=15*60*1000;
 var _secTimer=null;var _secPinCallback=null;
-function secResetTimer(){if(!S.user){if(_secTimer){clearTimeout(_secTimer);_secTimer=null;}return;}if(_secTimer)clearTimeout(_secTimer);_secTimer=setTimeout(function(){if(S.user){var pseudo=S.user.pseudo;S.user=null;if(_secTimer){clearTimeout(_secTimer);_secTimer=null;}jLog("deconnexion","Déconnexion auto (inactivité 5 min) — "+pseudo);_showInactivityAlert();R();}},SEC_INACTIVITY);}
-function _showInactivityAlert(){var old=document.getElementById("_inactAlert");if(old)old.remove();var d=document.createElement("div");d.id="_inactAlert";d.style.cssText="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;";d.innerHTML='<div style="background:#1e293b;border-radius:20px;padding:24px;max-width:300px;width:100%;text-align:center;"><div style="font-size:44px;margin-bottom:12px;">⏱</div><div style="color:#fff;font-size:16px;font-weight:800;margin-bottom:8px;">Session expirée</div><div style="color:#94a3b8;font-size:13px;margin-bottom:20px;">Déconnecté après 5 min d\'inactivité.</div><button onclick="document.getElementById(\'_inactAlert\').remove();" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:12px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">Se reconnecter</button></div>';document.body.appendChild(d);}
+
+
 ["touchstart","touchmove","click","keydown","scroll","mousedown"].forEach(function(ev){document.addEventListener(ev,function(){if(S.user)secResetTimer();},{passive:true,capture:true});});
-function secGetAttempts(){try{return JSON.parse(localStorage.getItem("sal_attempts")||"{}");}catch(e){return{};}}
-function secSetAttempts(data){try{localStorage.setItem("sal_attempts",JSON.stringify(data));}catch(e){}}
-function secCheckBlocked(pseudo){var data=secGetAttempts();if(!data[pseudo])return false;if(data[pseudo].blocked&&Date.now()<data[pseudo].blockedUntil)return Math.ceil((data[pseudo].blockedUntil-Date.now())/60000);if(data[pseudo].blocked&&Date.now()>=data[pseudo].blockedUntil){delete data[pseudo];secSetAttempts(data);return false;}return false;}
-function secRecordAttempt(pseudo,success){var data=secGetAttempts();if(success){delete data[pseudo];secSetAttempts(data);return;}if(!data[pseudo])data[pseudo]={count:0};data[pseudo].count++;if(data[pseudo].count>=SEC_MAX_ATTEMPTS){data[pseudo].blocked=true;data[pseudo].blockedUntil=Date.now()+SEC_BLOCK_DURATION;jLog("connexion","SÉCURITÉ: compte "+pseudo+" bloqué");}secSetAttempts(data);}
-function secAttemptsLeft(pseudo){var data=secGetAttempts();if(!data[pseudo])return SEC_MAX_ATTEMPTS;return Math.max(0,SEC_MAX_ATTEMPTS-data[pseudo].count);}
-function secLogSuspect(pseudo){var t=new Date().toLocaleString("fr-FR");try{var logs=JSON.parse(localStorage.getItem("sal_suspect")||"[]");logs.unshift({pseudo:pseudo,ts:t,ua:navigator.userAgent.substring(0,50)});if(logs.length>50)logs=logs.slice(0,50);localStorage.setItem("sal_suspect",JSON.stringify(logs));}catch(e){}}
-function secConfirmPin(action,cb){if(!S.user||S.user.niveau<3){cb();return;}_secPinCallback=cb;var old=document.getElementById("secPinModal");if(old)old.remove();var d=document.createElement("div");d.id="secPinModal";d.style.cssText="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px;";d.innerHTML='<div style="background:var(--bg2,#fff);border-radius:20px;padding:24px;max-width:300px;width:100%;"><div style="text-align:center;margin-bottom:16px;"><div style="font-size:36px;margin-bottom:8px;">🔐</div><div style="font-size:15px;font-weight:800;color:var(--txt,#0f172a);">Confirmation requise</div></div><input id="pinInput" type="password" placeholder="Mot de passe" style="margin-bottom:12px;"/><div id="pinErr" style="display:none;color:#dc2626;font-size:12px;text-align:center;margin-bottom:8px;"></div><div style="display:flex;gap:9px;"><button onclick="document.getElementById(\'secPinModal\').remove();_secPinCallback=null;" style="flex:1;padding:12px;border-radius:11px;background:var(--bg4,#eff6ff);border:1px solid var(--border2,#bfdbfe);color:#1d4ed8;font-weight:700;cursor:pointer;">Annuler</button><button onclick="secValidatePin()" class="bor" style="flex:1;padding:12px;">Confirmer</button></div></div>';document.body.appendChild(d);setTimeout(function(){var inp=document.getElementById("pinInput");if(inp)inp.focus();},100);var inp2=document.getElementById("pinInput");if(inp2)inp2.onkeydown=function(e){if(e.keyCode===13)secValidatePin();};}
-function secValidatePin(){var inp=document.getElementById("pinInput");if(!inp)return;var val=inp.value.trim();var ok=tousComptes().filter(function(c){return c.pseudo===S.user.pseudo&&c.mdp===val;}).length>0;if(ok){document.getElementById("secPinModal").remove();if(_secPinCallback){_secPinCallback();_secPinCallback=null;}}else{var err=document.getElementById("pinErr");if(err){err.style.display="block";err.textContent="Mot de passe incorrect";}inp.value="";inp.focus();}}
-function getSecurityLogs(){try{return JSON.parse(localStorage.getItem("sal_suspect")||"[]");}catch(e){return[];}}
+
+
+
+
+
+
+
+
+
 
 // ══ 2FA ══
 var TFA_KEY="sal_2fa_config";
-function get2FAConfig(){try{return JSON.parse(localStorage.getItem(TFA_KEY)||"{}");}catch(e){return{};}}
-function save2FAConfig(cfg){try{localStorage.setItem(TFA_KEY,JSON.stringify(cfg));}catch(e){}if(db){try{db.collection("sal_config").doc("2fa").set(cfg);}catch(e){}}}
-function load2FAConfig(cb){if(!db){cb(get2FAConfig());return;}db.collection("sal_config").doc("2fa").get().then(function(doc){if(doc.exists){var cfg=doc.data()||{};try{localStorage.setItem(TFA_KEY,JSON.stringify(cfg));}catch(e){}cb(cfg);}else{cb(get2FAConfig());}}).catch(function(){cb(get2FAConfig());});}
-function show2FA(user,onSuccess){var old=document.getElementById("tfa_screen");if(old)old.remove();var div=document.createElement("div");div.id="tfa_screen";div.style.cssText="position:fixed;inset:0;z-index:9998;background:linear-gradient(135deg,#1e3a8a,#2563eb);display:flex;align-items:center;justify-content:center;padding:20px;";div.innerHTML='<div style="width:100%;max-width:340px;"><div style="text-align:center;margin-bottom:24px;"><div style="width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;">🔐</div><div style="font-size:20px;font-weight:900;color:#fff;">Double Authentification</div><div style="font-size:12px;color:rgba(255,255,255,.7);margin-top:6px;">Connecté en tant que <strong>'+user.pseudo+'</strong></div></div><div style="background:#fff;border-radius:18px;padding:20px;"><div style="margin-bottom:12px;"><label style="display:block;font-size:11px;color:#64748b;margin-bottom:5px;font-weight:700;text-transform:uppercase;">Code secret 2FA</label><input id="tfa_input" type="password" placeholder="Votre code secret" style="text-align:center;font-size:22px;font-weight:900;letter-spacing:4px;" autocomplete="off"/></div><div id="tfa_err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:9px;font-size:12px;color:#dc2626;margin-bottom:11px;text-align:center;"></div><button id="tfa_btn" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border-radius:12px;padding:14px;font-weight:800;border:none;font-size:15px;cursor:pointer;">Valider</button><button onclick="document.getElementById(\'tfa_screen\').remove();S.user=null;R();" style="width:100%;margin-top:9px;background:transparent;border:none;color:#94a3b8;font-size:12px;cursor:pointer;padding:8px;">Annuler et se déconnecter</button></div></div>';document.body.appendChild(div);var inp=document.getElementById("tfa_input");var btn=document.getElementById("tfa_btn");var err=document.getElementById("tfa_err");var attempts=0;function validate(){var val=inp.value.trim();var cfg=get2FAConfig();if(val===cfg.code){div.remove();jLog("connexion","2FA validée — "+user.pseudo);onSuccess();}else{attempts++;inp.value="";err.style.display="block";err.textContent="Code incorrect. "+(5-attempts)+" tentative(s) restante(s).";if(attempts>=5){jLog("connexion","SÉCURITÉ: 2FA échouée 5x — "+user.pseudo);div.remove();S.user=null;alert("Trop de tentatives 2FA. Déconnecté.");R();}}}if(btn)btn.onclick=validate;if(inp)inp.onkeydown=function(e){if(e.keyCode===13)validate();};setTimeout(function(){if(inp)inp.focus();},100);}
+
+
+
+
 
 // ══ JOURNAL ══
 var JOURNAL_KEY="sal_journal";var JOURNAL_MAX=200;
 var JOURNAL_ICONS={connexion:"🔑",deconnexion:"🚪",versement_ajout:"💵",versement_suppr:"🗑",chauffeur_ajout:"👤",chauffeur_suppr:"❌",saloni_ajout:"🛺",saloni_suppr:"❌",depense_ajout:"📋",amende_ajout:"🚔"};
 var JOURNAL_COLORS={connexion:"#059669",deconnexion:"#64748b",versement_ajout:"#1d4ed8",versement_suppr:"#dc2626",chauffeur_ajout:"#7c3aed",chauffeur_suppr:"#dc2626",saloni_ajout:"#0891b2",saloni_suppr:"#dc2626",depense_ajout:"#d97706",amende_ajout:"#dc2626"};
-function jLog(type,detail){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");var entry={id:Date.now(),type:type,detail:detail||"",user:S.user?S.user.pseudo:"—",role:S.user?S.user.role:"—",date:td(),heure:hr(),ts:Date.now()};logs.unshift(entry);if(logs.length>JOURNAL_MAX)logs=logs.slice(0,JOURNAL_MAX);localStorage.setItem(JOURNAL_KEY,JSON.stringify(logs));
-  // Connexions/déconnexions → Firebase pour visibilité gérant
-  if(db&&(type==="connexion"||type==="deconnexion")){try{var fe=Object.assign({},entry,{id:entry.id.toString()});db.collection("sal_journal").doc(fe.id).set(fe);}catch(e){}}
-}catch(e){}}
-function getJournal(filtre){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");if(filtre&&filtre!=="tous")logs=logs.filter(function(l){if(filtre==="versements")return l.type.indexOf("versement")>=0;if(filtre==="acces")return l.type==="connexion"||l.type==="deconnexion";if(filtre==="donnees")return l.type.indexOf("chauffeur")>=0||l.type.indexOf("saloni")>=0||l.type.indexOf("depense")>=0||l.type.indexOf("amende")>=0;return true;});return logs;}catch(e){return[];}}
-function clearJournal(){if(!confirm("Effacer tout le journal ?"))return;try{localStorage.removeItem(JOURNAL_KEY);}catch(e){}rScreen();}
+
+
+
 
 // ══ ALERTES AUTO ══
 var ALERTE_KEY="sal_alertes_config";var ALERTE_SENT_KEY="sal_alertes_sent";
-function getAlerteConfig(){try{return JSON.parse(localStorage.getItem(ALERTE_KEY)||"{}");}catch(e){return{};}}
-function saveAlerteConfig(cfg){try{localStorage.setItem(ALERTE_KEY,JSON.stringify(cfg));}catch(e){}}
-function getMsgDefaut(c,manque){return "Bonjour "+c.nom+",\nVous n'avez pas effectué votre versement d'aujourd'hui.\nMontant manquant: "+fc(manque)+".\nMerci de régulariser au plus vite.\n— Saloni Manager";}
-function getMsgAlerte(c,manque){var cfg=getAlerteConfig();var tpl=cfg["msg_"+c.id]||cfg["msg_defaut"]||getMsgDefaut(c,manque);return tpl.replace(/\{nom\}/g,c.nom).replace(/\{manque\}/g,fc(manque)).replace(/\{date\}/g,td()).replace(/\{objectif\}/g,fc(getObjJ(c)));}
-function alerteDejaSent(cid){try{var sent=JSON.parse(localStorage.getItem(ALERTE_SENT_KEY)||"{}");return sent[cid]===td();}catch(e){return false;}}
-function marquerAlerteSent(cid){try{var sent=JSON.parse(localStorage.getItem(ALERTE_SENT_KEY)||"{}");sent[cid]=td();localStorage.setItem(ALERTE_SENT_KEY,JSON.stringify(sent));}catch(e){}}
-function envoyerAlerteNonPaiement(c,manque,forceWA){var msg=getMsgAlerte(c,manque);var item={id:Date.now(),de:"Système",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};S.data.messages.push(item);fbSave("messages",item);jLog("versement_suppr","⚠️ Alerte non-paiement: "+c.nom+" (manque "+fc(manque)+")");pushVersementManquant(c,manque);;var tel=c.tel?c.tel.replace(/\D/g,"").replace(/^0/,"225"):"";if(tel&&forceWA!==false)window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");marquerAlerteSent(c.id);}
-function checkAlertesAuto(){var cfg=getAlerteConfig();if(!cfg.actif)return;var heure=new Date().getHours();var heureAlerte=parseInt(cfg.heure||"20");if(heure<heureAlerte)return;var t=td();var vj=S.data.versements.filter(function(v){return v.date===t;});S.data.chauffeurs.forEach(function(c){if(c.statut!=="actif")return;if(c.freqPaiement==="Hebdomadaire")return;if(alerteDejaSent(c.id))return;var paye=getVJ(c,vj);var obj=getObjJ(c);var manque=obj-paye;if(manque>0)envoyerAlerteNonPaiement(c,manque,false);});if(S.user)R();}
+
+
+
+
+
+
+
+
 setInterval(function(){if(S.user)checkAlertesAuto();},60000);
 
 // ══ PRIMES ══
-function getPrimesData(){if(!S.data.primes)S.data.primes=[];if(!S.data.entretiens)S.data.entretiens=[];if(!S.data.sanctions)S.data.sanctions=[];if(!S.data.positions)S.data.positions=[];return S.data.primes;}
-function getPrimeChauffeur(cid){return getPrimesData().filter(function(p){return String(p.chauffeurId)===String(cid);});}
-function getPrimeActive(cid){return getPrimesData().filter(function(p){return String(p.chauffeurId)===String(cid)&&p.statut==="active"&&!p.paye;});}
-function getNbPrimesActives(){return getPrimesData().filter(function(p){return p.statut==="active"&&!p.paye;}).length;}
-function primeConditionsOk(cid){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];
-  if(!c)return{ok:false,details:"Chauffeur introuvable"};
-  var sem=getSem();
-  var vSem=S.data.versements.filter(function(v){return String(v.chauffeurId)===String(c.id)&&sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
-  var objSem=getObjS(c);
-  var retard=vSem<objSem;
-  var accident=c.accident===true;
-  var details=[];
-  if(retard)details.push("Versements incomplets ("+fc(vSem)+" / "+fc(objSem)+")");
-  if(accident)details.push("Accident signalé");
-  return{ok:!retard&&!accident,details:details.length?details.join(", "):"✅ Conditions remplies"};
-}
-function activerPrime(cid,periode){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];if(!c)return;
-  var dejaActive=getPrimeActive(cid).length>0;
-  if(dejaActive){alert("Ce chauffeur a déjà une prime active non payée.");return;}
-  var item={id:Date.now(),chauffeurId:String(cid),nom:c.nom,montant:PRIME_MONTANT,statut:"active",periode:periode||td(),dateAttribution:td(),heureAttribution:hr(),paye:false};
-  if(!S.data.primes)S.data.primes=[];if(!S.data.entretiens)S.data.entretiens=[];if(!S.data.sanctions)S.data.sanctions=[];if(!S.data.positions)S.data.positions=[];
-  S.data.primes.push(item);
-  fbSave("primes",item);save();
-  jLog("versement_ajout","⭐ Prime attribuée: "+c.nom+" — "+fc(PRIME_MONTANT));pushPrimeDisponible(c);
-  alert("Prime de "+fc(PRIME_MONTANT)+" attribuée à "+c.nom+" !");
-  R();
-}
-function marquerPrimePayee(primeId){
-  var p=S.data.primes.filter(function(x){return String(x.id)===String(primeId);})[0];
-  if(p){p.statut="payee";p.paye=true;p.datePaiement=td();fbSave("primes",p);save();R();}
-}
-function supprimerPrime(primeId){
-  if(!confirm("Annuler cette prime ?"))return;
-  S.data.primes=S.data.primes.filter(function(p){return String(p.id)!==String(primeId);});
-  fbDel("primes",primeId);save();R();
-}
+
+
+
+
+
+
+
+
 // ══ GPS WHATSAPP ══
-function envoyerGPS(c){
-  var tel=c.tel?c.tel.replace(/\D/g,"").replace(/^0/,"225"):"";
-  if(!tel){alert("Numéro manquant pour "+c.nom);return;}
-  var msg="📍 Saloni Manager — Demande de position\n\nBonjour "+c.nom+",\nMerci de partager votre position en temps réel via ce lien :\nhttps://wa.me/"+tel+"\n\nAppuyez sur 📎 > Position > Partager position en direct";
-  window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");
-}
-function ouvrirCarteGPS(lat,lng,nom){
-  window.open("https://www.google.com/maps?q="+lat+","+lng+"&z=15","_blank");
-}
+
+
 
 // ══ ENTRETIENS ══
-function getEntretiensChauffeur(cid){return(S.data.entretiens||[]).filter(function(e){return String(e.chauffeurId)===String(cid);}).sort(function(a,b){return b.ts-a.ts;});}
-function getAlerteEntretiens(){
-  var alerts=[];
-  S.data.chauffeurs.forEach(function(c){
-    var ents=getEntretiensChauffeur(c.id);
-    var types=["vidange","pneus","freins","revision"];
-    types.forEach(function(type){
-      var last=ents.filter(function(e){return e.type===type&&e.statut==="fait";})[0];
-      var seuils={vidange:90,pneus:180,freins:365,revision:90};
-      if(last){
-        var lastDate=new Date(last.dateFait||last.date.split("/").reverse().join("-"));
-        var jours=Math.round((Date.now()-lastDate.getTime())/(1000*60*60*24));
-        if(jours>=seuils[type])alerts.push({id:"ent-"+c.id+"-"+type,icon:"🔧",msg:c.nom+" — "+type+" à faire ("+jours+"j écoulés)",cid:c.id,type:type,urgent:jours>=seuils[type]*1.2});
-      }else{
-        alerts.push({id:"ent-"+c.id+"-"+type,icon:"🔧",msg:c.nom+" — "+type+" jamais enregistré",cid:c.id,type:type,urgent:false});
-      }
-    });
-  });
-  return alerts;
-}
-function signalerEntretien(cid,type,statut,note){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];if(!c)return;
-  var item={id:Date.now(),chauffeurId:String(cid),nomChauffeur:c.nom,type:type,statut:statut||"demande",note:note||"",date:td(),heure:hr(),ts:Date.now(),dateFait:statut==="fait"?td():""};
-  if(!S.data.entretiens)S.data.entretiens=[];
-  S.data.entretiens.push(item);
-  fbSave("entretiens",item);save();
-  jLog("versement_ajout","🔧 Entretien "+type+" ("+statut+"): "+c.nom);
-  // Notifier le gérant via message interne
-  if(statut==="demande"){
-    var msg="🔧 Entretien demandé par "+c.nom+"\nType: "+type.toUpperCase()+"\nDate: "+td()+(note?" — "+note:"");
-    var msg_item={id:Date.now()+1,de:c.nom,pour:null,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
-    S.data.messages.push(msg_item);fbSave("messages",msg_item);
-  }
-  R();
-}
-function validerEntretien(entId){
-  var e=S.data.entretiens.filter(function(x){return String(x.id)===String(entId);})[0];
-  if(e){e.statut="fait";e.dateFait=td();fbSave("entretiens",e);save();R();}
-}
-function closeME(){var m=document.getElementById("_modalEnt");if(m)m.remove();}
 
-function modalEntretien(cid){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];
-  if(!c)return;
-  var isCh=estCompteChauf();
-  var old=document.getElementById("_modalEnt");if(old)old.remove();
-  var typeKeys=["vidange","pneus","freins","revision","autre"];
-  var typeIcons={vidange:"🛢",pneus:"🔵",freins:"🔴",revision:"🔧",autre:"⚙️"};
-  var typeLabels={vidange:"Vidange",pneus:"Pneus",freins:"Freins",revision:"Revision",autre:"Autre"};
-  var ents=getEntretiensChauffeur(cid).slice(0,5);
-  var statut=isCh?"demande":"fait";
 
-  // Overlay
-  var d=document.createElement("div");
-  d.id="_modalEnt";
-  d.style.cssText="position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.6);display:flex;align-items:flex-end;";
-  d.onclick=function(ev){if(ev.target===d)closeME();};
 
-  // Sheet
-  var sheet=document.createElement("div");
-  sheet.style.cssText="background:var(--sheet-bg,#fff);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;";
 
-  // Handle bar
-  var bar=document.createElement("div");
-  bar.style.cssText="width:36px;height:4px;background:#dbeafe;border-radius:2px;margin:10px auto;";
-  sheet.appendChild(bar);
 
-  // Header
-  var hdr=document.createElement("div");
-  hdr.style.cssText="padding:12px 18px;border-bottom:1px solid var(--border,#dbeafe);display:flex;justify-content:space-between;align-items:center;";
-  var hdrTxt=document.createElement("div");
-  hdrTxt.style.cssText="font-size:16px;font-weight:800;color:var(--txt,#0f172a);";
-  hdrTxt.textContent="Entretien — "+c.nom;
-  var closeBtn=document.createElement("button");
-  closeBtn.textContent="X";
-  closeBtn.style.cssText="background:#f8faff;border:1px solid #dbeafe;border-radius:9px;padding:7px 12px;color:#64748b;cursor:pointer;";
-  closeBtn.onclick=closeME;
-  hdr.appendChild(hdrTxt);hdr.appendChild(closeBtn);
-  sheet.appendChild(hdr);
 
-  // Body
-  var body=document.createElement("div");
-  body.style.cssText="padding:16px 18px 32px;";
 
-  var bodyTitle=document.createElement("div");
-  bodyTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:10px;";
-  bodyTitle.textContent=isCh?"Signaler une panne / besoin":"Marquer comme effectue";
-  body.appendChild(bodyTitle);
 
-  // Grid boutons types
-  var grid=document.createElement("div");
-  grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;";
-  typeKeys.forEach(function(t){
-    var last=getEntretiensChauffeur(cid).filter(function(e){return e.type===t&&e.statut==="fait";})[0];
-    var btn=document.createElement("div");
-    btn.style.cssText="background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);border-radius:12px;padding:13px 8px;text-align:center;cursor:pointer;";
-    var ico=document.createElement("div");ico.style.cssText="font-size:18px;margin-bottom:4px;";ico.textContent=typeIcons[t];
-    var lbl=document.createElement("div");lbl.style.cssText="font-size:11px;font-weight:700;color:var(--txt,#0f172a);";lbl.textContent=typeLabels[t];
-    var st=document.createElement("div");st.style.cssText="font-size:9px;margin-top:2px;color:"+(last?"#059669":"#dc2626")+";";
-    st.textContent=last?last.dateFait:"Non enregistre";
-    btn.appendChild(ico);btn.appendChild(lbl);btn.appendChild(st);
-    (function(type,s){
-      btn.onclick=function(){signalerEntretien(cid,type,s);closeME();};
-    })(t,statut);
-    grid.appendChild(btn);
-  });
-  body.appendChild(grid);
 
-  // Historique
-  if(ents.length>0){
-    var histTitle=document.createElement("div");
-    histTitle.style.cssText="font-size:12px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:8px;";
-    histTitle.textContent="Historique recent";
-    body.appendChild(histTitle);
-    var histCard=document.createElement("div");
-    histCard.style.cssText="background:var(--bg3,#f8faff);border:1px solid var(--border,#dbeafe);border-radius:12px;padding:4px 0;";
-    ents.forEach(function(e){
-      var sCol=e.statut==="fait"?"#059669":e.statut==="demande"?"#d97706":"#64748b";
-      var row=document.createElement("div");
-      row.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border,#dbeafe);";
-      row.innerHTML='<div style="font-size:18px;">'+(typeIcons[e.type]||"⚙️")+'</div>'
-        +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--txt,#0f172a);">'+e.type.charAt(0).toUpperCase()+e.type.slice(1)+'</div>'
-        +'<div style="font-size:10px;color:#64748b;">'+e.date+'</div></div>'
-        +'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+sCol+'18;color:'+sCol+';border:1px solid '+sCol+'33;font-weight:700;">'+e.statut+'</span>';
-      histCard.appendChild(row);
-    });
-    body.appendChild(histCard);
-  }
-
-  sheet.appendChild(body);
-  d.appendChild(sheet);
-  document.body.appendChild(d);
-}
-
-function signalerEntretienCh(cid,type,statut){signalerEntretien(cid,type,statut);}
 
 
 // ══ SANCTIONS ══
-function getSanctionsChauffeur(cid){return(S.data.sanctions||[]).filter(function(s){return String(s.chauffeurId)===String(cid);}).sort(function(a,b){return b.ts-a.ts;});}
-function checkEtAppliquerSanctions(){
-  if(!S.data.sanctions)S.data.sanctions=[];
-  if(!S.data.entretiens)S.data.entretiens=[];
-
-  S.data.chauffeurs.forEach(function(c){
-    if(c.statut!=="actif")return;
-    var isHebdo=c.freqPaiement==="Hebdomadaire";
-
-    if(isHebdo){
-      // ══ CHAUFFEUR HEBDOMADAIRE : sanction si 1 semaine sans verser ══
-      // Récupérer les 7 derniers jours
-      var jours7=[];
-      for(var i=1;i<=7;i++){
-        var d=new Date();d.setDate(d.getDate()-i);
-        jours7.push(d.toLocaleDateString("fr-FR"));
-      }
-      // Aucun versement sur toute la semaine ?
-      var aVerseHebdo=S.data.versements.some(function(v){
-        return String(v.chauffeurId)===String(c.id)&&jours7.indexOf(v.date)>=0;
-      });
-      if(aVerseHebdo)return;
-
-      // Panne signalée cette semaine ?
-      var panneSemaine=S.data.entretiens.some(function(e){
-        return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&jours7.indexOf(e.date)>=0;
-      });
-      if(panneSemaine)return;
-
-      // Déjà sanctionné cette semaine ?
-      var dejaSanctHebdo=S.data.sanctions.some(function(s){
-        return String(s.chauffeurId)===String(c.id)&&s.type==="non_versement_hebdo"
-          &&(Date.now()-s.ts)<7*24*60*60*1000;
-      });
-      if(dejaSanctHebdo)return;
-
-      // Appliquer sanction hebdo
-      var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,
-        type:"non_versement_hebdo",frequence:"Hebdomadaire",
-        montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
-        description:"1 semaine sans versement sans notification de panne"};
-      S.data.sanctions.push(item);
-      fbSave("sanctions",item);save();
-      var msg="Sanction HEBDO: "+c.nom+" - 1 semaine sans versement sans panne signalee. Contactez votre gerant. — Saloni Manager";
-      var mi={id:Date.now()+1,de:"Systeme",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
-      S.data.messages.push(mi);fbSave("messages",mi);
-      jLog("versement_suppr","Sanction hebdo auto: "+c.nom);
-      pushSanctionAuto(c);
-
-    }else{
-      // ══ CHAUFFEUR JOURNALIER : sanction si 2 jours consécutifs sans verser ══
-      var jours=[];
-      for(var i=1;i<=7&&jours.length<2;i++){
-        var d=new Date();d.setDate(d.getDate()-i);
-        if(d.getDay()!==0)jours.push(d.toLocaleDateString("fr-FR"));
-      }
-      var nonVerses=jours.filter(function(j){
-        return !S.data.versements.some(function(v){
-          return String(v.chauffeurId)===String(c.id)&&v.date===j;
-        });
-      });
-      if(nonVerses.length<2)return;
-
-      // Panne signalée ces 2 jours ?
-      var panneJour=S.data.entretiens.some(function(e){
-        return String(e.chauffeurId)===String(c.id)&&e.statut==="demande"&&nonVerses.indexOf(e.date)>=0;
-      });
-      if(panneJour)return;
-
-      // Déjà sanctionné aujourd'hui ?
-      var dejaSanctJour=S.data.sanctions.some(function(s){
-        return String(s.chauffeurId)===String(c.id)&&s.date===td()&&s.type==="non_versement_journalier";
-      });
-      if(dejaSanctJour)return;
-
-      // Appliquer sanction journalière
-      var item={id:Date.now(),chauffeurId:String(c.id),nomChauffeur:c.nom,
-        type:"non_versement_journalier",frequence:"Journalier",
-        montant:0,statut:"active",date:td(),heure:hr(),ts:Date.now(),
-        description:"2 jours sans versement sans notification de panne ("+nonVerses.join(", ")+")"};
-      S.data.sanctions.push(item);
-      fbSave("sanctions",item);save();
-      var msg="Sanction: "+c.nom+" - 2 jours sans versement ("+nonVerses.join(" et ")+") sans panne signalee. Contactez votre gerant. — Saloni Manager";
-      var mi={id:Date.now()+1,de:"Systeme",pour:c.id,texte:msg,date:td(),heure:hr(),lu:false,auto:true};
-      S.data.messages.push(mi);fbSave("messages",mi);
-      jLog("versement_suppr","Sanction journalier auto: "+c.nom+" ("+nonVerses.join(", ")+")");
-      pushSanctionAuto(c);
-    }
-  });
-}
-function getNbSanctionsActives(){return(S.data.sanctions||[]).filter(function(s){return s.statut==="active";}).length;}
-function leverSanctionPrompt(sid){showLeverModal(sid,"");}
-
-function gpsParId(cid){var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(cid);})[0];if(c)envoyerGPS(c);else alert('Chauffeur introuvable');}
-function gpsParSanction(chauffeurId){
-  var c=S.data.chauffeurs.filter(function(x){return String(x.id)===String(chauffeurId);})[0];
-  if(c)envoyerGPS(c);else alert("Chauffeur introuvable");
-}
-function leverSanctionUI(sid){showLeverModal(sid,"");}
 
 
-function showLeverModal(sid, nomChauffeur){
-  var old=document.getElementById("_leverModal");if(old)old.remove();
-  var d=document.createElement("div");
-  d.id="_leverModal";
-  d.style.cssText="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;";
-  
-  var box=document.createElement("div");
-  box.style.cssText="background:var(--bg2,#fff);border-radius:20px;padding:24px;width:100%;max-width:320px;";
-  
-  var titre=document.createElement("div");
-  titre.style.cssText="font-size:16px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:6px;";
-  titre.textContent="Lever la sanction";
-  box.appendChild(titre);
-  
-  var sous=document.createElement("div");
-  sous.style.cssText="font-size:12px;color:#64748b;margin-bottom:14px;";
-  sous.textContent="Chauffeur : "+nomChauffeur;
-  box.appendChild(sous);
-  
-  var label=document.createElement("div");
-  label.style.cssText="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:6px;";
-  label.textContent="Motif";
-  box.appendChild(label);
-  
-  var inp=document.createElement("input");
-  inp.type="text";
-  inp.placeholder="Ex: Régularisation effectuée";
-  inp.style.cssText="width:100%;padding:12px 13px;border:1.5px solid #bfdbfe;border-radius:10px;font-size:15px;margin-bottom:14px;background:var(--input-bg,#f8faff);color:var(--txt,#0f172a);font-family:inherit;";
-  box.appendChild(inp);
-  
-  var btns=document.createElement("div");
-  btns.style.cssText="display:flex;gap:9px;";
-  
-  var btnAnn=document.createElement("button");
-  btnAnn.textContent="Annuler";
-  btnAnn.style.cssText="flex:1;padding:12px;border-radius:11px;background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);color:#1d4ed8;font-weight:700;font-size:13px;cursor:pointer;";
-  btnAnn.onclick=function(){d.remove();};
-  btns.appendChild(btnAnn);
-  
-  var btnOk=document.createElement("button");
-  btnOk.textContent="✅ Confirmer";
-  btnOk.style.cssText="flex:1;padding:12px;border-radius:11px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;font-weight:700;font-size:13px;cursor:pointer;";
-  btnOk.onclick=function(){
-    var motif=inp.value.trim()||"Levée par gérant";
-    d.remove();
-    leverSanction(sid,motif);
-  };
-  btns.appendChild(btnOk);
-  
-  box.appendChild(btns);
-  d.appendChild(box);
-  document.body.appendChild(d);
-  setTimeout(function(){inp.focus();},100);
-  d.onclick=function(ev){if(ev.target===d)d.remove();};
-}
 
-function leverSanction(sid,motif){
-  var s=(S.data.sanctions||[]).filter(function(x){return String(x.id)===String(sid);})[0];
-  if(s){s.statut="levee";s.motivLevee=motif||"Levée par gérant";s.dateLevee=td();fbSave("sanctions",s);save();R();}
-}
+
+
+
+
+
+
+
+
+
+
 // Vérifier sanctions toutes les heures
 setInterval(function(){if(S.user&&S.user.niveau>=2)checkEtAppliquerSanctions();},3600000);
 
 
 // ══ PDF ══
-function loadJsPDF(cb){if(window.jspdf){cb();return;}var s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";s.onload=function(){var s2=document.createElement("script");s2.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js";s2.onload=cb;s2.onerror=cb;document.head.appendChild(s2);};s.onerror=function(){alert("Impossible de charger jsPDF.");};document.head.appendChild(s);}
-function showPdfLoader(show){var el=document.getElementById("pdfLoader");if(el)el.style.display=show?"flex":"none";}
-function pdfHeader(doc,titre,sous){var pw=doc.internal.pageSize.getWidth();doc.setFillColor(29,78,216);doc.rect(0,0,pw,28,"F");doc.setTextColor(255,255,255);doc.setFontSize(16);doc.setFont("helvetica","bold");doc.text("SALONI MANAGER",14,11);doc.setFontSize(9);doc.setFont("helvetica","normal");doc.text("Gestion de flotte - Abidjan, Cote d'Ivoire",14,18);doc.setFontSize(11);doc.setFont("helvetica","bold");doc.text(titre,pw-14,12,{align:"right"});doc.setFontSize(8);doc.setFont("helvetica","normal");doc.text(sous||("Genere le "+td()+" a "+hr()),pw-14,19,{align:"right"});doc.setTextColor(15,23,42);return 34;}
-function pdfFooter(doc){var pw=doc.internal.pageSize.getWidth();var ph=doc.internal.pageSize.getHeight();doc.setDrawColor(219,234,254);doc.line(14,ph-12,pw-14,ph-12);doc.setFontSize(7);doc.setTextColor(100,116,139);doc.text("Saloni Manager © "+new Date().getFullYear()+" - Abidjan, Cote d'Ivoire",14,ph-7);doc.text("Page "+doc.internal.getCurrentPageInfo().pageNumber,pw-14,ph-7,{align:"right"});}
-function exportPDF(type){showPdfLoader(true);loadJsPDF(function(){setTimeout(function(){try{if(type==="versements")_pdfVersements();else if(type==="chauffeurs")_pdfChauffeurs();else if(type==="financier")_pdfFinancier();}catch(e){console.error(e);alert("Erreur PDF: "+e.message);}showPdfLoader(false);},100);});}
-function _pdfVersements(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});var pw=doc.internal.pageSize.getWidth();var fC=S.filtreCh||"",fD=S.filtreDate||"";var lst=[].concat(S.data.versements).reverse();if(fC)lst=lst.filter(function(v){return v.chauffeurId===parseInt(fC);});if(fD)lst=lst.filter(function(v){return v.date===fD;});var total=lst.reduce(function(s,v){return s+v.montant;},0);var y=pdfHeader(doc,"VERSEMENTS","Periode: "+(fD||"Toutes")+" | "+lst.length+" versement(s)");doc.setFillColor(239,246,255);doc.roundedRect(14,y,pw-28,18,3,3,"F");doc.setFontSize(9);doc.setTextColor(100,116,139);doc.text("TOTAL VERSEMENTS",20,y+6);doc.setFontSize(14);doc.setTextColor(5,150,105);doc.setFont("helvetica","bold");doc.text(fc(total),20,y+14);y+=24;var rows=lst.map(function(v){var ch=S.data.chauffeurs.filter(function(c){return String(c.id)===String(v.chauffeurId);})[0];return[v.date,ch?ch.nom:"?",fc(v.montant),v.mode||"Especes",v.note||"—"];});if(doc.autoTable){doc.autoTable({startY:y,head:[["Date","Chauffeur","Montant","Mode","Note"]],body:rows,theme:"grid",headStyles:{fillColor:[29,78,216],textColor:255,fontSize:9,fontStyle:"bold"},bodyStyles:{fontSize:8,textColor:[15,23,42]},alternateRowStyles:{fillColor:[248,250,255]},margin:{left:14,right:14},didDrawPage:function(){pdfFooter(doc);}});}pdfFooter(doc);doc.save("Saloni_Versements_"+td().replace(/\//g,"-")+".pdf");}
-function _pdfChauffeurs(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});var pw=doc.internal.pageSize.getWidth();var VE=S.data.versements;var y=pdfHeader(doc,"LISTE DES CHAUFFEURS","Total: "+S.data.chauffeurs.length+" chauffeur(s)");var rows=S.data.chauffeurs.map(function(c){var tC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);return[c.nom,c.tel||"—",c.zone,c.statut,c.freqPaiement||"Journalier",fc(tC),c.dette>0?fc(c.dette):"—"];});if(doc.autoTable){doc.autoTable({startY:y+20,head:[["Nom","Tel","Zone","Statut","Freq.","Total","Dette"]],body:rows,theme:"grid",headStyles:{fillColor:[29,78,216],textColor:255,fontSize:8,fontStyle:"bold"},bodyStyles:{fontSize:7.5,textColor:[15,23,42]},margin:{left:14,right:14},didDrawPage:function(){pdfFooter(doc);}});}pdfFooter(doc);doc.save("Saloni_Chauffeurs_"+td().replace(/\//g,"-")+".pdf");}
-function _pdfFinancier(){var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});var pw=doc.internal.pageSize.getWidth();var VE=S.data.versements,DE=S.data.depenses,AM=S.data.amendes;var tR=VE.reduce(function(s,v){return s+v.montant;},0);var tD=DE.reduce(function(s,v){return s+v.montant;},0);var tA=AM.filter(function(a){return a.statut==="impayee";}).reduce(function(s,a){return s+a.montant;},0);var bn=tR-tD-tA;var y=pdfHeader(doc,"RÉSUMÉ FINANCIER","Genere le "+td()+" a "+hr());var kpis=[{l:"RECETTES TOTALES",v:fc(tR),c:[5,150,105]},{l:"DÉPENSES",v:fc(tD),c:[220,38,38]},{l:"AMENDES IMPAYÉES",v:fc(tA),c:[217,119,6]},{l:"BÉNÉFICE NET",v:fc(bn),c:bn>=0?[5,150,105]:[220,38,38]}];var kw=(pw-28-9)/2;kpis.forEach(function(k,i){var kx=14+(i%2)*(kw+9);var ky=y+(Math.floor(i/2)*20);doc.setFillColor(248,250,255);doc.roundedRect(kx,ky,kw,16,2,2,"F");doc.setFontSize(7);doc.setFont("helvetica","normal");doc.setTextColor(100,116,139);doc.text(k.l,kx+4,ky+6);doc.setFontSize(12);doc.setFont("helvetica","bold");doc.setTextColor(k.c[0],k.c[1],k.c[2]);doc.text(k.v,kx+4,ky+13);});pdfFooter(doc);doc.save("Saloni_Financier_"+td().replace(/\//g,"-")+".pdf");}
+
+
+
+
+
+
+
+
 
 // ══ FIREBASE ══
 var db=null,syncTimer=null;
-function initFirebase(){
-  var s1=document.createElement("script");
-  s1.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
-  s1.onload=function(){
-    var s2=document.createElement("script");
-    s2.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";
-    s2.onload=function(){
-      var s3=document.createElement("script");
-      s3.src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js";
-      s3.onload=function(){
-        try{
-          if(!firebase.apps.length){
-            firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});
-          }
-          db=firebase.firestore();
-          if(S.user){startSync();setTimeout(ecouterNotifications,2000);}
-          loadMdpOverrides(function(){});
-        }catch(e){console.log("FB:",e);}
-      };
-      document.head.appendChild(s3);
-    };
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(s1);
-}
-function showSync(msg,col){var b=document.getElementById("syncBar");if(!b)return;b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";if(syncTimer)clearTimeout(syncTimer);if(col==="#10b981")syncTimer=setTimeout(function(){b.style.display="none";},2000);}
+
+
 var unsubs=[];
 var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports","sousComptes","chats","primes","entretiens","sanctions","positions"];
-function startSync(){if(!db)return;unsubs.forEach(function(u){u();});unsubs=[];showSync("Connexion..","#f59e0b");var cnt=0;COLS.forEach(function(col){var u=db.collection("sal_"+col).onSnapshot(function(snap){var fbData=snap.docs.map(function(d){var x=d.data();delete x._t;if(x.id&&!isNaN(x.id))x.id=parseInt(x.id);if(x.chauffeurId&&!isNaN(x.chauffeurId))x.chauffeurId=parseInt(x.chauffeurId);return x;});if(fbData.length>0)S.data[col]=fbData;cnt++;if(cnt>=COLS.length)showSync("Synchronise","#10b981");if(S.user)R();},function(){showSync("Hors ligne","#ef4444");});unsubs.push(u);});}
-function fbSave(col,item){save();if(!db)return;try{var d=Object.assign({},item);d._t=firebase.firestore.FieldValue.serverTimestamp();db.collection("sal_"+col).doc(String(item.id)).set(d);}catch(e){}}
-function fbDel(col,id){save();if(!db)return;try{db.collection("sal_"+col).doc(String(id)).delete();}catch(e){}}
+
+
+
 
 // ══ STOCKAGE ══
-function load(){try{var d=localStorage.getItem("sal_v2");if(d)S.data=JSON.parse(d);}catch(e){}try{var i=localStorage.getItem("sal_ign");if(i)S.ign=JSON.parse(i);}catch(e){}if(!S.data.sousComptes)S.data.sousComptes=[];if(!S.data.chats)S.data.chats=[];if(!S.data.primes)S.data.primes=[];if(!S.data.entretiens)S.data.entretiens=[];if(!S.data.sanctions)S.data.sanctions=[];if(!S.data.positions)S.data.positions=[];if(!S.data.chauffeurs)S.data.chauffeurs=[];if(!S.data.versements)S.data.versements=[];if(!S.data.salonis)S.data.salonis=[];if(!S.data.depenses)S.data.depenses=[];if(!S.data.amendes)S.data.amendes=[];if(!S.data.messages)S.data.messages=[];if(!S.data.rapports)S.data.rapports=[];try{S.darkMode=localStorage.getItem("sal_dark")==="1";}catch(e){}applyDark();}
-function applyDark(){if(S.darkMode)document.body.classList.add("dark");else document.body.classList.remove("dark");}
-function toggleDark(){S.darkMode=!S.darkMode;try{localStorage.setItem("sal_dark",S.darkMode?"1":"0");}catch(e){}applyDark();rHD();}
-function save(){try{localStorage.setItem("sal_v2",JSON.stringify(S.data));}catch(e){}}
-function pingSession(){if(!S.user)return;try{var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}}
-function getConx(){try{var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");return sess.filter(function(s){return Date.now()-s.ts<1800000;});}catch(e){return[];}}
+
+
+
+
+
+
+// Présence temps réel Firebase
+var _presenceOnline=[];
+
+
+
+// Marquer offline à la déconnexion
+
 setInterval(function(){if(S.user)pingSession();},60000);
 var _mdpOverrides={};
-function loadMdpOverrides(cb){if(!db){cb();return;}db.collection("sal_config").doc("mdp_overrides").get().then(function(doc){if(doc.exists)_mdpOverrides=doc.data()||{};cb();}).catch(function(){cb();});}
-function saveMdpOverride(pseudo,newMdp){_mdpOverrides[pseudo]=newMdp;try{var ov=JSON.parse(localStorage.getItem("sal_mdp_overrides")||"{}");ov[pseudo]=newMdp;localStorage.setItem("sal_mdp_overrides",JSON.stringify(ov));}catch(e){}if(db){try{db.collection("sal_config").doc("mdp_overrides").set(_mdpOverrides);}catch(e){}}}
-function tousComptes(){var base=COMPTES_BASE.map(function(c){var newMdp=_mdpOverrides[c.pseudo]||null;if(!newMdp){try{var ov=JSON.parse(localStorage.getItem("sal_mdp_overrides")||"{}");newMdp=ov[c.pseudo]||null;}catch(e){}}if(newMdp)return Object.assign({},c,{mdp:newMdp});return c;});return base.concat(S.data.sousComptes||[]);}
+
+
+
 
 // ══ HELPERS CHAUFFEUR ══
-function estCompteChauf(){if(!S.user)return false;return S.user.typeCompte==="chauffeur";}
-function getChauffeurDuCompte(){if(!S.user||!S.user.chauffeurId)return null;return S.data.chauffeurs.filter(function(c){return String(c.id)===String(S.user.chauffeurId);})[0]||null;}
-function hasPerm(p){if(!S.user)return false;if(S.user.niveau>=3)return true;if(estCompteChauf())return false;if(S.user.perms)return S.user.perms[p]===true;if(S.user.niveau>=2)return p!=="reinit"&&p!=="supprimer";return false;}
+
+
+
 
 // ══ UTILITAIRES ══
-function td(){return new Date().toLocaleDateString("fr-FR");}
-function hr(){return new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
-function fc(n){return(n||0).toLocaleString("fr-FR")+" F";}
-function pc(a,b){return b>0?Math.min(Math.round(a/b*100),100):0;}
-function gv(id){var e=document.getElementById(id);return e?e.value:"";}
-function getSem(){var d=[],n=new Date(),dw=n.getDay();var l=new Date(n);
-// Si dimanche (dw=0), la semaine va de lundi (-6j) à dimanche (aujourd'hui)
-// Si autre jour, la semaine va du lundi de cette semaine
-var reculer=dw===0?6:dw-1;
-l.setDate(n.getDate()-reculer);
-var nbJours=dw===0?7:6;// Dimanche: 7 jours (Lun-Dim), sinon 6 (Lun-Sam)
-for(var i=0;i<nbJours;i++){var x=new Date(l);x.setDate(l.getDate()+i);d.push(x.toLocaleDateString("fr-FR"));}return d;}
-function getMois(){var n=new Date(),d=[];var last=new Date(n.getFullYear(),n.getMonth()+1,0);for(var x=new Date(n.getFullYear(),n.getMonth(),1);x<=last;x.setDate(x.getDate()+1)){if(x.getDay()!==0)d.push(new Date(x).toLocaleDateString("fr-FR"));}return d;}
+
+
+
+
+
+
+
 
 // ══ CHAT ══
-function getChatConvId(cid){return "conv_"+String(cid);}
-function getChatMsgs(cid){return(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(cid);}).sort(function(a,b){return a.ts-b.ts;});}
-function getNbChatNonLus(){if(!S.user)return 0;var estSC=estCompteChauf();return(S.data.chats||[]).filter(function(m){if(m.lu)return false;if(estSC)return m.convId===getChatConvId(S.user.chauffeurId)&&m.de==="admin";return m.de==="chauffeur";}).length;}
-function marquerChatLu(cid){var estSC=estCompteChauf();(S.data.chats||[]).forEach(function(m){if(m.lu)return;if(!estSC&&m.convId===getChatConvId(cid)&&m.de==="chauffeur"){m.lu=true;fbSave("chats",m);}if(estSC&&m.convId===getChatConvId(cid)&&m.de==="admin"){m.lu=true;fbSave("chats",m);}});}
-function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
-function msgBubble(m,moiDe){var moi=m.de===moiDe;return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:6px;"><div style="max-width:78%;background:'+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":"1px solid #dbeafe")+';">'+m.texte.replace(/</g,"&lt;")+'<div style="font-size:9px;opacity:.55;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div></div></div>";}
-function chatBox(cid,moiDe){var msgs=getChatMsgs(cid);marquerChatLu(cid);return'<div style="flex:1;overflow-y:auto;padding:12px 14px;" id="chatBox">'+(msgs.length===0?'<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">💬 Aucun message pour l\'instant</div>':msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))+"</div>";}
-function chatInput(cid){return'<div style="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;"><textarea id="chatInput" placeholder="Votre message..." rows="1" style="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea><button onclick="envoyerChat('+cid+')" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;">↑</button></div>';}
-function joursRestants(dateStr){if(!dateStr)return null;var exp=new Date(dateStr);var now=new Date();now.setHours(0,0,0,0);exp.setHours(0,0,0,0);return Math.round((exp-now)/(1000*60*60*24));}
-function getDocAlerts(c){var alerts=[];[{key:"permisExp",label:"Permis"},{key:"cgFin",label:"Carte grise"},{key:"vignetteExp",label:"Vignette"}].forEach(function(d){var j=joursRestants(c[d.key]);if(j===null)return;if(j<0)alerts.push({sev:"expire",label:d.label,jours:j,msg:d.label+" expiré depuis "+Math.abs(j)+" jour(s)"});else if(j<=30)alerts.push({sev:"bientot",label:d.label,jours:j,msg:d.label+" expire dans "+j+" jour(s)"});});return alerts;}
-function getAl(){var a=[];S.data.chauffeurs.forEach(function(c){if(c.dette>0)a.push({id:"dt-"+c.id,icon:"💸",msg:"Dette: "+c.nom+" — "+fc(c.dette)});var docAl=getDocAlerts(c);docAl.forEach(function(d){a.push({id:"doc-"+c.id+"-"+d.label,icon:d.sev==="expire"?"🚨":"⚠️",msg:c.nom+" — "+d.msg});});});return{all:a,vis:a.filter(function(x){return S.ign.indexOf(x.id)<0;})};}
-function pill(l,c){return'<span class="pill" style="background:'+c+'18;color:'+c+';border:1px solid '+c+'33;">'+l+'</span>';}
-function lbl(t,i){return'<div class="mb"><label class="lbl">'+t+'</label>'+i+'</div>';}
-function sl(id,opts,v){v=v||"";return'<select id="'+id+'">'+opts.map(function(x){return'<option'+(x==v?" selected":"")+'>'+x+'</option>';}).join("")+'</select>';}
-function bar(p,c){return'<div class="bw"><div class="bf" style="width:'+p+'%;background:'+c+'"></div></div>';}
-function getObjJ(c){return c.objectifJour||5000;}
-function getObjS(c){return c.freqPaiement==="Hebdomadaire"?(c.objectifSemaine||30000):(c.objectifJour||5000)*6;}
-function getVJ(c,vj){return vj.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);}
-function getVS(c,VE){var sem=getSem();return VE.filter(function(v){return String(v.chauffeurId)===String(c.id)&&sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);}
-function checkRetards(){if(!S.user||new Date().getDay()!==0)return;var sem=getSem();S.retards=[];S.data.chauffeurs.forEach(function(c){if(c.statut!=="actif")return;var total=S.data.versements.filter(function(v){return String(v.chauffeurId)===String(c.id)&&sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);if(total<getObjS(c))S.retards.push({c:c,total:total,obj:getObjS(c),manque:getObjS(c)-total});});}
-function envRetard(cid){var r=null;for(var i=0;i<S.retards.length;i++){if(S.retards[i].c.id===cid){r=S.retards[i];break;}}if(!r)return;var msg="Rappel Saloni Manager\n\nBonjour "+r.c.nom+"\nVersement incomplet.\nManquant: "+fc(r.manque);var tel=r.c.tel?r.c.tel.replace(/\s/g,"").replace(/^0/,"225"):"";if(tel)window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");else{if(navigator.clipboard)navigator.clipboard.writeText(msg);alert("Numero manquant - message copie");}}
-function getPhoto(cid){var ch=S.data.chauffeurs.filter(function(c){return String(c.id)===String(cid);})[0];if(ch&&ch.photo&&ch.photo.length>10)return ch.photo;try{return localStorage.getItem("photo_"+cid)||"";}catch(e){return "";}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ══ RENDU PRINCIPAL ══
-function R(){
-  if(!S.user){rLogin();return;}
-  pingSession();rHD();rNAV();rScreen();
-  if(S.modal)rModal();
-  // Reprendre GPS si chauffeur et GPS était actif
-  if(estCompteChauf()&&!_gpsActif){
-    try{if(localStorage.getItem("sal_gps_actif")==="1"){_gpsActif=true;envoyerPosition();_gpsInterval=setInterval(envoyerPosition,30000);}}catch(e){}
-  }
-  // Restaurer notifications push si déjà autorisées
-  try{
-    if(localStorage.getItem("sal_notif_perm")==="granted" && "Notification" in window && Notification.permission==="granted"){
-      if(!_fcmToken) _fcmToken = "native_restored_"+Date.now();
-    }
-  }catch(e){}
-}
 
-function rLogin(){
-  document.getElementById("hd").innerHTML="";document.getElementById("nav").innerHTML="";
-  document.getElementById("screen").innerHTML=
-  '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#1e3a8a,#2563eb,#3b82f6);">'
-  +'<div style="width:100%;max-width:340px;">'
-  +'<div style="text-align:center;margin-bottom:24px;">'
-  +'<div style="width:72px;height:72px;border-radius:20px;background:rgba(255,255,255,.2);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto 12px;border:2px solid rgba(255,255,255,.3);">🛺</div>'
-  +'<div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:1px;">SALONI</div>'
-  +'<div style="font-size:12px;color:rgba(255,255,255,.7);margin-top:4px;">Gestion de flotte · Abidjan 🇨🇮</div>'
-  +'</div>'
-  +'<div class="card">'
-  +'<div class="mb"><label class="lbl">Identifiant</label><input id="lp" type="text" placeholder="Votre identifiant" autocapitalize="none"/></div>'
-  +'<div class="mb"><label class="lbl">Mot de passe / Code unique</label>'
-  +'<div style="position:relative"><input id="lm" type="password" placeholder="••••••••" style="padding-right:44px"/>'
-  +'<button onclick="toggleP()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;font-size:17px;cursor:pointer;">👁</button>'
-  +'</div></div>'
-  +'<div id="LE" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:9px;font-size:12px;color:#dc2626;margin-bottom:11px;text-align:center;"></div>'
-  +'<button onclick="login()" class="bor">Se connecter</button>'
-  +'<div style="margin-top:12px;text-align:center;font-size:11px;color:#94a3b8;">Chauffeur ? Utilisez votre code unique attribué par le gérant</div>'
-  +'</div></div></div>';
-  var lm=document.getElementById("lm");if(lm)lm.onkeydown=function(e){if(e.key==="Enter")login();};
-}
 
-function rHD(){
-  var al=getAl();var conx=getConx();
-  var isCh=estCompteChauf();
-  var isDesktop=window.innerWidth>=900;
-  var tt={home:"Accueil",chauffeurs:"Mon equipe",salonis:"Ma flotte",finances:"Finances",plus:"Plus",versements:"Versements",rapports:"Rapports",alertes:"Alertes",messages:"Messages",comptes:"Sous-comptes",journal:"Journal",alertesAuto:"Alertes auto",chat:"Chat",rsi:"RSI — Rentabilité",ia:"Assistant IA",bi:"Business Intelligence",dashboard:"Tableau de bord",historique:"Historique",securite:"Securite",primes:"Primes",monversements:"Mes Versements",monprofil:"Mon Profil",entretien:"Mon Entretien",sanctions:"Sanctions",entretiens:"Entretiens Flotte",carte:"Localisation",pushConfig:"Notifications Push"};
-  var pageTitle=tt[S.tab]||"Accueil";
-  var hdEl=document.getElementById("hd");
-  hdEl.innerHTML="";
 
-  var wrap=document.createElement("div");
-  wrap.className="hd";
 
-  if(isDesktop){
-    wrap.style.cssText="display:flex;align-items:center;justify-content:space-between;";
-    var left=document.createElement("div");
-    left.style.cssText="display:flex;align-items:center;gap:10px;";
-    if(S.tab!=="home"){
-      var backBtn=document.createElement("button");
-      backBtn.textContent="← Retour";
-      backBtn.style.cssText="background:var(--bg4);border:1px solid var(--border2);color:var(--accent);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;";
-      backBtn.onclick=function(){sT("home");};
-      left.appendChild(backBtn);
-    }
-    var titleEl=document.createElement("div");
-    titleEl.style.cssText="font-size:16px;font-weight:800;color:var(--txt);";
-    titleEl.textContent=pageTitle;
-    left.appendChild(titleEl);
-    var right=document.createElement("div");
-    right.style.cssText="display:flex;align-items:center;gap:8px;";
-    if(!isCh&&al.vis.length>0){
-      var alertBtn=document.createElement("button");
-      alertBtn.textContent="🚨 "+al.vis.length+" alerte(s)";
-      alertBtn.style.cssText="background:#fde8e8;border:1px solid #fecaca;color:#c81e1e;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;";
-      alertBtn.onclick=function(){sT("alertes");};
-      right.appendChild(alertBtn);
-    }
-    var roleEl=document.createElement("span");
-    roleEl.style.cssText="font-size:12px;color:var(--txt2);padding:0 8px;";
-    roleEl.textContent=S.user.role+" · "+conx.length+" en ligne";
-    right.appendChild(roleEl);
-    var darkBtn=document.createElement("button");
-    darkBtn.textContent=S.darkMode?"☀️":"🌙";
-    darkBtn.style.cssText="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:14px;cursor:pointer;";
-    darkBtn.onclick=function(){toggleDark();};
-    right.appendChild(darkBtn);
-    var logoutBtn=document.createElement("button");
-    logoutBtn.textContent="Quitter";
-    logoutBtn.style.cssText="background:#fde8e8;border:1px solid #fecaca;color:#c81e1e;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;";
-    logoutBtn.onclick=function(){jLog("deconnexion","Deconnexion");S.user=null;R();};
-    right.appendChild(logoutBtn);
-    wrap.appendChild(left);
-    wrap.appendChild(right);
 
-  } else {
-    // Mobile
-    var row=document.createElement("div");
-    row.style.cssText="display:flex;align-items:center;justify-content:space-between;";
-    var mLeft=document.createElement("div");
-    mLeft.style.cssText="display:flex;align-items:center;gap:10px;";
-    if(S.tab==="home"){
-      mLeft.innerHTML="<div style='width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;'>🛺</div>"
-        +"<div><div style='font-size:15px;font-weight:900;color:#fff;'>SALONI</div>"
-        +"<div style='font-size:10px;color:rgba(255,255,255,.65);'>"+(isCh?"Chauffeur · "+S.user.pseudo:S.user.role+" · "+conx.length+" en ligne")+"</div></div>";
-    } else {
-      var mBack=document.createElement("button");
-      mBack.textContent="←";
-      mBack.style.cssText="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:5px;padding:5px 9px;font-size:14px;cursor:pointer;";
-      mBack.onclick=function(){sT("home");};
-      mLeft.appendChild(mBack);
-      var mTitle=document.createElement("div");
-      mTitle.style.cssText="font-size:14px;font-weight:800;color:#fff;";
-      mTitle.textContent=pageTitle;
-      mLeft.appendChild(mTitle);
-    }
-    var mRight=document.createElement("div");
-    mRight.style.cssText="display:flex;gap:6px;align-items:center;";
-    if(!isCh&&al.vis.length>0){
-      var mAlert=document.createElement("button");
-      mAlert.textContent="🚨 "+al.vis.length;
-      mAlert.style.cssText="background:rgba(220,38,38,.3);border:1px solid rgba(220,38,38,.5);border-radius:5px;padding:4px 9px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;";
-      mAlert.onclick=function(){sT("alertes");};
-      mRight.appendChild(mAlert);
-    }
-    var mDark=document.createElement("button");
-    mDark.textContent=S.darkMode?"☀️":"🌙";
-    mDark.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 8px;font-size:14px;cursor:pointer;";
-    mDark.onclick=function(){toggleDark();};
-    mRight.appendChild(mDark);
-    var mLogout=document.createElement("button");
-    mLogout.textContent="🚪";
-    mLogout.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:5px;padding:5px 9px;color:#fff;font-size:14px;cursor:pointer;";
-    mLogout.onclick=function(){jLog("deconnexion","Deconnexion");S.user=null;R();};
-    mRight.appendChild(mLogout);
-    row.appendChild(mLeft);
-    row.appendChild(mRight);
-    wrap.appendChild(row);
-  }
 
-  hdEl.appendChild(wrap);
-}
 
-function rNAV(){
-  var isCh=estCompteChauf();
-  var nbChat=getNbChatNonLus();
-  var T;
-  if(isCh){
-    var nbPrimes=getPrimeActive(S.user.chauffeurId).length;
-    T=[
-      {id:"home",ic:"⊞",lb:"Accueil"},
-      {id:"monversements",ic:"💵",lb:"Versements"},
-      {id:"chat",ic:"💬",lb:"Chat",badge:nbChat},
-      {id:"primes",ic:"⭐",lb:"Primes",badge:nbPrimes},
-      {id:"entretien",ic:"🔧",lb:"Entretien"},
-      {id:"monprofil",ic:"👤",lb:"Profil"}
-    ];
-  }else{
-    T=[
-      {id:"home",ic:"⊞",lb:"Accueil"},
-      {id:"chauffeurs",ic:"👥",lb:"Équipe"},
-      {id:"versements",ic:"💵",lb:"Versements"},
-      {id:"chat",ic:"💬",lb:"Chat",badge:nbChat},
-      {id:"plus",ic:"⋯",lb:"Plus"}
-    ];
-  }
-  document.getElementById("nav").innerHTML=T.map(function(t){
-    var bd=(t.badge&&t.badge>0)?'<span style="position:absolute;top:2px;right:6px;background:#dc2626;color:#fff;border-radius:8px;min-width:14px;padding:0 3px;font-size:8px;font-weight:800;line-height:14px;text-align:center;">'+t.badge+'</span>':"";
-    return'<button class="nb'+(S.tab===t.id?" on":"")+'" onclick="sT(\''+t.id+'\')" style="position:relative;">'+bd+'<span>'+t.ic+'</span><span>'+t.lb+'</span></button>';
-  }).join("");
-}
 
 
 
@@ -1376,561 +881,54 @@ var _gpsWatchId=null;
 var _gpsActif=false;
 var _gpsInterval=null;
 
-function showGPSPermModal(){
-  var old=document.getElementById("_gpsPermModal");if(old)old.remove();
-  var d=document.createElement("div");
-  d.id="_gpsPermModal";
-  d.style.cssText="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;padding:0;";
-  
-  var box=document.createElement("div");
-  box.style.cssText="background:var(--bg2,#fff);border-radius:20px 20px 0 0;width:100%;padding:24px 20px 36px;";
-  
-  box.innerHTML='<div style="width:36px;height:4px;background:#dbeafe;border-radius:2px;margin:0 auto 16px;"></div>'
-  +'<div style="text-align:center;margin-bottom:16px;">'
-  +'<div style="font-size:44px;margin-bottom:10px;">📍</div>'
-  +'<div style="font-size:17px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:6px;">Autorisation GPS requise</div>'
-  +'<div style="font-size:13px;color:#64748b;line-height:1.6;">L\'application n\'a pas acces a votre position. Voici comment l\'activer :</div>'
-  +'</div>'
-  +'<div style="background:var(--bg4,#eff6ff);border:1px solid var(--border2,#bfdbfe);border-radius:14px;padding:14px;margin-bottom:16px;">'
-  +'<div style="font-size:12px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">📱 Sur iPhone :</div>'
-  +'<div style="font-size:12px;color:var(--txt,#0f172a);line-height:1.8;">'
-  +'1. Ouvrez <strong>Reglages</strong><br>'
-  +'2. Faites defiler vers Safari<br>'
-  +'3. Localisation → Autoriser<br>'
-  +'4. Revenez ici et reessayez'
-  +'</div>'
-  +'</div>'
-  +'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:14px;padding:12px;margin-bottom:16px;font-size:11px;color:#dc2626;line-height:1.6;">'
-  +'⚠️ Sans GPS actif, votre gerant ne peut pas voir votre position en temps reel.'
-  +'</div>';
-  
-  var btnOk=document.createElement("button");
-  btnOk.textContent="J'ai compris, je vais activer";
-  btnOk.style.cssText="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:10px;";
-  btnOk.onclick=function(){d.remove();};
-  box.appendChild(btnOk);
-  
-  var btnIgn=document.createElement("button");
-  btnIgn.textContent="Pas maintenant";
-  btnIgn.style.cssText="width:100%;padding:12px;border-radius:12px;background:transparent;border:1px solid var(--border2,#bfdbfe);color:#64748b;font-size:13px;cursor:pointer;";
-  btnIgn.onclick=function(){d.remove();};
-  box.appendChild(btnIgn);
-  
-  d.appendChild(box);
-  document.body.appendChild(d);
-  d.onclick=function(ev){if(ev.target===d)d.remove();};
-}
 
-function showGPSErrMsg(msg){
-  var old=document.getElementById("_gpsErrBar");if(old)old.remove();
-  var d=document.createElement("div");
-  d.id="_gpsErrBar";
-  d.style.cssText="position:fixed;top:60px;left:14px;right:14px;z-index:9000;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 14px rgba(220,38,38,.2);";
-  
-  var txt=document.createElement("div");
-  txt.style.cssText="font-size:12px;font-weight:600;color:#dc2626;flex:1;";
-  txt.textContent="📍 "+msg;
-  d.appendChild(txt);
-  
-  var btn=document.createElement("button");
-  btn.textContent="✕";
-  btn.style.cssText="background:none;border:none;color:#dc2626;font-size:16px;cursor:pointer;padding:0 0 0 8px;";
-  btn.onclick=function(){d.remove();};
-  d.appendChild(btn);
-  
-  document.body.appendChild(d);
-  setTimeout(function(){if(d.parentNode)d.remove();},5000);
-}
 
-function toggleGPSChauffeur(){
-  if(gpsEstActif())arreterGPS();
-  else demarrerGPS();
-}
 
-function demarrerGPS(){
-  // Utilisé pour la reprise automatique au rechargement (pas depuis un tap direct)
-  if(!navigator.geolocation||_gpsActif)return;
-  _gpsActif=true;
-  try{localStorage.setItem("sal_gps_actif","1");}catch(e){}
-  envoyerPosition();
-  if(_gpsInterval)clearInterval(_gpsInterval);
-  _gpsInterval=setInterval(envoyerPosition,30000);
-}
 
-function _activerGPS(){
-  _gpsActif=true;
-  try{localStorage.setItem("sal_gps_actif","1");}catch(e){}
-  envoyerPosition();
-  _gpsInterval=setInterval(envoyerPosition,30000);
-  R();
-}
 
-function arreterGPS(){
-  _gpsActif=false;
-  try{localStorage.setItem("sal_gps_actif","0");}catch(e){}
-  if(_gpsWatchId!==null){navigator.geolocation.clearWatch(_gpsWatchId);_gpsWatchId=null;}
-  if(_gpsInterval){clearInterval(_gpsInterval);_gpsInterval=null;}
-  // Marquer hors ligne dans Firebase
-  var c=getChauffeurDuCompte();
-  if(c&&db){
-    try{
-      db.collection("sal_positions").doc(String(c.id)).set({
-        chauffeurId:String(c.id),nom:c.nom,actif:false,
-        lat:0,lng:0,ts:Date.now(),date:td(),heure:hr()
-      });
-    }catch(e){}
-  }
-  R();
-}
 
-function _sauverPosition(pos){
-  var c=getChauffeurDuCompte();
-  if(!c)return;
-  var item={
-    id:String(c.id),
-    chauffeurId:String(c.id),
-    nom:c.nom,
-    saloniId:c.saloniId||"",
-    lat:pos.coords.latitude,
-    lng:pos.coords.longitude,
-    precision:Math.round(pos.coords.accuracy),
-    actif:true,
-    ts:Date.now(),
-    date:td(),
-    heure:hr()
-  };
-  if(db){
-    try{
-      var d=Object.assign({},item);
-      d._t=firebase.firestore.FieldValue.serverTimestamp();
-      db.collection("sal_positions").doc(String(c.id)).set(d);
-    }catch(e){}
-  }
-  if(!S.data.positions)S.data.positions=[];
-  var idx=S.data.positions.findIndex(function(p){return String(p.chauffeurId)===String(c.id);});
-  if(idx>=0)S.data.positions[idx]=item;
-  else S.data.positions.push(item);
-}
 
-function envoyerPosition(){
-  if(!_gpsActif)return;
-  var c=getChauffeurDuCompte();
-  if(!c)return;
-  navigator.geolocation.getCurrentPosition(
-    function(pos){_sauverPosition(pos);},
-    function(err){
-      if(err.code===1){
-        // Permission révoquée - arrêter
-        _gpsActif=false;
-        try{localStorage.setItem("sal_gps_actif","0");}catch(e){}
-        if(_gpsInterval){clearInterval(_gpsInterval);_gpsInterval=null;}
-        showGPSPermModal();
-        R();
-      }
-      // Pour les autres erreurs, continuer à essayer
-    },
-    {enableHighAccuracy:true,timeout:10000,maximumAge:20000}
-  );
-}
 
-function getPositions(){
-  // Lire depuis Firebase directement
-  return S.data.positions||[];
-}
 
-function getPositionChauffeur(cid){
-  return(S.data.positions||[]).filter(function(p){return String(p.chauffeurId)===String(cid);})[0]||null;
-}
 
-function gpsEstActif(){
-  try{return localStorage.getItem("sal_gps_actif")==="1"&&_gpsActif;}catch(e){return false;}
-}
+
+
+
+
+
+
+
+
+
+
+
 
 // Charger les positions depuis Firebase au démarrage (lecture unique)
-function chargerPositions(){
-  if(!db)return;
-  db.collection("sal_positions").onSnapshot(function(snap){
-    S.data.positions=snap.docs.map(function(d){var x=d.data();delete x._t;return x;});
-    // Si on est sur l'onglet carte, rafraîchir
-    if(S.user&&S.tab==="carte")rScreen();
-  });
-}
+
 
 // Afficher la carte gérant
-function renderCarte(sc){
-  var positions=getPositions().filter(function(p){return p.actif&&p.lat&&p.lng;});
-  var tousChauf=S.data.chauffeurs;
-  
-  var wrapper=document.createElement("div");
-  wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 110px);";
-  
-  // Barre de statut
-  var statBar=document.createElement("div");
-  statBar.style.cssText="padding:10px 14px;background:var(--bg2,#fff);border-bottom:1px solid var(--border,#dbeafe);display:flex;justify-content:space-between;align-items:center;";
-  
-  var nbActifs=positions.length;
-  var statTxt=document.createElement("div");
-  statTxt.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--txt,#0f172a);">'+nbActifs+' chauffeur(s) en ligne</div>'
-  +'<div style="font-size:10px;color:#64748b;margin-top:2px;">Mise à jour: toutes les 30 secondes</div>';
-  statBar.appendChild(statTxt);
-  
-  var refreshBtn=document.createElement("button");
-  refreshBtn.textContent="🔄";
-  refreshBtn.style.cssText="background:var(--bg4,#eff6ff);border:1px solid var(--border2,#bfdbfe);border-radius:9px;padding:7px 12px;font-size:16px;cursor:pointer;";
-  refreshBtn.onclick=function(){chargerPositions();};
-  statBar.appendChild(refreshBtn);
-  wrapper.appendChild(statBar);
-  
-  // Carte Google Maps iframe ou liste si pas de positions
-  if(positions.length===0){
-    var empty=document.createElement("div");
-    empty.style.cssText="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;";
-    empty.innerHTML='<div style="font-size:48px;margin-bottom:14px;">📡</div>'
-    +'<div style="font-size:15px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:8px;">Aucun chauffeur en ligne</div>'
-    +'<div style="font-size:12px;color:#64748b;line-height:1.6;">Les chauffeurs doivent activer leur GPS depuis leur onglet Accueil.</div>';
-    wrapper.appendChild(empty);
-  } else {
-    // Construire URL Google Maps avec tous les marqueurs
-    var center=positions[0];
-    var mapDiv=document.createElement("div");
-    mapDiv.style.cssText="flex:1;position:relative;";
-    
-    // iframe Google Maps statique avec markers
-    var markersParam=positions.map(function(p){
-      return"markers=color:red%7Clabel:"+encodeURIComponent(p.nom.charAt(0))+"%7C"+p.lat+","+p.lng;
-    }).join("&");
-    
-    var mapUrl="https://www.google.com/maps?"+markersParam+"&q="+center.lat+","+center.lng+"&output=embed&z=13";
-    
-    var iframe=document.createElement("iframe");
-    iframe.style.cssText="width:100%;height:100%;border:none;";
-    iframe.src=mapUrl;
-    iframe.setAttribute("allowfullscreen","");
-    mapDiv.appendChild(iframe);
-    wrapper.appendChild(mapDiv);
-  }
-  
-  // Liste des chauffeurs avec statut
-  var listDiv=document.createElement("div");
-  listDiv.style.cssText="background:var(--bg2,#fff);border-top:1px solid var(--border,#dbeafe);max-height:200px;overflow-y:auto;";
-  
-  tousChauf.forEach(function(c){
-    var pos=getPositionChauffeur(c.id);
-    var enLigne=pos&&pos.actif&&pos.lat;
-    var minutesAgo=pos?Math.round((Date.now()-pos.ts)/60000):null;
-    var recente=minutesAgo!==null&&minutesAgo<5;
-    
-    var row=document.createElement("div");
-    row.style.cssText="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border,#dbeafe);cursor:"+(enLigne?"pointer":"default")+";";
-    
-    var dot=document.createElement("div");
-    dot.style.cssText="width:10px;height:10px;border-radius:50%;background:"+(enLigne&&recente?"#059669":enLigne?"#d97706":"#94a3b8")+";flex-shrink:0;";
-    row.appendChild(dot);
-    
-    var info=document.createElement("div");
-    info.style.cssText="flex:1;";
-    info.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--txt,#0f172a);">'+c.nom+'</div>'
-    +'<div style="font-size:10px;color:#64748b;">'
-    +(enLigne?'🟢 En ligne — il y a '+minutesAgo+'min · Précision: '+(pos.precision||"?")+'m':"⚫ Hors ligne")
-    +'</div>';
-    row.appendChild(info);
-    
-    if(enLigne&&pos.lat){
-      var linkBtn=document.createElement("button");
-      linkBtn.textContent="📍";
-      linkBtn.style.cssText="background:var(--bg4,#eff6ff);border:1px solid var(--border2,#bfdbfe);border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;";
-      (function(p){
-        linkBtn.onclick=function(){
-          window.open("https://www.google.com/maps?q="+p.lat+","+p.lng+"&z=16","_blank");
-        };
-      })(pos);
-      row.appendChild(linkBtn);
-    }
-    
-    listDiv.appendChild(row);
-  });
-  wrapper.appendChild(listDiv);
-  
-  sc.innerHTML="";
-  sc.appendChild(wrapper);
-}
+
 // ══ ÉCRANS CHAUFFEURS ══
-function rScreen(){
-  var sc=document.getElementById("screen");
-  var isCh=estCompteChauf();
-  if(isCh){
-    var chMoi=getChauffeurDuCompte();
-    if(!chMoi){sc.innerHTML='<div class="sec"><div class="card" style="text-align:center;padding:40px 20px;"><div style="font-size:44px;margin-bottom:12px;">⚠️</div><div style="font-size:15px;font-weight:800;color:#dc2626;">Compte non lié</div><div style="font-size:12px;color:#64748b;margin-top:8px;">Ce compte chauffeur n\'est pas encore lié à un chauffeur. Contactez le gérant.</div></div></div>';return;}
-    if(S.tab==="home")renderHomeChauf(sc,chMoi);
-    else if(S.tab==="monversements")renderVersementsChauf(sc,chMoi);
-    else if(S.tab==="chat")renderChatChauf(sc,chMoi);
-    else if(S.tab==="primes")renderPrimesChauf(sc,chMoi);
-    else if(S.tab==="monprofil")renderProfilChauf(sc,chMoi);
-    else if(S.tab==="entretien")renderEntretienChauf(sc,chMoi);
-    else renderHomeChauf(sc,chMoi);
-    // Pas de FAB pour chauffeurs
-    var oldF=document.getElementById("fab");if(oldF)oldF.remove();
-    return;
-  }
-  // Écrans normaux
-  if(S.tab==="carte"){renderCarte(sc);var oldF=document.getElementById("fab");if(oldF)oldF.remove();return;}
-  if(S.tab==="historique"&&S.detCh){renderHistoriquePresence(sc,S.detCh);var oldF2=document.getElementById("fab");if(oldF2)oldF2.remove();return;}
-  rScreenGlobal(sc);
-}
-
-function renderHomeChauf(sc,c){
-  if(!c){sc.innerHTML="";return;}
-  var VE=S.data.versements;
-  var t=td();
-  var vj=VE.filter(function(v){return v.date===t;});
-  var vjC=vj.filter(function(v){return String(v.chauffeurId)===String(c.id);});
-  var totalJ=vjC.reduce(function(s,v){return s+v.montant;},0);
-  var objJ=getObjJ(c);
-  var pJ=pc(totalJ,objJ);
-  var colJ=pJ>=100?"#059669":pJ>=60?"#d97706":"#dc2626";
-  var sem=getSem();
-  var totalS=getVS(c,VE);
-  var objS=getObjS(c);
-  var pS=pc(totalS,objS);
-  var colS=pS>=100?"#059669":pS>=60?"#d97706":"#dc2626";
-  var primeActive=getPrimeActive(c.id);
-  var primeHtml=primeActive.length>0?'<div class="prime-badge" onclick="sT(\'primes\')" style="margin-bottom:14px;">🌟 Prime disponible : '+fc(primeActive.reduce(function(s,p){return s+p.montant;},0))+'  — Voir mes primes</div>':"";
-  // Sanctions actives
-  var sanctionsC=getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";});
-  var sanctionHtml=sanctionsC.length>0?'<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:14px;padding:13px;margin-bottom:12px;"><div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:5px;">⚠️ Sanction active</div><div style="font-size:11px;color:#334155;line-height:1.6;">'+sanctionsC[0].description+'</div><div style="font-size:10px;color:#dc2626;margin-top:5px;">Contactez votre gérant pour régulariser.</div></div>':'';
-  // Entretiens en attente
-  var entsAttente=(S.data.entretiens||[]).filter(function(e){return String(e.chauffeurId)===String(c.id)&&e.statut==="demande";});
-  var entAttenteHtml=entsAttente.length>0?'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:10px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:12px;font-weight:700;color:#d97706;">🔧 Entretien demandé</div><div style="font-size:10px;color:#64748b;">'+entsAttente.map(function(e){return e.type;}).join(", ")+'  — En attente du gérant</div></div></div>':'';
-  // Derniers versements (5 max)
-  var derniers=[].concat(VE).filter(function(v){return String(v.chauffeurId)===String(c.id);}).reverse().slice(0,5);
-  sc.innerHTML='<div class="sec">'
-  +sanctionHtml+entAttenteHtml+primeHtml
-  +'<div style="background:var(--header-bg);border-radius:8px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.15);">'
-  +'<div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Bonjour '+c.nom.split(" ")[0]+'  👋</div>'
-  +'<div style="font-size:28px;font-weight:900;color:#fff;">'+fc(totalJ)+'</div>'
-  +'<div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;">versé aujourd\'hui · objectif: '+fc(objJ)+'</div>'
-  +'<div style="height:6px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden;margin-top:8px;">'
-  +'<div style="height:100%;width:'+pJ+'%;background:#fff;border-radius:3px;transition:width .6s;"></div></div>'
-  +'</div>'
-  // Semaine
-  +'<div style="display:flex;gap:8px;margin-bottom:14px;">'
-  +'<div class="card" style="flex:1;"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Cette semaine</div><div style="font-size:18px;font-weight:900;color:'+colS+';">'+fc(totalS)+'</div><div style="font-size:10px;color:#64748b;">/ '+fc(objS)+'</div>'+bar(pS,colS)+'</div>'
-  +'<div class="card" style="flex:1;"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Mon saloni</div><div style="font-size:15px;font-weight:900;color:#1d4ed8;">'+(c.saloniId||"—")+'</div><div style="font-size:10px;color:#64748b;">'+c.zone+'</div><div style="margin-top:4px;">'+pill(c.statut,CHC[c.statut]||"#64748b")+'</div></div>'
-  +'</div>'
-  // Dette si applicable
-  +(c.dette>0?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><div style="font-size:13px;font-weight:700;color:#dc2626;">💸 Dette en cours</div><div style="font-size:15px;font-weight:900;color:#dc2626;">'+fc(c.dette)+'</div></div>':"")
-  // Boutons action rapide
-  +'<div style="display:flex;gap:8px;margin-bottom:14px;">'
-  +'<button onclick="sT(\'entretien\')" style="flex:1;padding:11px;border-radius:12px;background:#fffbeb;border:1.5px solid #fde68a;color:#d97706;font-size:12px;font-weight:700;cursor:pointer;">🔧 Entretien</button>'
-
-  +'</div>'
-  // Derniers versements
-  +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Mes derniers versements</div>'
-  +(derniers.length===0?'<div class="card" style="text-align:center;padding:20px;color:#64748b;">Aucun versement enregistré</div>'
-  :'<div class="card" style="padding:0;overflow:hidden;">'
-  +derniers.map(function(v,i){var modeColors={"Wave":"#1a9fff","Orange Money":"#f97316","MTN Money":"#eab308","Virement":"#7c3aed","Especes":"#059669"};var modeColor=modeColors[v.mode]||"#64748b";return'<div style="display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #eff6ff;background:'+(i%2?"#f8faff":"#fff")+'"><div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#0f172a;">'+v.date+'</div><div style="font-size:10px;color:'+modeColor+';font-weight:700;">'+(v.mode||"Especes")+(v.ref?' — '+v.ref:'')+'</div></div><div style="font-weight:800;font-size:14px;color:#059669;">'+fc(v.montant)+'</div></div>';}).join("")
-  +'</div>')
-  +'</div>';
-}
-
-function renderVersementsChauf(sc,c){
-  if(!c){sc.innerHTML="";return;}
-  var VE=S.data.versements.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reverse();
-  var total=VE.reduce(function(s,v){return s+v.montant;},0);
-  var sem=getSem();
-  var totalSem=VE.filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
-  sc.innerHTML='<div class="sec">'
-  +'<div style="display:flex;gap:8px;margin-bottom:12px;">'
-  +'<div class="card" style="flex:1;text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Total versé</div><div style="font-size:15px;font-weight:900;color:#059669;margin-top:4px;">'+fc(total)+'</div></div>'
-  +'<div class="card" style="flex:1;text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Cette semaine</div><div style="font-size:15px;font-weight:900;color:#1d4ed8;margin-top:4px;">'+fc(totalSem)+'</div></div>'
-  +'</div>'
-  +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;">Historique ('+VE.length+' versements)</div>'
-  +(VE.length===0?'<div class="card" style="text-align:center;padding:30px;color:#64748b;">Aucun versement</div>'
-  :'<div class="card" style="padding:0;overflow:hidden;">'
-  +VE.map(function(v,i){var modeColors={"Wave":"#1a9fff","Orange Money":"#f97316","MTN Money":"#eab308","Virement":"#7c3aed","Especes":"#059669"};var mc=modeColors[v.mode]||"#64748b";return'<div style="display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #eff6ff;background:'+(i%2?"#f8faff":"#fff")+'"><div style="width:36px;height:36px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">💵</div><div style="flex:1;margin:0 10px;"><div style="font-size:12px;font-weight:700;color:#0f172a;">'+v.date+(v.heure?' à '+v.heure:'')+'</div><div style="font-size:10px;color:'+mc+';font-weight:700;">'+(v.mode||"Especes")+(v.ref?' — Réf: '+v.ref:'')+(v.note?' · '+v.note:'')+'</div></div><div style="font-weight:800;font-size:14px;color:#059669;">+'+fc(v.montant)+'</div></div>';}).join("")
-  +'</div>')
-  +'</div>';
-}
-
-function renderChatChauf(sc,c){
-  if(!c){sc.innerHTML="";return;}
-  var cid=c.id;
-  sc.innerHTML='<div style="display:flex;flex-direction:column;height:calc(100vh - 130px);">'
-  +'<div style="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;">'
-  +'<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;">🛺</div>'
-  +'<div><div style="font-weight:700;font-size:13px;color:#0f172a;">Gérant / Admin</div>'
-  +'<div style="font-size:10px;color:#059669;">💬 Message instantané</div></div>'
-  +'</div>'
-  +chatBox(cid,"chauffeur")
-  +chatInput(cid)
-  +'</div>';
-  setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
-}
-
-function renderPrimesChauf(sc,c){
-  if(!c){sc.innerHTML="";return;}
-  var primes=getPrimeChauffeur(c.id);
-  var active=primes.filter(function(p){return p.statut==="active"&&!p.paye;});
-  var payees=primes.filter(function(p){return p.paye;});
-  var cond=primeConditionsOk(c.id);
-  sc.innerHTML='<div class="sec">'
-  // Header prime
-  +'<div style="background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 6px 20px rgba(245,158,11,.3);">'
-  +'<div style="font-size:11px;color:rgba(255,255,255,.8);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Prime mensuelle</div>'
-  +'<div style="font-size:34px;font-weight:900;color:#fff;">'+fc(PRIME_MONTANT)+'</div>'
-  +'<div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:4px;">Attribuée par le gérant si conditions remplies</div>'
-  +'</div>'
-  // Conditions
-  +'<div class="card" style="margin-bottom:14px;">'
-  +'<div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:10px;">📋 Conditions pour la prime</div>'
-  +'<div style="display:flex;flex-direction:column;gap:7px;">'
-  +'<div style="display:flex;align-items:center;gap:10px;padding:8px;background:'+(cond.ok?"#f0fdf4":"#fef2f2")+';border-radius:10px;border:1px solid '+(cond.ok?"#bbf7d0":"#fecaca")+';">'
-  +'<div style="font-size:18px;">'+(cond.ok?"✅":"❌")+'</div>'
-  +'<div><div style="font-size:12px;font-weight:700;color:'+(cond.ok?"#059669":"#dc2626")+';">'+(cond.ok?"Toutes les conditions sont remplies !":cond.details)+'</div>'
-  +'<div style="font-size:10px;color:#64748b;margin-top:2px;">Versements complets cette semaine + aucun accident</div>'
-  +'</div></div>'
-  +'</div>'
-  +'<div style="margin-top:10px;padding:10px;background:#eff6ff;border-radius:9px;font-size:11px;color:#1d4ed8;">ℹ️ La prime est activée manuellement par le gérant après vérification.</div>'
-  +'</div>'
-  // Prime active
-  +(active.length>0
-  ?'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">🌟 Prime disponible</div>'
-  +active.map(function(p){return'<div style="background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 4px 14px rgba(245,158,11,.3);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:11px;color:rgba(255,255,255,.8);font-weight:700;text-transform:uppercase;">Prime attribuée</div><div style="font-size:24px;font-weight:900;color:#fff;margin:4px 0;">'+fc(p.montant)+'</div><div style="font-size:10px;color:rgba(255,255,255,.8);">Le '+p.dateAttribution+'</div></div><div style="font-size:44px;">⭐</div></div></div>';}).join("")
-  :"")
-  // Historique
-  +(payees.length>0
-  ?'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;margin-top:4px;">📊 Historique primes payées</div>'
-  +'<div class="card" style="padding:0;overflow:hidden;">'
-  +payees.reverse().map(function(p){return'<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid #eff6ff;"><div><div style="font-size:12px;font-weight:700;color:#0f172a;">'+fc(p.montant)+'</div><div style="font-size:10px;color:#64748b;">'+p.dateAttribution+(p.datePaiement?' → payée le '+p.datePaiement:'')+'</div></div>'+pill("Payée","#059669")+'</div>';}).join("")
-  +'</div>'
-  :active.length===0?'<div class="card" style="text-align:center;padding:24px;color:#64748b;margin-top:4px;">Aucune prime pour le moment.<br><span style="font-size:11px;color:#94a3b8;margin-top:6px;display:block;">Remplissez vos objectifs pour être éligible !</span></div>':"")
-  +'</div>';
-}
-
-function renderProfilChauf(sc,c){
-  if(!c){sc.innerHTML="";return;}
-  var VE=S.data.versements.filter(function(v){return String(v.chauffeurId)===String(c.id);});
-  var total=VE.reduce(function(s,v){return s+v.montant;},0);
-  var sem=getSem();
-  var totalSem=VE.filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
-  var objSem=getObjS(c);
-  var pSem=pc(totalSem,objSem);
-  var colSem=pSem>=100?"#059669":pSem>=60?"#d97706":"#dc2626";
-  var photo=getPhoto(c.id);
-  sc.innerHTML='<div class="sec">'
-  // Avatar + nom
-  +'<div style="text-align:center;margin-bottom:18px;">'
-  +'<div style="width:80px;height:80px;border-radius:22px;overflow:hidden;margin:0 auto 10px;border:3px solid #dbeafe;">'
-  +(photo?'<img src="'+photo+'" style="width:100%;height:100%;object-fit:cover;"/>'
-  :'<div style="width:100%;height:100%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#fff;">'+c.nom.charAt(0)+'</div>')
-  +'</div>'
-  +'<div style="font-size:18px;font-weight:900;color:#0f172a;">'+c.nom+'</div>'
-  +'<div style="font-size:12px;color:#64748b;margin-top:3px;">'+(c.tel||"—")+'</div>'
-  +'<div style="margin-top:6px;">'+pill(c.statut,CHC[c.statut]||"#64748b")+'</div>'
-  +'</div>'
-  // Infos
-  +'<div class="card" style="margin-bottom:12px;">'
-  +'<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">📋 MES INFORMATIONS</div>'
-  +[["🛺 Saloni",c.saloniId||"—"],["📍 Zone",c.zone],["💵 Objectif/jour",fc(getObjJ(c))],["📅 Fréquence",c.freqPaiement||"Journalier"],["💰 Solde",fc(c.solde||0)]].map(function(x){return'<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eff6ff;"><span style="font-size:12px;color:#64748b;">'+x[0]+'</span><span style="font-size:12px;font-weight:700;color:#0f172a;">'+x[1]+'</span></div>';}).join("")
-  +(c.dette>0?'<div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="font-size:12px;color:#dc2626;">💸 Dette</span><span style="font-size:12px;font-weight:700;color:#dc2626;">'+fc(c.dette)+'</span></div>':"")
-  +'</div>'
-  // Stats
-  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px;">'
-  +'<div class="card" style="text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Total versé</div><div style="font-size:16px;font-weight:900;color:#059669;margin-top:4px;">'+fc(total)+'</div></div>'
-  +'<div class="card" style="text-align:center;"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Semaine</div><div style="font-size:16px;font-weight:900;color:'+colSem+';margin-top:4px;">'+pSem+'%</div></div>'
-  +'</div>'
-  // Changer mdp
-  +'<button onclick="oM(\'chgMdpSelf\')" class="bgr" style="width:100%;margin-bottom:8px;">🔑 Changer mon code</button>'
-  +'</div>';
-}
 
 
-function renderEntretienChauf(sc,c){
-  if(!c){sc.innerHTML="";return;}
-  var ents=getEntretiensChauffeur(c.id);
-  var typeKeys=["vidange","pneus","freins","revision"];
-  var typeIcons={vidange:"🛢",pneus:"🔵",freins:"🔴",revision:"🔧"};
-  var typeLabels={vidange:"Vidange",pneus:"Pneus",freins:"Freins",revision:"Revision"};
 
-  sc.innerHTML="";
-  var wrap=document.createElement("div");
-  wrap.className="sec";
 
-  // Header
-  var hdr=document.createElement("div");
-  hdr.style.cssText="background:linear-gradient(135deg,#d97706,#f59e0b);border-radius:18px;padding:16px;margin-bottom:14px;";
-  hdr.innerHTML="<div style='font-size:11px;color:rgba(255,255,255,.8);font-weight:700;margin-bottom:4px;'>MON ENTRETIEN</div>"
-    +"<div style='font-size:20px;font-weight:900;color:#fff;'>"+c.nom+"</div>"
-    +"<div style='font-size:11px;color:rgba(255,255,255,.8);margin-top:3px;'>Saloni: "+(c.saloniId||"—")+"</div>";
-  wrap.appendChild(hdr);
 
-  // Card boutons
-  var card=document.createElement("div");
-  card.className="card";
-  card.style.marginBottom="14px";
-  var cardTitle=document.createElement("div");
-  cardTitle.style.cssText="font-size:13px;font-weight:800;color:var(--txt,#0f172a);margin-bottom:6px;";
-  cardTitle.textContent="Signaler un besoin ou une panne";
-  var cardInfo=document.createElement("div");
-  cardInfo.style.cssText="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.6;";
-  cardInfo.textContent="Signalez ici si vous avez une panne pour eviter une sanction automatique.";
-  var grid=document.createElement("div");
-  grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px;";
 
-  typeKeys.forEach(function(type){
-    var last=ents.filter(function(e){return e.type===type&&e.statut==="fait";})[0];
-    var pending=ents.filter(function(e){return e.type===type&&e.statut==="demande";})[0];
-    var btn=document.createElement("div");
-    btn.style.cssText="background:var(--bg4,#eff6ff);border:1.5px solid var(--border2,#bfdbfe);border-radius:12px;padding:13px 8px;text-align:center;"+(pending?"opacity:.6;":"cursor:pointer;");
-    var ico=document.createElement("div");ico.style.fontSize="24px";ico.style.marginBottom="4px";ico.textContent=typeIcons[type];
-    var lbl=document.createElement("div");lbl.style.cssText="font-size:12px;font-weight:700;color:var(--txt,#0f172a);";lbl.textContent=typeLabels[type];
-    var st=document.createElement("div");st.style.cssText="font-size:9px;margin-top:2px;color:"+(pending?"#d97706":last?"#059669":"#dc2626")+";";
-    st.textContent=pending?"En attente":last?last.dateFait:"Non fait";
-    btn.appendChild(ico);btn.appendChild(lbl);btn.appendChild(st);
-    if(!pending){(function(t){btn.onclick=function(){signalerEntretien(c.id,t,"demande");};})(type);}
-    grid.appendChild(btn);
-  });
 
-  card.appendChild(cardTitle);card.appendChild(cardInfo);card.appendChild(grid);
-  wrap.appendChild(card);
 
-  // Historique
-  var histTitle=document.createElement("div");
-  histTitle.style.cssText="font-size:13px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:9px;";
-  histTitle.textContent="Historique";
-  wrap.appendChild(histTitle);
 
-  if(ents.length===0){
-    var empty=document.createElement("div");
-    empty.className="card";
-    empty.style.cssText="text-align:center;padding:24px;color:#64748b;";
-    empty.textContent="Aucun entretien enregistre";
-    wrap.appendChild(empty);
-  }else{
-    var histCard=document.createElement("div");
-    histCard.className="card";
-    histCard.style.cssText="padding:0;overflow:hidden;";
-    ents.slice(0,10).forEach(function(e){
-      var row=document.createElement("div");
-      var sCol=e.statut==="fait"?"#059669":e.statut==="demande"?"#d97706":"#64748b";
-      row.style.cssText="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border,#dbeafe);";
-      row.innerHTML="<div style='font-size:20px;'>"+(typeIcons[e.type]||"⚙️")+"</div>"
-        +"<div style='flex:1;'><div style='font-size:12px;font-weight:700;color:var(--txt,#0f172a);'>"+e.type.charAt(0).toUpperCase()+e.type.slice(1)+"</div>"
-        +"<div style='font-size:10px;color:#64748b;'>"+e.date+"</div></div>"
-        +"<span style='font-size:9px;padding:2px 8px;border-radius:20px;background:"+sCol+"18;color:"+sCol+";border:1px solid "+sCol+"33;font-weight:700;'>"+e.statut+"</span>";
-      histCard.appendChild(row);
-    });
-    wrap.appendChild(histCard);
-  }
 
-  sc.appendChild(wrap);
-}
+
+
+
+
 
 
 
 // ══ DONNÉES DE BASE ══
 var COMPTES_BASE=[
-  {pseudo:"gerant",mdp:"saloni2026",role:"Gerant",niveau:3},
+  {pseudo:"gerant",mdp:"Cedric10@",role:"Gerant",niveau:3},
   {pseudo:"admin",mdp:"admin123",role:"Admin",niveau:2},
   {pseudo:"abidjan",mdp:"saloni123",role:"Abidjan",niveau:1}
 ];
@@ -1950,6 +948,30 @@ var CATS=["Carburant","Reparation","Assurance","Pieces","Lavage","Autre"];
 var CHC={actif:"#059669",repos:"#d97706",suspendu:"#dc2626"};
 var JOURS=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 var PRIME_MONTANT=15000;
+
+// ══ SONS MESSAGES ══
+function playSound(type){
+  try{
+    var ctx=new(window.AudioContext||window.webkitAudioContext)();
+    var o=ctx.createOscillator();
+    var g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    if(type==="send"){
+      o.frequency.setValueAtTime(520,ctx.currentTime);
+      o.frequency.setValueAtTime(640,ctx.currentTime+0.1);
+      g.gain.setValueAtTime(0.3,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);
+      o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);
+    }else if(type==="receive"){
+      o.frequency.setValueAtTime(880,ctx.currentTime);
+      o.frequency.setValueAtTime(660,ctx.currentTime+0.1);
+      o.frequency.setValueAtTime(880,ctx.currentTime+0.2);
+      g.gain.setValueAtTime(0.4,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
+      o.start(ctx.currentTime);o.stop(ctx.currentTime+0.4);
+    }
+  }catch(e){}
+}
 
 var S={
 user:null,tab:"home",seg:"recettes",rapSeg:"semaine",
@@ -2386,7 +1408,7 @@ function initFirebase(){
             firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});
           }
           db=firebase.firestore();
-          if(S.user){startSync();setTimeout(ecouterNotifications,2000);}
+          if(S.user){startSync();setTimeout(ecouterNotifications,2000);setTimeout(startPresenceSync,3000);}
           loadMdpOverrides(function(){});
         }catch(e){console.log("FB:",e);}
       };
@@ -2399,7 +1421,17 @@ function initFirebase(){
 function showSync(msg,col){var b=document.getElementById("syncBar");if(!b)return;b.textContent=msg;b.style.background=col;b.style.color="#000";b.style.display="block";if(syncTimer)clearTimeout(syncTimer);if(col==="#10b981")syncTimer=setTimeout(function(){b.style.display="none";},2000);}
 var unsubs=[];
 var COLS=["chauffeurs","salonis","versements","depenses","amendes","messages","rapports","sousComptes","chats","primes","entretiens","sanctions","positions"];
-function startSync(){if(!db)return;unsubs.forEach(function(u){u();});unsubs=[];showSync("Connexion..","#f59e0b");var cnt=0;COLS.forEach(function(col){var u=db.collection("sal_"+col).onSnapshot(function(snap){var fbData=snap.docs.map(function(d){var x=d.data();delete x._t;if(x.id&&!isNaN(x.id))x.id=parseInt(x.id);if(x.chauffeurId&&!isNaN(x.chauffeurId))x.chauffeurId=parseInt(x.chauffeurId);return x;});if(fbData.length>0)S.data[col]=fbData;cnt++;if(cnt>=COLS.length)showSync("Synchronise","#10b981");if(S.user)R();},function(){showSync("Hors ligne","#ef4444");});unsubs.push(u);});}
+function startSync(){if(!db)return;unsubs.forEach(function(u){u();});unsubs=[];showSync("Connexion..","#f59e0b");var cnt=0;COLS.forEach(function(col){var u=db.collection("sal_"+col).onSnapshot(function(snap){var fbData=snap.docs.map(function(d){var x=d.data();delete x._t;if(x.id&&!isNaN(x.id))x.id=parseInt(x.id);if(x.chauffeurId&&!isNaN(x.chauffeurId))x.chauffeurId=parseInt(x.chauffeurId);return x;});if(fbData.length>0)S.data[col]=fbData;cnt++;if(cnt>=COLS.length)showSync("Synchronise","#10b981");if(S.user){
+          // Son si nouveau message reçu
+          if(col==="chats"&&fbData.length>0){
+            var lastMsg=fbData[fbData.length-1];
+            var estSC=estCompteChauf();
+            var estPourMoi=estSC?(lastMsg.convId===getChatConvId(S.user.chauffeurId)&&lastMsg.de==="admin"):(lastMsg.de==="chauffeur");
+            if(estPourMoi&&!lastMsg.lu&&lastMsg.ts&&(Date.now()-lastMsg.ts)<5000){
+              playSound("receive");
+            }
+          }
+          R();}},function(){showSync("Hors ligne","#ef4444");});unsubs.push(u);});}
 function fbSave(col,item){save();if(!db)return;try{var d=Object.assign({},item);d._t=firebase.firestore.FieldValue.serverTimestamp();db.collection("sal_"+col).doc(String(item.id)).set(d);}catch(e){}}
 function fbDel(col,id){save();if(!db)return;try{db.collection("sal_"+col).doc(String(id)).delete();}catch(e){}}
 
@@ -2408,8 +1440,64 @@ function load(){try{var d=localStorage.getItem("sal_v2");if(d)S.data=JSON.parse(
 function applyDark(){if(S.darkMode)document.body.classList.add("dark");else document.body.classList.remove("dark");}
 function toggleDark(){S.darkMode=!S.darkMode;try{localStorage.setItem("sal_dark",S.darkMode?"1":"0");}catch(e){}applyDark();rHD();}
 function save(){try{localStorage.setItem("sal_v2",JSON.stringify(S.data));}catch(e){}}
-function pingSession(){if(!S.user)return;try{var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}}
+function pingSession(){if(!S.user)return;try{var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}
+  // Sync presence Firebase
+  if(db&&S.user){try{
+    var tsNow=Date.now();
+    db.collection("sal_presence").doc(S.user.pseudo).set({pseudo:S.user.pseudo,role:S.user.role,typeCompte:S.user.typeCompte||"normal",ts:tsNow,online:true});
+    // Cache local pour last seen
+    try{var cache=JSON.parse(localStorage.getItem("sal_presence_cache")||"{}");cache[S.user.pseudo]=tsNow;localStorage.setItem("sal_presence_cache",JSON.stringify(cache));}catch(e){}
+  }catch(e){}}
+}
 function getConx(){try{var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");return sess.filter(function(s){return Date.now()-s.ts<1800000;});}catch(e){return[];}}
+// Présence temps réel Firebase
+var _presenceOnline=[];
+function startPresenceSync(){
+  if(!db)return;
+  db.collection("sal_presence").onSnapshot(function(snap){
+    var allPresence=snap.docs.map(function(d){var x=d.data();return x;});
+    _presenceOnline=allPresence.filter(function(p){return Date.now()-p.ts<300000;});
+    // Mettre à jour le cache last seen pour tous (sauf gérant)
+    try{
+      var cache=JSON.parse(localStorage.getItem("sal_presence_cache")||"{}");
+      allPresence.forEach(function(p){
+        if(p.pseudo&&p.pseudo!=="gerant"&&p.ts){
+          if(!cache[p.pseudo]||p.ts>cache[p.pseudo])cache[p.pseudo]=p.ts;
+        }
+      });
+      localStorage.setItem("sal_presence_cache",JSON.stringify(cache));
+    }catch(e){}
+    // Rafraîchir le badge chat si on est sur cet onglet
+    if(S.user&&(S.tab==="chat"||S.tab==="home"))rNAV();
+  });
+}
+function getOnlineUsers(){return _presenceOnline.filter(function(p){return !S.user||p.pseudo!==S.user.pseudo;});}
+function isUserOnline(pseudo){return _presenceOnline.some(function(p){return p.pseudo===pseudo&&Date.now()-p.ts<300000;});}
+function getLastSeen(pseudo){
+  // Chercher dans la presence Firebase
+  var p=_presenceOnline.filter(function(x){return x.pseudo===pseudo;})[0];
+  if(p){
+    var diff=Date.now()-p.ts;
+    if(diff<300000)return{online:true,label:"En ligne"};
+    if(diff<3600000)return{online:false,label:"Vu il y a "+Math.round(diff/60000)+" min"};
+    if(diff<86400000)return{online:false,label:"Vu il y a "+Math.round(diff/3600000)+"h"};
+    return{online:false,label:"Vu il y a "+Math.round(diff/86400000)+"j"};
+  }
+  // Chercher dans Firebase sal_presence via localStorage cache
+  try{
+    var cache=JSON.parse(localStorage.getItem("sal_presence_cache")||"{}");
+    if(cache[pseudo]){
+      var diff2=Date.now()-cache[pseudo];
+      if(diff2<300000)return{online:true,label:"En ligne"};
+      if(diff2<3600000)return{online:false,label:"Vu il y a "+Math.round(diff2/60000)+" min"};
+      if(diff2<86400000)return{online:false,label:"Vu il y a "+Math.round(diff2/3600000)+"h"};
+      return{online:false,label:"Vu il y a "+Math.round(diff2/86400000)+"j"};
+    }
+  }catch(e){}
+  return{online:false,label:"Jamais connecté"};
+}
+// Marquer offline à la déconnexion
+function setOffline(){if(!db||!S.user)return;try{db.collection("sal_presence").doc(S.user.pseudo).delete();}catch(e){}}
 setInterval(function(){if(S.user)pingSession();},60000);
 var _mdpOverrides={};
 function loadMdpOverrides(cb){if(!db){cb();return;}db.collection("sal_config").doc("mdp_overrides").get().then(function(doc){if(doc.exists)_mdpOverrides=doc.data()||{};cb();}).catch(function(){cb();});}
@@ -2441,7 +1529,7 @@ function getChatConvId(cid){return "conv_"+String(cid);}
 function getChatMsgs(cid){return(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(cid);}).sort(function(a,b){return a.ts-b.ts;});}
 function getNbChatNonLus(){if(!S.user)return 0;var estSC=estCompteChauf();return(S.data.chats||[]).filter(function(m){if(m.lu)return false;if(estSC)return m.convId===getChatConvId(S.user.chauffeurId)&&m.de==="admin";return m.de==="chauffeur";}).length;}
 function marquerChatLu(cid){var estSC=estCompteChauf();(S.data.chats||[]).forEach(function(m){if(m.lu)return;if(!estSC&&m.convId===getChatConvId(cid)&&m.de==="chauffeur"){m.lu=true;fbSave("chats",m);}if(estSC&&m.convId===getChatConvId(cid)&&m.de==="admin"){m.lu=true;fbSave("chats",m);}});}
-function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
+function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);playSound("send");var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
 function msgBubble(m,moiDe){var moi=m.de===moiDe;return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:6px;"><div style="max-width:78%;background:'+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":"1px solid #dbeafe")+';">'+m.texte.replace(/</g,"&lt;")+'<div style="font-size:9px;opacity:.55;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div></div></div>";}
 function chatBox(cid,moiDe){var msgs=getChatMsgs(cid);marquerChatLu(cid);return'<div style="flex:1;overflow-y:auto;padding:12px 14px;" id="chatBox">'+(msgs.length===0?'<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">💬 Aucun message pour l\'instant</div>':msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))+"</div>";}
 function chatInput(cid){return'<div style="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;"><textarea id="chatInput" placeholder="Votre message..." rows="1" style="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea><button onclick="envoyerChat('+cid+')" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;">↑</button></div>';}
@@ -3690,22 +2778,173 @@ function rScreenGlobal(sc){
 
   else if(S.tab==="chat"){
     if(S.chatConvOuverte){
-      var cid2=S.chatConvOuverte;var chC=CH.filter(function(x){return String(x.id)===String(cid2);})[0];
-      html='<div style="display:flex;flex-direction:column;height:calc(100vh - 130px);">'
-      +'<div style="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;">'
-      +'<button onclick="S.chatConvOuverte=null;rScreen();" style="background:#fff;border:1px solid #dbeafe;border-radius:9px;padding:6px 10px;font-size:13px;cursor:pointer;">←</button>'
-      +'<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;">'+(chC?chC.nom.charAt(0):"?")+'</div>'
-      +'<div><div style="font-weight:700;font-size:13px;color:#0f172a;">'+(chC?chC.nom:"Chauffeur")+'</div><div style="font-size:10px;color:#64748b;">'+(chC?chC.zone:"")+'</div></div></div>'
-      +chatBox(cid2,"admin")+chatInput(cid2)+'</div>';
+      // ── Conversation ouverte ──
+      var cid2=S.chatConvOuverte;
+      var chC=CH.filter(function(x){return String(x.id)===String(cid2);})[0];
+      // Trouver le sous-compte chauffeur pour savoir s'il est en ligne
+      var scC=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===String(cid2);})[0];
+      var enLigne=scC?isUserOnline(scC.pseudo):false;
+      var wrapper=document.createElement("div");
+      wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
+      // Header conversation
+      var convHd=document.createElement("div");
+      convHd.style.cssText="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;";
+      var backBtn=document.createElement("button");
+      backBtn.textContent="←";
+      backBtn.style.cssText="background:#fff;border:1px solid #dbeafe;border-radius:9px;padding:6px 10px;font-size:13px;cursor:pointer;";
+      backBtn.onclick=function(){S.chatConvOuverte=null;rScreen();};
+      var avatar=document.createElement("div");
+      avatar.style.cssText="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
+      avatar.textContent=chC?chC.nom.charAt(0):"?";
+      // Point de présence
+      var dot=document.createElement("div");
+      dot.style.cssText="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:"+(enLigne?"#10b981":"#94a3b8")+";border:2px solid #eff6ff;";
+      avatar.appendChild(dot);
+      var convInfo=document.createElement("div");
+      convInfo.style.flex="1";
+      convInfo.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>"+(chC?chC.nom:"Chauffeur")+"</div>"
+        +"<div style='font-size:10px;color:"+(enLigne?"#10b981":"#94a3b8")+";font-weight:600;'>"+(enLigne?"🟢 En ligne":"⚫ Hors ligne")+"</div>";
+      convHd.appendChild(backBtn);convHd.appendChild(avatar);convHd.appendChild(convInfo);
+      wrapper.appendChild(convHd);
+      // Messages
+      var chatBoxDiv=document.createElement("div");
+      chatBoxDiv.id="chatBox";
+      chatBoxDiv.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
+      var msgs=getChatMsgs(cid2);
+      marquerChatLu(cid2);
+      if(msgs.length===0){
+        chatBoxDiv.innerHTML="<div style='text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;'>💬 Aucun message</div>";
+      }else{
+        msgs.forEach(function(m){
+          var moi=m.de==="admin";
+          var bbl=document.createElement("div");
+          bbl.style.cssText="display:flex;justify-content:"+(moi?"flex-end":"flex-start")+";margin-bottom:6px;";
+          var inner=document.createElement("div");
+          inner.style.cssText="max-width:78%;background:"+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+";color:"+(moi?"#fff":"#0f172a")+";border-radius:"+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi?"none":"1px solid #dbeafe")+";";
+          inner.textContent=m.texte;
+          // Heure + statut lu
+          var meta=document.createElement("div");
+          meta.style.cssText="font-size:9px;opacity:.6;margin-top:3px;text-align:right;display:flex;justify-content:flex-end;align-items:center;gap:3px;";
+          meta.textContent=m.heure;
+          if(moi){
+            var tick=document.createElement("span");
+            tick.style.cssText="font-size:11px;color:"+(m.lu?"#60a5fa":"rgba(255,255,255,0.6)")+";";
+            tick.textContent=m.lu?" ✓✓":" ✓";
+            meta.appendChild(tick);
+          }
+          inner.appendChild(meta);
+          bbl.appendChild(inner);
+          chatBoxDiv.appendChild(bbl);
+        });
+      }
+      wrapper.appendChild(chatBoxDiv);
+      // Input
+      var inputDiv=document.createElement("div");
+      inputDiv.style.cssText="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;";
+      var ta=document.createElement("textarea");
+      ta.id="chatInput";ta.placeholder="Votre message...";ta.rows=1;
+      ta.style.cssText="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;";
+      ta.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChat(cid2);}};
+      var sendBtn=document.createElement("button");
+      sendBtn.textContent="↑";
+      sendBtn.style.cssText="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
+      sendBtn.onclick=function(){envoyerChat(cid2);};
+      inputDiv.appendChild(ta);inputDiv.appendChild(sendBtn);
+      wrapper.appendChild(inputDiv);
+      sc.innerHTML="";sc.appendChild(wrapper);
       setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
+      html=null;
+
     }else{
-      html='<div class="sec">';
-      if(CH.length===0){html+='<div class="card" style="text-align:center;padding:30px;color:#64748b;">Aucun chauffeur enregistré</div>';}
-      else{CH.forEach(function(c){var msgs2=getChatMsgs(c.id);var dernierMsg=msgs2.length>0?msgs2[msgs2.length-1]:null;var nonLus=(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(c.id)&&!m.lu&&m.de==="chauffeur";}).length;html+='<div onclick="S.chatConvOuverte='+c.id+';rScreen();" style="background:#fff;border:1px solid '+(nonLus>0?"#93c5fd":"#dbeafe")+';border-radius:14px;padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px;cursor:pointer;"><div style="width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">'+c.nom.charAt(0)+'</div><div style="flex:1;min-width:0;"><div style="font-weight:'+(nonLus>0?"800":"700")+';font-size:13px;color:#0f172a;">'+c.nom+'</div><div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">'+(dernierMsg?dernierMsg.texte.substring(0,40)+(dernierMsg.texte.length>40?"...":""):"Pas encore de message")+'</div></div>'+(nonLus>0?'<span style="background:#dc2626;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;">'+nonLus+'</span>':'<span style="color:#bfdbfe;font-size:18px;">›</span>')+'</div>';});}
-      html+='</div>';
+      // ── Liste conversations avec présence ──
+      var wrapper2=document.createElement("div");
+      wrapper2.style.cssText="background:#f8faff;min-height:100%;";
+
+      // Barre personnes en ligne
+      var online=getOnlineUsers();
+      if(online.length>0){
+        var onlineBar=document.createElement("div");
+        onlineBar.style.cssText="background:#fff;border-bottom:1px solid #dbeafe;padding:10px 14px;";
+        var onlineTitle=document.createElement("div");
+        onlineTitle.style.cssText="font-size:11px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;";
+        onlineTitle.textContent="🟢 En ligne ("+online.length+")";
+        onlineBar.appendChild(onlineTitle);
+        var onlineRow=document.createElement("div");
+        onlineRow.style.cssText="display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;";
+        online.forEach(function(u){
+          var item=document.createElement("div");
+          item.style.cssText="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;";
+          var av=document.createElement("div");
+          av.style.cssText="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;position:relative;border:2px solid #10b981;";
+          av.textContent=u.pseudo.charAt(0).toUpperCase();
+          var dot2=document.createElement("div");
+          dot2.style.cssText="position:absolute;bottom:0;right:0;width:13px;height:13px;border-radius:50%;background:#10b981;border:2px solid #fff;";
+          av.appendChild(dot2);
+          var name=document.createElement("div");
+          name.style.cssText="font-size:10px;font-weight:700;color:#0f172a;text-align:center;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+          name.textContent=u.pseudo;
+          item.appendChild(av);item.appendChild(name);
+          // Cliquer sur un utilisateur en ligne → ouvrir sa conversation si chauffeur
+          var scMatch=(S.data.sousComptes||[]).filter(function(sc){return sc.pseudo===u.pseudo&&sc.chauffeurId;});
+          if(scMatch.length>0){
+            (function(chId){item.onclick=function(){S.chatConvOuverte=chId;rScreen();};})(scMatch[0].chauffeurId);
+          }
+          onlineRow.appendChild(item);
+        });
+        onlineBar.appendChild(onlineRow);
+        wrapper2.appendChild(onlineBar);
+      }
+
+      // Liste conversations
+      var listTitle=document.createElement("div");
+      listTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
+      listTitle.textContent="Conversations";
+      wrapper2.appendChild(listTitle);
+
+      if(CH.length===0){
+        var empty=document.createElement("div");
+        empty.className="card";
+        empty.style.cssText="text-align:center;padding:30px;color:#64748b;margin:0 14px;";
+        empty.textContent="Aucun chauffeur";
+        wrapper2.appendChild(empty);
+      }else{
+        CH.forEach(function(c){
+          var msgs2=getChatMsgs(c.id);
+          var dernierMsg=msgs2.length>0?msgs2[msgs2.length-1]:null;
+          var nonLus=(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(c.id)&&!m.lu&&m.de==="chauffeur";}).length;
+          var scC2=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===String(c.id);})[0];
+          var enLigne2=scC2?isUserOnline(scC2.pseudo):false;
+          var row=document.createElement("div");
+          row.style.cssText="background:#fff;border-bottom:1px solid #f0f2f5;padding:13px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;"+(nonLus>0?"background:#eff6ff;":"");
+          var av2=document.createElement("div");
+          av2.style.cssText="width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
+          av2.textContent=c.nom.charAt(0);
+          var dot3=document.createElement("div");
+          dot3.style.cssText="position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:"+(enLigne2?"#10b981":"#94a3b8")+";border:2px solid #fff;";
+          av2.appendChild(dot3);
+          var info=document.createElement("div");info.style.cssText="flex:1;min-width:0;";
+          var nomDiv=document.createElement("div");
+          nomDiv.style.cssText="font-weight:"+(nonLus>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
+          nomDiv.textContent=c.nom;
+          if(enLigne2){var onPill=document.createElement("span");onPill.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";onPill.textContent="en ligne";nomDiv.appendChild(onPill);}
+          var lastMsg=document.createElement("div");
+          lastMsg.style.cssText="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;";
+          // Afficher "vu il y a..." si hors ligne, dernier message sinon
+          var lastSeenInfo=scC2?getLastSeen(scC2.pseudo):{online:false,label:"Jamais connecté"};
+          var lastMsgTxt=dernierMsg?dernierMsg.texte.substring(0,35)+(dernierMsg.texte.length>35?"...":""):"";
+          lastMsg.innerHTML=(enLigne2?"":('<span style="color:'+(lastSeenInfo.label==="Jamais connecté"?"#dc2626":"#64748b")+';font-size:10px;">'+lastSeenInfo.label+'</span>'))+(lastMsgTxt&&!enLigne2?' · '+lastMsgTxt:lastMsgTxt||"");
+          info.appendChild(nomDiv);info.appendChild(lastMsg);
+          var right2=document.createElement("div");right2.style.cssText="display:flex;flex-direction:column;align-items:flex-end;gap:4px;";
+          if(nonLus>0){var badge=document.createElement("span");badge.style.cssText="background:#dc2626;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";badge.textContent=nonLus;right2.appendChild(badge);}
+          else{var chev2=document.createElement("span");chev2.style.cssText="color:#bfdbfe;font-size:18px;";chev2.textContent="›";right2.appendChild(chev2);}
+          row.appendChild(av2);row.appendChild(info);row.appendChild(right2);
+          (function(cid){row.onclick=function(){S.chatConvOuverte=cid;rScreen();};})(c.id);
+          wrapper2.appendChild(row);
+        });
+      }
+      sc.innerHTML="";sc.appendChild(wrapper2);html=null;
     }
   }
-
   else if(S.tab==="primes"){
     // Onglet Primes Gérant
     var semaines=["Semaine en cours","Semaine dernière","Ce mois"];
@@ -4916,6 +4155,7 @@ function saveFCMToken(token){
 }
 
 function showPushNotification(title, body, data){
+  playSound("receive");
   // Afficher une notif in-app quand l'app est ouverte
   var old = document.getElementById("_pushNotif");
   if(old) old.remove();
