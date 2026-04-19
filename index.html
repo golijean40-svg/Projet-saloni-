@@ -1009,8 +1009,8 @@ var JOURNAL_KEY="sal_journal";var JOURNAL_MAX=200;
 var JOURNAL_ICONS={connexion:"🔑",deconnexion:"🚪",versement_ajout:"💵",versement_suppr:"🗑",chauffeur_ajout:"👤",chauffeur_suppr:"❌",saloni_ajout:"🛺",saloni_suppr:"❌",depense_ajout:"📋",amende_ajout:"🚔"};
 var JOURNAL_COLORS={connexion:"#059669",deconnexion:"#64748b",versement_ajout:"#1d4ed8",versement_suppr:"#dc2626",chauffeur_ajout:"#7c3aed",chauffeur_suppr:"#dc2626",saloni_ajout:"#0891b2",saloni_suppr:"#dc2626",depense_ajout:"#d97706",amende_ajout:"#dc2626"};
 function jLog(type,detail){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");var entry={id:Date.now(),type:type,detail:detail||"",user:S.user?S.user.pseudo:"—",role:S.user?S.user.role:"—",date:td(),heure:hr(),ts:Date.now()};logs.unshift(entry);if(logs.length>JOURNAL_MAX)logs=logs.slice(0,JOURNAL_MAX);localStorage.setItem(JOURNAL_KEY,JSON.stringify(logs));
-  // Connexions/déconnexions → Firebase pour visibilité gérant
-  if(db&&(type==="connexion"||type==="deconnexion")){try{var fe=Object.assign({},entry,{id:entry.id.toString()});db.collection("sal_journal").doc(fe.id).set(fe);}catch(e){}}
+  // Toutes les actions → Firebase pour visibilité gérant (pas seulement connexion)
+  if(db){try{var fe=Object.assign({},entry,{id:entry.id.toString()});db.collection("sal_journal").doc(fe.id).set(fe);}catch(e){}}
 }catch(e){}}
 function getJournal(filtre){try{var logs=JSON.parse(localStorage.getItem(JOURNAL_KEY)||"[]");if(filtre&&filtre!=="tous")logs=logs.filter(function(l){if(filtre==="versements")return l.type.indexOf("versement")>=0;if(filtre==="acces")return l.type==="connexion"||l.type==="deconnexion";if(filtre==="donnees")return l.type.indexOf("chauffeur")>=0||l.type.indexOf("saloni")>=0||l.type.indexOf("depense")>=0||l.type.indexOf("amende")>=0;return true;});return logs;}catch(e){return[];}}
 function clearJournal(){if(!confirm("Effacer tout le journal ?"))return;try{localStorage.removeItem(JOURNAL_KEY);}catch(e){}rScreen();}
@@ -1408,7 +1408,31 @@ function initFirebase(){
             firebase.initializeApp({apiKey:"AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI",authDomain:"saloni-manager-1c0d3.firebaseapp.com",projectId:"saloni-manager-1c0d3",storageBucket:"saloni-manager-1c0d3.firebasestorage.app",messagingSenderId:"372199257115",appId:"1:372199257115:web:7e2aaacd4b30900acdb4be"});
           }
           db=firebase.firestore();
-          if(S.user){startSync();setTimeout(ecouterNotifications,2000);setTimeout(startPresenceSync,3000);}
+          if(S.user){
+            startSync();
+            setTimeout(ecouterNotifications,2000);
+            setTimeout(startPresenceSync,3000);
+            // Ping présence immédiat maintenant que Firebase est prêt
+            try{
+              db.collection("sal_presence").doc(S.user.pseudo).set({
+                pseudo:S.user.pseudo,
+                role:S.user.role,
+                typeCompte:S.user.typeCompte||"normal",
+                ts:Date.now(),
+                online:true
+              });
+            }catch(e){}
+            // Enregistrer connexion dans Firebase journal (si pas gérant)
+            if(S.user.pseudo!=="gerant"){
+              try{
+                var entry={id:Date.now().toString(),type:"connexion",
+                  detail:"Connexion de "+S.user.pseudo+" ("+S.user.role+")",
+                  user:S.user.pseudo,role:S.user.role,
+                  date:td(),heure:hr(),ts:Date.now()};
+                db.collection("sal_journal").doc(entry.id).set(entry);
+              }catch(e){}
+            }
+          }
           loadMdpOverrides(function(){});
         }catch(e){console.log("FB:",e);}
       };
@@ -2046,15 +2070,96 @@ function renderVersementsChauf(sc,c){
 function renderChatChauf(sc,c){
   if(!c){sc.innerHTML="";return;}
   var cid=c.id;
-  sc.innerHTML='<div style="display:flex;flex-direction:column;height:calc(100vh - 130px);">'
-  +'<div style="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;">'
-  +'<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;">🛺</div>'
-  +'<div><div style="font-weight:700;font-size:13px;color:#0f172a;">Gérant / Admin</div>'
-  +'<div style="font-size:10px;color:#059669;">💬 Message instantané</div></div>'
-  +'</div>'
-  +chatBox(cid,"chauffeur")
-  +chatInput(cid)
-  +'</div>';
+  var wrapper=document.createElement("div");
+  wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
+
+  // Header
+  var hd=document.createElement("div");
+  hd.style.cssText="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;";
+  var ico=document.createElement("div");
+  ico.style.cssText="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;";
+  ico.textContent="🛺";
+  var hInfo=document.createElement("div");
+  hInfo.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>Gérant / Équipe</div>"
+    +"<div style='font-size:10px;color:#059669;'>💬 Message instantané</div>";
+  hd.appendChild(ico);hd.appendChild(hInfo);
+  wrapper.appendChild(hd);
+
+  // Messages
+  var chatBoxDiv=document.createElement("div");
+  chatBoxDiv.id="chatBox";
+  chatBoxDiv.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
+  var msgs=getChatMsgs(cid);
+  marquerChatLu(cid);
+  if(msgs.length===0){
+    chatBoxDiv.innerHTML="<div style='text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;'>💬 Aucun message pour l&#39;instant</div>";
+  }else{
+    msgs.forEach(function(m){
+      var moi=m.de==="chauffeur";
+      // Identifier expéditeur côté chauffeur
+      var expediteur="";
+      var bulleRecuBg="#fff";
+      var bulleRecuBorder="1px solid #dbeafe";
+      var expediteurColor="#1d4ed8";
+      if(!moi){
+        var allC=tousComptes();
+        var cc=allC.filter(function(x){return x.pseudo===m.auteur;})[0];
+        if(m.auteur==="gerant"||(!cc&&m.de==="admin")){
+          expediteur="Gérant";
+          bulleRecuBg="#e8f0fb";
+          bulleRecuBorder="1px solid #bfdbfe";
+          expediteurColor="#1d4ed8";
+        }else if(cc){
+          expediteur=cc.role||cc.pseudo;
+          bulleRecuBg="#f3e8ff";
+          bulleRecuBorder="1px solid #ddd6fe";
+          expediteurColor="#7c3aed";
+        }else{
+          expediteur=m.auteur||"Admin";
+        }
+      }
+      var bbl=document.createElement("div");
+      bbl.style.cssText="display:flex;justify-content:"+(moi?"flex-end":"flex-start")+";margin-bottom:8px;";
+      var inner=document.createElement("div");
+      inner.style.cssText="max-width:78%;";
+      // Nom expéditeur
+      if(!moi&&expediteur){
+        var expDiv=document.createElement("div");
+        expDiv.style.cssText="font-size:10px;font-weight:800;color:"+expediteurColor+";margin-bottom:3px;padding-left:4px;";
+        expDiv.textContent=expediteur;
+        inner.appendChild(expDiv);
+      }
+      // Bulle
+      var bulle=document.createElement("div");
+      bulle.style.cssText="background:"+(moi?"linear-gradient(135deg,#059669,#10b981)":bulleRecuBg)+";color:"+(moi?"#fff":"#0f172a")+";border-radius:"+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi?"none":bulleRecuBorder)+";";
+      bulle.textContent=m.texte;
+      // Heure + lu
+      var meta=document.createElement("div");
+      meta.style.cssText="font-size:9px;opacity:.6;margin-top:3px;text-align:right;";
+      meta.textContent=m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"");
+      bulle.appendChild(meta);
+      inner.appendChild(bulle);
+      bbl.appendChild(inner);
+      chatBoxDiv.appendChild(bbl);
+    });
+  }
+  wrapper.appendChild(chatBoxDiv);
+
+  // Input
+  var inputDiv=document.createElement("div");
+  inputDiv.style.cssText="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;";
+  var ta=document.createElement("textarea");
+  ta.id="chatInput";ta.placeholder="Votre message...";ta.rows=1;
+  ta.style.cssText="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;";
+  ta.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChat(cid);}};
+  var sendBtn=document.createElement("button");
+  sendBtn.textContent="↑";
+  sendBtn.style.cssText="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
+  sendBtn.onclick=function(){envoyerChat(cid);};
+  inputDiv.appendChild(ta);inputDiv.appendChild(sendBtn);
+  wrapper.appendChild(inputDiv);
+
+  sc.innerHTML="";sc.appendChild(wrapper);
   setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
 }
 
@@ -3029,14 +3134,18 @@ function rScreenGlobal(sc){
       }
 
       // Section Équipe (collaborateurs)
-      var equipe=(S.data.sousComptes||[]).filter(function(sc){return sc.typeCompte!=="chauffeur"&&sc.pseudo!==S.user.pseudo;});
+      // Pour la collaboratrice, ajouter aussi le gérant dans la liste équipe
+      var equipeBase=(S.data.sousComptes||[]).filter(function(sc){return sc.typeCompte!=="chauffeur"&&sc.pseudo!==S.user.pseudo;});
+      // Ajouter le gérant si l'utilisateur n'est pas lui-même le gérant
+      var gerantItem=S.user.pseudo!=="gerant"?[{id:"gerant_master",pseudo:"gerant",role:"Gérant",typeCompte:"normal",_isGerant:true}]:[];
+      var equipe=gerantItem.concat(equipeBase);
       if(equipe.length>0){
         var eqTitle=document.createElement("div");
         eqTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
         eqTitle.textContent="Equipe";
         wrapper2.appendChild(eqTitle);
         equipe.forEach(function(sc){
-          var convIdEq="conv_collab_"+sc.id;
+          var convIdEq=sc._isGerant?"conv_collab_gerant_"+S.user.pseudo:"conv_collab_"+sc.id;
           var msgs_eq=(S.data.chats||[]).filter(function(m){return m.convId===convIdEq;}).sort(function(a,b){return a.ts-b.ts;});
           var dernierMsg_eq=msgs_eq.length>0?msgs_eq[msgs_eq.length-1]:null;
           var nonLus_eq=msgs_eq.filter(function(m){return !m.lu&&m.auteur!==S.user.pseudo;}).length;
@@ -3063,9 +3172,17 @@ function rScreenGlobal(sc){
           if(nonLus_eq>0){var bdEq=document.createElement("span");bdEq.style.cssText="background:#7c3aed;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";bdEq.textContent=nonLus_eq;rightEq.appendChild(bdEq);}
           else{var chEq=document.createElement("span");chEq.style.cssText="color:#ddd6fe;font-size:18px;";chEq.textContent="›";rightEq.appendChild(chEq);}
           rowEq.appendChild(avEq);rowEq.appendChild(infoEq);rowEq.appendChild(rightEq);
-          (function(convId,scPseudo){
-            rowEq.onclick=function(){S.chatConvOuverte=convId;S.chatConvPseudo=scPseudo;rScreen();};
-          })(convIdEq,sc.pseudo);
+          (function(convId,scPseudo,scItem){
+            rowEq.onclick=function(){
+              if(scItem._isGerant){
+                // Conv avec le gérant - utiliser une conv_id spéciale
+                S.chatConvOuverte="conv_collab_gerant_"+S.user.pseudo;
+              }else{
+                S.chatConvOuverte=convId;
+              }
+              S.chatConvPseudo=scPseudo;rScreen();
+            };
+          })(convIdEq,sc.pseudo,sc);
           wrapper2.appendChild(rowEq);
         });
       }
@@ -4193,7 +4310,7 @@ function login(){
         }else{
           S.user=c;secResetTimer();pingSession();checkRetards();load();
           jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+(c.typeCompte==="chauffeur"?" — Chauffeur":"")+")"+(c.chauffeurId?" — chauffeur #"+c.chauffeurId:""));
-          R();setTimeout(initFirebase,200);
+          R();setTimeout(function(){initFirebase();setTimeout(function(){pingSession();startPresenceSync();},2000);},200);
         }
       });
     }else{
