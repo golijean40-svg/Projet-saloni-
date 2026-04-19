@@ -3117,7 +3117,7 @@ function rScreenGlobal(sc){
           var infoC=document.createElement("div");infoC.style.cssText="flex:1;min-width:0;";
           var nomC=document.createElement("div");
           nomC.style.cssText="font-weight:"+(nonLusC>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
-          nomC.textContent=collab.role||collab.pseudo;
+          nomC.textContent=(collab.role&&collab.role!=="Admin")?collab.role:collab.pseudo;
           if(enLigneC){var onPillC=document.createElement("span");onPillC.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";onPillC.textContent="en ligne";nomC.appendChild(onPillC);}
           var lastMsgC=document.createElement("div");
           lastMsgC.style.cssText="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;";
@@ -3133,60 +3133,6 @@ function rScreenGlobal(sc){
         });
       }
 
-      // Section Équipe (collaborateurs)
-      // Pour la collaboratrice, ajouter aussi le gérant dans la liste équipe
-      var equipeBase=(S.data.sousComptes||[]).filter(function(sc){return sc.typeCompte!=="chauffeur"&&sc.pseudo!==S.user.pseudo;});
-      // Ajouter le gérant si l'utilisateur n'est pas lui-même le gérant
-      var gerantItem=S.user.pseudo!=="gerant"?[{id:"gerant_master",pseudo:"gerant",role:"Gérant",typeCompte:"normal",_isGerant:true}]:[];
-      var equipe=gerantItem.concat(equipeBase);
-      if(equipe.length>0){
-        var eqTitle=document.createElement("div");
-        eqTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
-        eqTitle.textContent="Equipe";
-        wrapper2.appendChild(eqTitle);
-        equipe.forEach(function(sc){
-          var convIdEq=sc._isGerant?"conv_collab_gerant_"+S.user.pseudo:"conv_collab_"+sc.id;
-          var msgs_eq=(S.data.chats||[]).filter(function(m){return m.convId===convIdEq;}).sort(function(a,b){return a.ts-b.ts;});
-          var dernierMsg_eq=msgs_eq.length>0?msgs_eq[msgs_eq.length-1]:null;
-          var nonLus_eq=msgs_eq.filter(function(m){return !m.lu&&m.auteur!==S.user.pseudo;}).length;
-          var enLigne_eq=isUserOnline(sc.pseudo);
-          var lastSeen_eq=getLastSeen(sc.pseudo);
-          var rowEq=document.createElement("div");
-          rowEq.style.cssText="background:"+(nonLus_eq>0?"#f5f3ff":"#fff")+";border-bottom:1px solid #f0f2f5;padding:13px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;";
-          var avEq=document.createElement("div");
-          avEq.style.cssText="width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
-          avEq.textContent=sc.pseudo.charAt(0).toUpperCase();
-          var dotEq=document.createElement("div");
-          dotEq.style.cssText="position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:"+(enLigne_eq?"#10b981":"#94a3b8")+";border:2px solid #fff;";
-          avEq.appendChild(dotEq);
-          var infoEq=document.createElement("div");infoEq.style.cssText="flex:1;min-width:0;";
-          var nomEq=document.createElement("div");
-          nomEq.style.cssText="font-weight:"+(nonLus_eq>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
-          nomEq.textContent=sc.role||sc.pseudo;
-          if(enLigne_eq){var pillEq=document.createElement("span");pillEq.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";pillEq.textContent="en ligne";nomEq.appendChild(pillEq);}
-          var subEq=document.createElement("div");
-          subEq.style.cssText="font-size:11px;color:#94a3b8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-          subEq.textContent=dernierMsg_eq?dernierMsg_eq.texte.substring(0,35):(enLigne_eq?"":""+lastSeen_eq.label);
-          infoEq.appendChild(nomEq);infoEq.appendChild(subEq);
-          var rightEq=document.createElement("div");
-          if(nonLus_eq>0){var bdEq=document.createElement("span");bdEq.style.cssText="background:#7c3aed;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";bdEq.textContent=nonLus_eq;rightEq.appendChild(bdEq);}
-          else{var chEq=document.createElement("span");chEq.style.cssText="color:#ddd6fe;font-size:18px;";chEq.textContent="›";rightEq.appendChild(chEq);}
-          rowEq.appendChild(avEq);rowEq.appendChild(infoEq);rowEq.appendChild(rightEq);
-          (function(convId,scPseudo,scItem){
-            rowEq.onclick=function(){
-              if(scItem._isGerant){
-                // Conv avec le gérant - utiliser une conv_id spéciale
-                S.chatConvOuverte="conv_collab_gerant_"+S.user.pseudo;
-              }else{
-                S.chatConvOuverte=convId;
-              }
-              S.chatConvPseudo=scPseudo;rScreen();
-            };
-          })(convIdEq,sc.pseudo,sc);
-          wrapper2.appendChild(rowEq);
-        });
-      }
-      // Liste conversations chauffeurs
       var listTitle=document.createElement("div");
       listTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
       listTitle.textContent="Chauffeurs";
