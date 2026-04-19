@@ -1456,7 +1456,7 @@ function startPresenceSync(){
   if(!db)return;
   db.collection("sal_presence").onSnapshot(function(snap){
     var allPresence=snap.docs.map(function(d){var x=d.data();return x;});
-    _presenceOnline=allPresence.filter(function(p){return Date.now()-p.ts<300000;});
+    _presenceOnline=allPresence;// Garder tous pour last seen, isUserOnline filtre par ts
     // Mettre à jour le cache last seen pour tous (sauf gérant)
     try{
       var cache=JSON.parse(localStorage.getItem("sal_presence_cache")||"{}");
@@ -1472,13 +1472,14 @@ function startPresenceSync(){
   });
 }
 function getOnlineUsers(){return _presenceOnline.filter(function(p){return !S.user||p.pseudo!==S.user.pseudo;});}
-function isUserOnline(pseudo){return _presenceOnline.some(function(p){return p.pseudo===pseudo&&Date.now()-p.ts<300000;});}
+function isUserOnline(pseudo){return _presenceOnline.some(function(p){return p.pseudo===pseudo&&p.online!==false&&Date.now()-p.ts<120000;});}
 function getLastSeen(pseudo){
   // Chercher dans la presence Firebase
   var p=_presenceOnline.filter(function(x){return x.pseudo===pseudo;})[0];
   if(p){
     var diff=Date.now()-p.ts;
-    if(diff<300000)return{online:true,label:"En ligne"};
+    var enLigneNow=p.online!==false&&diff<120000;
+    if(enLigneNow)return{online:true,label:"En ligne"};
     if(diff<3600000)return{online:false,label:"Vu il y a "+Math.round(diff/60000)+" min"};
     if(diff<86400000)return{online:false,label:"Vu il y a "+Math.round(diff/3600000)+"h"};
     return{online:false,label:"Vu il y a "+Math.round(diff/86400000)+"j"};
@@ -1497,7 +1498,7 @@ function getLastSeen(pseudo){
   return{online:false,label:"Jamais connecté"};
 }
 // Marquer offline à la déconnexion
-function setOffline(){if(!db||!S.user)return;try{db.collection("sal_presence").doc(S.user.pseudo).delete();}catch(e){}}
+function setOffline(){if(!db||!S.user)return;try{db.collection("sal_presence").doc(S.user.pseudo).set({pseudo:S.user.pseudo,role:S.user.role,typeCompte:S.user.typeCompte||"normal",ts:Date.now(),online:false});}catch(e){}}
 setInterval(function(){if(S.user)pingSession();},60000);
 var _mdpOverrides={};
 function loadMdpOverrides(cb){if(!db){cb();return;}db.collection("sal_config").doc("mdp_overrides").get().then(function(doc){if(doc.exists)_mdpOverrides=doc.data()||{};cb();}).catch(function(){cb();});}
@@ -1527,10 +1528,34 @@ function getMois(){var n=new Date(),d=[];var last=new Date(n.getFullYear(),n.get
 // ══ CHAT ══
 function getChatConvId(cid){return "conv_"+String(cid);}
 function getChatMsgs(cid){return(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(cid);}).sort(function(a,b){return a.ts-b.ts;});}
-function getNbChatNonLus(){if(!S.user)return 0;var estSC=estCompteChauf();return(S.data.chats||[]).filter(function(m){if(m.lu)return false;if(estSC)return m.convId===getChatConvId(S.user.chauffeurId)&&m.de==="admin";return m.de==="chauffeur";}).length;}
+function getNbChatNonLus(){if(!S.user)return 0;var estSC=estCompteChauf();
+  if(estSC)return(S.data.chats||[]).filter(function(m){return !m.lu&&m.convId===getChatConvId(S.user.chauffeurId)&&m.de==="admin";}).length;
+  // Gérant/admin: messages chauffeurs + messages internes pour moi
+  var fromChauf=(S.data.chats||[]).filter(function(m){return !m.lu&&!m.interne&&m.de==="chauffeur";}).length;
+  var fromInterne=(S.data.chats||[]).filter(function(m){return !m.lu&&m.interne&&m.pour===S.user.pseudo;}).length;
+  return fromChauf+fromInterne;
+}
 function marquerChatLu(cid){var estSC=estCompteChauf();(S.data.chats||[]).forEach(function(m){if(m.lu)return;if(!estSC&&m.convId===getChatConvId(cid)&&m.de==="chauffeur"){m.lu=true;fbSave("chats",m);}if(estSC&&m.convId===getChatConvId(cid)&&m.de==="admin"){m.lu=true;fbSave("chats",m);}});}
-function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var item={id:Date.now(),convId:getChatConvId(cid),de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);playSound("send");var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
-function msgBubble(m,moiDe){var moi=m.de===moiDe;return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:6px;"><div style="max-width:78%;background:'+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":"1px solid #dbeafe")+';">'+m.texte.replace(/</g,"&lt;")+'<div style="font-size:9px;opacity:.55;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div></div></div>";}
+function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||!inp.value.trim())return;var txt=inp.value.trim();var estSC=estCompteChauf();var isCollabC=typeof cid==="string"&&cid.indexOf("conv_collab_")===0;var convIdFinal=isCollabC?cid:getChatConvId(cid);var item={id:Date.now(),convId:convIdFinal,de:estSC?"chauffeur":"admin",auteur:S.user.pseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false};if(!S.data.chats)S.data.chats=[];S.data.chats.push(item);fbSave("chats",item);playSound("send");var estSC2=estCompteChauf();if(estSC2){pushNouveauMessage("gerant",S.user.pseudo);}else if(item.convId){var cIdNotif=item.convId.replace("conv_","");var scNotif=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===cIdNotif;})[0];if(scNotif)pushNouveauMessage(scNotif.pseudo,S.user.pseudo);}inp.value="";setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);rScreen();setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},200);}
+function msgBubble(m,moiDe){
+  var moi=m.de===moiDe;
+  var expediteurNom="";
+  var bulleColor="linear-gradient(135deg,#1d4ed8,#3b82f6)";
+  var allC=tousComptes();
+  var cc=allC.filter(function(x){return x.pseudo===m.auteur;})[0];
+  if(moi){
+    if(S.user&&S.user.pseudo==="gerant"){bulleColor="linear-gradient(135deg,#1d4ed8,#3b82f6)";}
+    else if(S.user&&S.user.typeCompte==="chauffeur"){bulleColor="linear-gradient(135deg,#059669,#10b981)";}
+    else{bulleColor="linear-gradient(135deg,#7c3aed,#a855f7)";}
+  }else{
+    if(m.auteur==="gerant"){expediteurNom="Gerant";}
+    else if(cc){expediteurNom=cc.role||cc.pseudo;}
+    else{expediteurNom=m.auteur||"";}
+  }
+  var bulleRecuColor=m.de==="chauffeur"?"#fff":m.auteur==="gerant"?"#e8f0fb":"#f3e8ff";
+  var borderRecuColor=m.de==="chauffeur"?"1px solid #dbeafe":m.auteur==="gerant"?"1px solid #bfdbfe":"1px solid #ddd6fe";
+  return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:8px;">'  +'<div style="max-width:78%;">'  +(!moi&&expediteurNom?'<div style="font-size:10px;font-weight:800;color:'+(m.auteur==="gerant"?"#1d4ed8":"#7c3aed")+';margin-bottom:3px;padding-left:4px;">'+expediteurNom+'</div>':"")  +'<div style="background:'+(moi?bulleColor:bulleRecuColor)+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":borderRecuColor)+';">'  +m.texte.replace(/</g,"&lt;")  +'<div style="font-size:9px;opacity:.6;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div>"  +"</div></div></div>";}
+
 function chatBox(cid,moiDe){var msgs=getChatMsgs(cid);marquerChatLu(cid);return'<div style="flex:1;overflow-y:auto;padding:12px 14px;" id="chatBox">'+(msgs.length===0?'<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">💬 Aucun message pour l\'instant</div>':msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))+"</div>";}
 function chatInput(cid){return'<div style="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;"><textarea id="chatInput" placeholder="Votre message..." rows="1" style="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea><button onclick="envoyerChat('+cid+')" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;">↑</button></div>';}
 function joursRestants(dateStr){if(!dateStr)return null;var exp=new Date(dateStr);var now=new Date();now.setHours(0,0,0,0);exp.setHours(0,0,0,0);return Math.round((exp-now)/(1000*60*60*24));}
@@ -2778,12 +2803,75 @@ function rScreenGlobal(sc){
 
   else if(S.tab==="chat"){
     if(S.chatConvOuverte){
-      // ── Conversation ouverte ──
+      // ── Conversation interne (gérant ↔ collaborateur) ──
+      if(String(S.chatConvOuverte).indexOf("internal_")===0){
+        var convIdInt=String(S.chatConvOuverte).replace("internal_","");
+        var destPseudo=S.chatConvDest||"";
+        var allC2=tousComptes();
+        var destCompte=allC2.filter(function(x){return x.pseudo===destPseudo;})[0];
+        var destNom=destCompte?(destCompte.role||destCompte.pseudo):destPseudo;
+        var enLigneInt=isUserOnline(destPseudo);
+        var wrapInt=document.createElement("div");
+        wrapInt.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
+        var hdInt=document.createElement("div");
+        hdInt.style.cssText="padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;display:flex;align-items:center;gap:10px;";
+        var backInt=document.createElement("button");backInt.textContent="←";backInt.style.cssText="background:#fff;border:1px solid #bbf7d0;border-radius:9px;padding:6px 10px;font-size:13px;cursor:pointer;";
+        backInt.onclick=function(){S.chatConvOuverte=null;S.chatConvDest=null;rScreen();};
+        var avInt=document.createElement("div");
+        avInt.style.cssText="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
+        avInt.textContent=destNom.charAt(0).toUpperCase();
+        var dotInt=document.createElement("div");dotInt.style.cssText="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:"+(enLigneInt?"#10b981":"#94a3b8")+";border:2px solid #f0fdf4;";
+        avInt.appendChild(dotInt);
+        var infoInt=document.createElement("div");infoInt.style.flex="1";
+        infoInt.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>"+destNom+"</div><div style='font-size:10px;color:"+(enLigneInt?"#059669":"#94a3b8")+";font-weight:600;'>"+(enLigneInt?"🟢 En ligne":"⚫ "+getLastSeen(destPseudo).label)+"</div>";
+        hdInt.appendChild(backInt);hdInt.appendChild(avInt);hdInt.appendChild(infoInt);
+        wrapInt.appendChild(hdInt);
+        // Messages
+        marquerChatInterneOuvert(convIdInt);
+        var msgsInt=getInternalMsgs(convIdInt);
+        var boxInt=document.createElement("div");boxInt.id="chatBox";boxInt.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
+        if(msgsInt.length===0){boxInt.innerHTML="<div style='text-align:center;padding:40px;color:#94a3b8;font-size:13px;'>💬 Début de la conversation</div>";}
+        else{msgsInt.forEach(function(m){
+          var moi2=m.de===S.user.pseudo;
+          var bbl=document.createElement("div");bbl.style.cssText="display:flex;justify-content:"+(moi2?"flex-end":"flex-start")+";margin-bottom:6px;";
+          var inner=document.createElement("div");inner.style.cssText="max-width:78%;";
+          if(!moi2){var sn=document.createElement("div");sn.style.cssText="font-size:10px;font-weight:700;color:#059669;margin-bottom:3px;padding-left:4px;";sn.textContent=m.de==="gerant"?"Gérant":(destNom);inner.appendChild(sn);}
+          var bubble=document.createElement("div");
+          bubble.style.cssText="background:"+(moi2?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+";color:"+(moi2?"#fff":"#0f172a")+";border-radius:"+(moi2?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi2?"none":"1px solid #bbf7d0")+";";
+          bubble.textContent=m.texte;
+          var meta=document.createElement("div");meta.style.cssText="font-size:9px;opacity:.55;margin-top:3px;text-align:right;";meta.textContent=m.heure+(moi2&&m.lu?" ✓✓":moi2?" ✓":"");
+          bubble.appendChild(meta);inner.appendChild(bubble);bbl.appendChild(inner);boxInt.appendChild(bbl);
+        });}
+        wrapInt.appendChild(boxInt);
+        var inputInt=document.createElement("div");inputInt.style.cssText="padding:10px 12px;background:#fff;border-top:1px solid #bbf7d0;display:flex;gap:8px;align-items:flex-end;";
+        var taInt=document.createElement("textarea");taInt.id="chatInput";taInt.placeholder="Message à "+destNom+"...";taInt.rows=1;
+        taInt.style.cssText="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bbf7d0;background:#f0fdf4;font-family:inherit;";
+        taInt.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChatInterne(convIdInt,destPseudo);}};
+        var sendInt=document.createElement("button");sendInt.textContent="↑";sendInt.style.cssText="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
+        sendInt.onclick=function(){envoyerChatInterne(convIdInt,destPseudo);};
+        inputInt.appendChild(taInt);inputInt.appendChild(sendInt);wrapInt.appendChild(inputInt);
+        sc.innerHTML="";sc.appendChild(wrapInt);
+        setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
+        html=null;
+      } else {
+      // ── Conversation chauffeur ──
       var cid2=S.chatConvOuverte;
-      var chC=CH.filter(function(x){return String(x.id)===String(cid2);})[0];
-      // Trouver le sous-compte chauffeur pour savoir s'il est en ligne
-      var scC=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===String(cid2);})[0];
-      var enLigne=scC?isUserOnline(scC.pseudo):false;
+      var isCollabConv=typeof cid2==="string"&&cid2.indexOf("conv_collab_")===0;
+      var chC=null;var enLigne=false;var convTitle="";var convSub="";
+      if(isCollabConv){
+        // Conv entre collaborateurs
+        var scId2=cid2.replace("conv_collab_","");
+        var scC2=(S.data.sousComptes||[]).filter(function(sc){return sc.id===scId2;})[0];
+        convTitle=scC2?scC2.role||scC2.pseudo:"Collaborateur";
+        enLigne=scC2?isUserOnline(scC2.pseudo):false;
+        convSub=enLigne?"En ligne":scC2?getLastSeen(scC2.pseudo).label:"";
+      }else{
+        chC=CH.filter(function(x){return String(x.id)===String(cid2);})[0];
+        var scC=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===String(cid2);})[0];
+        enLigne=scC?isUserOnline(scC.pseudo):false;
+        convTitle=chC?chC.nom:"Chauffeur";
+        convSub=chC?chC.zone:"";
+      }
       var wrapper=document.createElement("div");
       wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
       // Header conversation
@@ -2802,16 +2890,19 @@ function rScreenGlobal(sc){
       avatar.appendChild(dot);
       var convInfo=document.createElement("div");
       convInfo.style.flex="1";
-      convInfo.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>"+(chC?chC.nom:"Chauffeur")+"</div>"
-        +"<div style='font-size:10px;color:"+(enLigne?"#10b981":"#94a3b8")+";font-weight:600;'>"+(enLigne?"🟢 En ligne":"⚫ Hors ligne")+"</div>";
+      convInfo.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>"+convTitle+"</div>"
+        +"<div style='font-size:10px;color:"+(enLigne?"#10b981":"#94a3b8")+";font-weight:600;'>"+(enLigne?"🟢 En ligne":"⚫ "+convSub)+"</div>";
       convHd.appendChild(backBtn);convHd.appendChild(avatar);convHd.appendChild(convInfo);
       wrapper.appendChild(convHd);
       // Messages
       var chatBoxDiv=document.createElement("div");
       chatBoxDiv.id="chatBox";
       chatBoxDiv.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
-      var msgs=getChatMsgs(cid2);
-      marquerChatLu(cid2);
+      var msgs=isCollabConv
+        ?(S.data.chats||[]).filter(function(m){return m.convId===cid2;}).sort(function(a,b){return a.ts-b.ts;})
+        :getChatMsgs(cid2);
+      // Marquer lus
+      msgs.forEach(function(m){if(!m.lu&&m.auteur!==S.user.pseudo){m.lu=true;fbSave("chats",m);}});
       if(msgs.length===0){
         chatBoxDiv.innerHTML="<div style='text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;'>💬 Aucun message</div>";
       }else{
@@ -2854,6 +2945,7 @@ function rScreenGlobal(sc){
       sc.innerHTML="";sc.appendChild(wrapper);
       setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
       html=null;
+      } // fin else conv chauffeur
 
     }else{
       // ── Liste conversations avec présence ──
@@ -2896,9 +2988,91 @@ function rScreenGlobal(sc){
       }
 
       // Liste conversations
+      // ── Section équipe interne (gérant ↔ collaborateurs) ──
+      var collaborateurs=(S.data.sousComptes||[]).filter(function(sc){return sc.typeCompte!=="chauffeur";});
+      if(collaborateurs.length>0){
+        var equipeTitle=document.createElement("div");
+        equipeTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
+        equipeTitle.textContent="Équipe interne";
+        wrapper2.appendChild(equipeTitle);
+        collaborateurs.forEach(function(collab){
+          var convId=getInternalConvId(S.user.pseudo, collab.pseudo);
+          var msgsCollab=getInternalMsgs(convId);
+          var dernierMsgC=msgsCollab.length>0?msgsCollab[msgsCollab.length-1]:null;
+          var nonLusC=(S.data.chats||[]).filter(function(m){return m.convId===convId&&!m.lu&&m.pour===S.user.pseudo;}).length;
+          var enLigneC=isUserOnline(collab.pseudo);
+          var rowC=document.createElement("div");
+          rowC.style.cssText="background:#fff;border-bottom:1px solid #f0f2f5;padding:13px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;"+(nonLusC>0?"background:#eff6ff;":"");
+          var avC=document.createElement("div");
+          avC.style.cssText="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
+          avC.textContent=collab.pseudo.charAt(0).toUpperCase();
+          var dotC=document.createElement("div");
+          dotC.style.cssText="position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:"+(enLigneC?"#10b981":"#94a3b8")+";border:2px solid #fff;";
+          avC.appendChild(dotC);
+          var infoC=document.createElement("div");infoC.style.cssText="flex:1;min-width:0;";
+          var nomC=document.createElement("div");
+          nomC.style.cssText="font-weight:"+(nonLusC>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
+          nomC.textContent=collab.role||collab.pseudo;
+          if(enLigneC){var onPillC=document.createElement("span");onPillC.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";onPillC.textContent="en ligne";nomC.appendChild(onPillC);}
+          var lastMsgC=document.createElement("div");
+          lastMsgC.style.cssText="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;";
+          var lsC=getLastSeen(collab.pseudo);
+          lastMsgC.innerHTML=(!enLigneC?'<span style="font-size:10px;color:#64748b;">'+lsC.label+'</span>'+"  ":"")+(dernierMsgC?dernierMsgC.texte.substring(0,30)+(dernierMsgC.texte.length>30?"...":""):"");
+          infoC.appendChild(nomC);infoC.appendChild(lastMsgC);
+          var rightC=document.createElement("div");rightC.style.cssText="display:flex;flex-direction:column;align-items:flex-end;gap:4px;";
+          if(nonLusC>0){var badgeC=document.createElement("span");badgeC.style.cssText="background:#dc2626;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";badgeC.textContent=nonLusC;rightC.appendChild(badgeC);}
+          else{var chevC=document.createElement("span");chevC.style.cssText="color:#bfdbfe;font-size:18px;";chevC.textContent="›";rightC.appendChild(chevC);}
+          rowC.appendChild(avC);rowC.appendChild(infoC);rowC.appendChild(rightC);
+          (function(cId,cPseudo){rowC.onclick=function(){S.chatConvOuverte="internal_"+cId;S.chatConvDest=cPseudo;rScreen();};})(convId, collab.pseudo);
+          wrapper2.appendChild(rowC);
+        });
+      }
+
+      // Section Équipe (collaborateurs)
+      var equipe=(S.data.sousComptes||[]).filter(function(sc){return sc.typeCompte!=="chauffeur"&&sc.pseudo!==S.user.pseudo;});
+      if(equipe.length>0){
+        var eqTitle=document.createElement("div");
+        eqTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
+        eqTitle.textContent="Equipe";
+        wrapper2.appendChild(eqTitle);
+        equipe.forEach(function(sc){
+          var convIdEq="conv_collab_"+sc.id;
+          var msgs_eq=(S.data.chats||[]).filter(function(m){return m.convId===convIdEq;}).sort(function(a,b){return a.ts-b.ts;});
+          var dernierMsg_eq=msgs_eq.length>0?msgs_eq[msgs_eq.length-1]:null;
+          var nonLus_eq=msgs_eq.filter(function(m){return !m.lu&&m.auteur!==S.user.pseudo;}).length;
+          var enLigne_eq=isUserOnline(sc.pseudo);
+          var lastSeen_eq=getLastSeen(sc.pseudo);
+          var rowEq=document.createElement("div");
+          rowEq.style.cssText="background:"+(nonLus_eq>0?"#f5f3ff":"#fff")+";border-bottom:1px solid #f0f2f5;padding:13px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;";
+          var avEq=document.createElement("div");
+          avEq.style.cssText="width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
+          avEq.textContent=sc.pseudo.charAt(0).toUpperCase();
+          var dotEq=document.createElement("div");
+          dotEq.style.cssText="position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:"+(enLigne_eq?"#10b981":"#94a3b8")+";border:2px solid #fff;";
+          avEq.appendChild(dotEq);
+          var infoEq=document.createElement("div");infoEq.style.cssText="flex:1;min-width:0;";
+          var nomEq=document.createElement("div");
+          nomEq.style.cssText="font-weight:"+(nonLus_eq>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
+          nomEq.textContent=sc.role||sc.pseudo;
+          if(enLigne_eq){var pillEq=document.createElement("span");pillEq.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";pillEq.textContent="en ligne";nomEq.appendChild(pillEq);}
+          var subEq=document.createElement("div");
+          subEq.style.cssText="font-size:11px;color:#94a3b8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+          subEq.textContent=dernierMsg_eq?dernierMsg_eq.texte.substring(0,35):(enLigne_eq?"":""+lastSeen_eq.label);
+          infoEq.appendChild(nomEq);infoEq.appendChild(subEq);
+          var rightEq=document.createElement("div");
+          if(nonLus_eq>0){var bdEq=document.createElement("span");bdEq.style.cssText="background:#7c3aed;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";bdEq.textContent=nonLus_eq;rightEq.appendChild(bdEq);}
+          else{var chEq=document.createElement("span");chEq.style.cssText="color:#ddd6fe;font-size:18px;";chEq.textContent="›";rightEq.appendChild(chEq);}
+          rowEq.appendChild(avEq);rowEq.appendChild(infoEq);rowEq.appendChild(rightEq);
+          (function(convId,scPseudo){
+            rowEq.onclick=function(){S.chatConvOuverte=convId;S.chatConvPseudo=scPseudo;rScreen();};
+          })(convIdEq,sc.pseudo);
+          wrapper2.appendChild(rowEq);
+        });
+      }
+      // Liste conversations chauffeurs
       var listTitle=document.createElement("div");
       listTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
-      listTitle.textContent="Conversations";
+      listTitle.textContent="Chauffeurs";
       wrapper2.appendChild(listTitle);
 
       if(CH.length===0){
@@ -4248,6 +4422,44 @@ function pushPrimeDisponible(chauffeur){
   var sc = (S.data.sousComptes||[]).filter(function(c){return String(c.chauffeurId)===String(chauffeur.id);})[0];
   if(sc) envoyerPush(sc.pseudo, "⭐ Prime disponible !", "Votre prime de "+fc(PRIME_MONTANT)+" est disponible", {tab:"primes"});
   envoyerPush("gerant", "⭐ Prime à payer", chauffeur.nom+": prime en attente", {tab:"primes"});
+}
+
+
+// ══ CHAT INTERNE (gérant ↔ collaborateurs) ══
+function getInternalConvId(pseudo1, pseudo2){
+  // Toujours même ordre alphabétique pour avoir le même ID des 2 côtés
+  var arr=[pseudo1,pseudo2].sort();
+  return "internal_"+arr[0]+"_"+arr[1];
+}
+function getInternalMsgs(convId){
+  return (S.data.chats||[]).filter(function(m){return m.convId===convId;}).sort(function(a,b){return a.ts-b.ts;});
+}
+function envoyerChatInterne(convId, destPseudo){
+  var inp=document.getElementById("chatInput");
+  if(!inp||!inp.value.trim())return;
+  var txt=inp.value.trim();
+  var item={id:Date.now(),convId:convId,de:S.user.pseudo,auteur:S.user.pseudo,pour:destPseudo,texte:txt,date:td(),heure:hr(),ts:Date.now(),lu:false,interne:true};
+  if(!S.data.chats)S.data.chats=[];
+  S.data.chats.push(item);
+  fbSave("chats",item);
+  playSound("send");
+  pushNouveauMessage(destPseudo, S.user.pseudo);
+  inp.value="";
+  setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},150);
+  rScreen();
+}
+function getNbMsgsInternesNonLus(){
+  if(!S.user)return 0;
+  return (S.data.chats||[]).filter(function(m){
+    return m.interne&&!m.lu&&m.pour===S.user.pseudo;
+  }).length;
+}
+function marquerChatInterneOuvert(convId){
+  (S.data.chats||[]).forEach(function(m){
+    if(m.convId===convId&&!m.lu&&m.pour===S.user.pseudo){
+      m.lu=true; fbSave("chats",m);
+    }
+  });
 }
 
 load();checkEtAppliquerSanctions();R();showInstallBanner();
