@@ -1844,7 +1844,6 @@ function rNAV(){
       addItem("securite","🔐","Sécurité");
     }
     addItem("pushConfig","🔔","Notifications");
-
     // Déconnexion
     var sep2=document.createElement("div");sep2.style.cssText="margin-top:8px;border-top:1px solid var(--border,#dde3ec);padding:8px;";
     var logBtn=document.createElement("button");
@@ -3074,8 +3073,24 @@ function rScreenGlobal(sc){
     :CH.map(function(c){var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c);var tC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);var p=pc(val,obj),col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";var stats=[["Saloni",c.saloniId||"—","#64748b"],[isH?"Sem.":"Auj.",fc(val),col],["Total",fc(tC),"#059669"],["Dette",c.dette>0?fc(c.dette):"—",c.dette>0?"#dc2626":"#64748b"]];var docAlerts=getDocAlerts(c);return'<div class="card" style="margin-bottom:10px;border-left:3px solid '+(CHC[c.statut]||"#64748b")+'"><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><div style="display:flex;align-items:center;gap:10px;"><div onclick="pickPhoto('+c.id+')" style="width:46px;height:46px;border-radius:13px;overflow:hidden;flex-shrink:0;cursor:pointer;border:2px solid #dbeafe;position:relative;">'+(getPhoto(c.id)?'<img src="'+getPhoto(c.id)+'" style="width:100%;height:100%;object-fit:cover;"/>':"<div style=\"width:100%;height:100%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;\">"+c.nom.charAt(0)+"</div>")+'<div style="position:absolute;bottom:0;right:0;width:16px;height:16px;background:#1d4ed8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;">📷</div></div><div><div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div><div style="font-size:10px;color:#64748b;">'+(c.tel||"—")+' · '+c.zone+'</div><div style="margin-top:2px;">'+pill(isH?"Hebdo":"Jour",isH?"#7c3aed":"#1d4ed8")+'</div></div></div>'+pill(c.statut,CHC[c.statut]||"#64748b")+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px;">'+stats.map(function(x){return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:8px;padding:5px 6px;text-align:center;"><div style="font-size:8px;color:#64748b;">'+x[0]+'</div><div style="font-size:10px;font-weight:700;color:'+x[2]+';margin-top:1px;">'+x[1]+'</div></div>';}).join("")+'</div>'+(docAlerts.length>0?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">'+docAlerts.map(function(d){var col=d.sev==="expire"?"#dc2626":"#d97706";return'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+(d.sev==="expire"?"#fef2f2":"#fffbeb")+';color:'+col+';border:1px solid '+(d.sev==="expire"?"#fecaca":"#fde68a")+';font-weight:700;">'+(d.sev==="expire"?"🚨":"⚠️")+" "+d.msg+"</span>";}).join("")+'</div>':"")+bar(p,col)+'<div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;">'
 +'<button onclick="oD('+c.id+')" class="bgr" style="flex:1;font-size:11px;padding:8px;min-width:60px;">Détails</button>'
 +(hasPerm("rapport")?'<button onclick="oRp('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">Rapport</button>':"")
-+'<button onclick="modalEntretien('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔧</button>'
-+(hasPerm('chauffeur')?'<button onclick="oEditCh('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">✏️</button>':"")
++'<button onclick="modalEntretien('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔧</button>'+(c.simTracker?(function(){
+  var rawTel=c.simTracker.replace(/[^0-9]/g,'');
+  // Forcer indicatif Côte d'Ivoire +225
+  if(rawTel.startsWith('225')){rawTel=rawTel;}
+  else if(rawTel.startsWith('0')){rawTel='225'+rawTel.substring(1);}
+  else{rawTel='225'+rawTel;}
+  var tel=rawTel;
+  var imei=c.imeiTracker||'';
+  var cmdCoupe='*HQ,'+imei+',S20,time,1,1#';
+  var cmdRetab='*HQ,'+imei+',S20,time,0,1#';
+  var cmd=c.moteurCoupe?cmdRetab:cmdCoupe;
+  var bg=c.moteurCoupe?'#f0fdf4':'#fef2f2';
+  var border=c.moteurCoupe?'#bbf7d0':'#fecaca';
+  var color=c.moteurCoupe?'#059669':'#dc2626';
+  var label=c.moteurCoupe?'✅ ON':'✂️ OFF';
+  return '<a href="sms://+'+tel+'?body='+encodeURIComponent(cmd)+'" onclick="markCoupeCircuit('+c.id+','+(!c.moteurCoupe)+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid '+border+';background:'+bg+';color:'+color+';font-size:11px;font-weight:700;cursor:pointer;min-width:60px;text-align:center;text-decoration:none;display:inline-block;">'+label+'</a>';
+})():"")
++(hasPerm('chauffeur')?'<button onclick="oEditCh('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">✏️</button>':"")+'<button onclick="genContratPDF('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #d1fae5;background:#f0fdf4;color:#059669;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">📄</button>'
 +(hasPerm("versement")?'<button onclick="oV('+c.id+')" class="bor" style="flex:1;font-size:11px;padding:8px;min-width:60px;">+Vers.</button>':"")
 +'</div>'
 +(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";}).length>0?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:7px 10px;margin-top:7px;font-size:10px;color:#dc2626;font-weight:700;">⚠️ Sanction active — '+(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";})[0]||{}).description+'</div>':"")
@@ -4287,6 +4302,10 @@ function rModal(){
     +'<div class="row2">'+lbl("Permis — Expiration",'<input id="cPermis" type="date" value="'+(ce.permisExp||'')+'"/>')+lbl("Carte grise — Début",'<input id="cCgDebut" type="date" value="'+(ce.cgDebut||'')+'"/>')+'</div>'
     +'<div class="row2">'+lbl("Carte grise — Fin",'<input id="cCgFin" type="date" value="'+(ce.cgFin||'')+'"/>')+lbl("Vignette — Expiration",'<input id="cVignette" type="date" value="'+(ce.vignetteExp||'')+'"/>')+'</div>'
     +'</div>'
+    +'<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:11px;padding:12px;margin-bottom:12px;">'
+    +'<div style="font-size:11px;font-weight:800;color:#ea580c;margin-bottom:10px;">📡 TRACKER GPS (Micodus)</div>'
+    +'<div class="row2">'+lbl("N° SIM Tracker",'<input id="cSimTracker" type="tel" placeholder="0566028629" value="'+(ce.simTracker||'')+'" inputmode="numeric"/>')+lbl("IMEI Tracker",'<input id="cImeiTracker" type="text" placeholder="7201271275" value="'+(ce.imeiTracker||'')+'"/>')+'</div>'
+    +'</div>'
     +'<div style="display:flex;gap:9px;">'
     +'<button onclick="saveEditCh('+MD.id+')" class="bor" style="flex:2;">💾 Enregistrer</button>'
     +(hasPerm("supprimer")?'<button onclick="fM();oM(\'sup\',{id:'+MD.id+'})" style="flex:1;padding:13px;border-radius:12px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-weight:700;cursor:pointer;">🗑 Suppr.</button>':"")
@@ -4507,6 +4526,8 @@ function saveEditCh(id){
   c.cgDebut=gv("cCgDebut")||"";
   c.cgFin=gv("cCgFin")||"";
   c.vignetteExp=gv("cVignette")||"";
+  c.simTracker=gv("cSimTracker")||"";
+  c.imeiTracker=gv("cImeiTracker")||"";
   fbSave("chauffeurs",c);
   jLog("chauffeur_ajout","Modification chauffeur: "+nom);
   fM();
@@ -4793,6 +4814,14 @@ function pushSanctionAuto(chauffeur){
   envoyerPush(chauffeur.pseudo||"all", "⚠️ Sanction automatique", chauffeur.nom+": 2 jours sans versement", {tab:"sanctions"});
   // Notifier aussi le gérant
   envoyerPush("gerant", "⚠️ Sanction déclenchée", "Sanction auto: "+chauffeur.nom, {tab:"sanctions"});
+  // Coupe-circuit automatique si tracker configuré
+  if(chauffeur.simTracker&&chauffeur.imeiTracker){
+    var cmd=getCoupeCircuitCmd(chauffeur.imeiTracker,true);
+    var tel=chauffeur.simTracker.replace(/\s/g,"").replace(/^0/,"225");
+    window.open("sms:"+tel+"?body="+encodeURIComponent(cmd),"_blank");
+    chauffeur.moteurCoupe=true;chauffeur.moteurCoupeDate=td();
+    fbSave("chauffeurs",chauffeur);
+  }
 }
 function pushPrimeDisponible(chauffeur){
   // Notifier le chauffeur que sa prime est disponible
@@ -4851,6 +4880,300 @@ function envoyerPhotoChat(cid,isAdmin){
     reader.readAsDataURL(file);
   };
   inp.click();
+}
+
+
+// ══ COUPE-CIRCUIT SMS MICODUS ══
+function getCoupeCircuitCmd(imei,couper){
+  // Commande SMS MV720: *HQ,IMEI,S20,time,1,1# pour couper
+  // *HQ,IMEI,S20,time,0,1# pour rétablir
+  var val=couper?"1":"0";
+  return "*HQ,"+imei+",S20,time,"+val+",1#";
+}
+
+function markCoupeCircuit(chauffeurId, coupe){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c)return;
+  c.moteurCoupe=coupe;
+  c.moteurCoupeDate=coupe?td():null;
+  fbSave("chauffeurs",c);
+  setTimeout(function(){R();},500);
+}
+
+function coupMoteurSMS(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){alert("Chauffeur introuvable");return;}
+  if(!c.simTracker){
+    alert("Aucun numero SIM tracker configure pour "+c.nom+".\nAllez dans Modifier > Tracker GPS pour l'ajouter.");
+    return;
+  }
+  if(!c.imeiTracker){
+    alert("Aucun IMEI tracker configuré pour "+c.nom+".");
+    return;
+  }
+  if(!confirm("Couper le moteur de "+c.nom+" ?"))return;
+  var cmd=getCoupeCircuitCmd(c.imeiTracker,true);
+  var tel=c.simTracker.replace(/\s+/g,"").replace(/^0/,"225");
+  // Créer un lien <a> et le cliquer (Safari iOS bloque window.open pour sms:)
+  var a=document.createElement("a");
+  a.href="sms:"+tel+"?body="+encodeURIComponent(cmd);
+  a.style.display="none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){a.remove();},500);
+  // Log
+  jLog("sanction","✂️ Coupe-circuit envoyé: "+c.nom+" ("+cmd+")");
+  // Marquer dans les données
+  c.moteurCoupe=true;c.moteurCoupeDate=td();
+  fbSave("chauffeurs",c);
+  R();
+}
+
+function retablirMoteurSMS(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){alert("Chauffeur introuvable");return;}
+  if(!c.simTracker||!c.imeiTracker){
+    alert("Numéro SIM ou IMEI tracker manquant pour "+c.nom);
+    return;
+  }
+  if(!confirm("Rétablir le moteur de "+c.nom+" ?"))return;
+  var cmd=getCoupeCircuitCmd(c.imeiTracker,false);
+  var tel=c.simTracker.replace(/\s+/g,"").replace(/^0/,"225");
+  var a=document.createElement("a");
+  a.href="sms:"+tel+"?body="+encodeURIComponent(cmd);
+  a.style.display="none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){a.remove();},500);
+  jLog("sanction","✅ Moteur rétabli: "+c.nom);
+  c.moteurCoupe=false;c.moteurCoupeDate=null;
+  fbSave("chauffeurs",c);
+  R();
+}
+
+// ══ GÉNÉRATION CONTRAT PDF CHAUFFEUR ══
+function genContratPDF(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){alert("Chauffeur introuvable");return;}
+  var sal=(S.data.salonis||[]).filter(function(x){return String(x.id)===String(c.saloniId);})[0];
+  showPdfLoader(true);
+  loadJsPDF(function(){
+    try{_genContratPDFInner(c,sal);}catch(e){alert("Erreur PDF: "+e.message);}
+    showPdfLoader(false);
+  });
+}
+function _genContratPDFInner(c,sal){
+
+  // Calculer dates contrat
+  var today=new Date();
+  var fin=new Date(today);fin.setMonth(fin.getMonth()+6);
+  var fmt=function(d){return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();};
+  var dateDebut=fmt(today);
+  var dateFin=fmt(fin);
+
+  var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,H=297;
+  var ml=15,mr=15,pw=W-ml-mr;
+  var y=15;
+
+  // ── Couleurs ──
+  var BLEU=[29,78,216];
+  var VERT=[5,150,105];
+  var GRIS=[55,65,81];
+  var LGRIS=[243,244,246];
+  var LBLEU=[239,246,255];
+
+  // ── Header ──
+  doc.setFillColor(29,78,216);
+  doc.rect(0,0,W,28,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16);doc.setFont('helvetica','bold');
+  doc.text("DIAKITE TRANSPORT",W/2,12,{align:'center'});
+  doc.setFontSize(8);doc.setFont('helvetica','normal');
+  doc.text("Adjame St Michel, Lot 611, Abidjan",W/2,18,{align:'center'});
+  doc.text("Gestion de Flotte Saloni Manager",W/2,23,{align:'center'});
+  y=36;
+
+  // ── Titre contrat ──
+  doc.setTextColor(17,24,39);
+  doc.setFontSize(13);doc.setFont('helvetica','bold');
+  doc.text("CONTRAT DE LOCATION DE TRICYCLE (SALONI)",W/2,y,{align:'center'});
+  y+=6;
+  doc.setFontSize(9);doc.setFont('helvetica','italic');
+  doc.setTextColor(107,114,128);
+  doc.text("Contrat a Duree Determinee - 6 mois",W/2,y,{align:'center'});
+  y+=5;
+  doc.setDrawColor(29,78,216);doc.setLineWidth(0.5);
+  doc.line(ml,y,W-mr,y);
+  y+=6;
+
+  // ══ ART 1: PARTIES ══
+  // Bailleur
+  doc.setFillColor(29,78,216);
+  doc.rect(ml,y,pw,7,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+  doc.text("ARTICLE 1 - PARTIES AU CONTRAT",ml+3,y+4.5);
+  y+=10;
+
+  // Tableau bailleur
+  doc.setFillColor(239,246,255);doc.rect(ml,y,pw,5,'F');
+  doc.setTextColor(29,78,216);doc.setFont('helvetica','bold');doc.setFontSize(8.5);
+  doc.text("BAILLEUR (Proprietaire)",ml+3,y+3.5);
+  y+=5;
+
+  var lignesBailleur=[
+    ["Entreprise :", "DIAKITE TRANSPORT"],
+    ["Representee par :", "DIAKITE Korotum Marceline - Gerante"],
+    ["Adresse :", "Adjame St Michel, Lot 611, Abidjan"],
+  ];
+  lignesBailleur.forEach(function(l){
+    doc.setTextColor(75,85,99);doc.setFont('helvetica','bold');doc.setFontSize(8);
+    doc.text(l[0],ml+3,y+3.5);
+    doc.setFont('helvetica','normal');doc.setTextColor(17,24,39);
+    doc.text(l[1],ml+45,y+3.5);
+    doc.setDrawColor(229,231,235);doc.setLineWidth(0.2);
+    doc.line(ml,y+5,W-mr,y+5);
+    y+=5;
+  });
+  y+=3;
+
+  // Locataire
+  doc.setFillColor(5,150,105);doc.rect(ml,y,pw,5,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8.5);
+  doc.text("LOCATAIRE (Chauffeur)",ml+3,y+3.5);
+  y+=5;
+
+  var nom=c.nom||"";var tel=c.tel||"N/A";
+  var lignesChauf=[
+    ["Nom & Prenom :", nom],
+    ["Telephone :", tel],
+    ["N° Permis :", c.permisExp?"Exp: "+c.permisExp:"N/A"],
+    ["Saloni attribue :", sal?"Saloni #"+(sal.nom||sal.id||c.saloniId)+" ("+( sal.immat||"")+")":(c.saloniId||"N/A")],
+  ];
+  lignesChauf.forEach(function(l){
+    doc.setFillColor(240,253,244);doc.rect(ml,y,pw,5,'F');
+    doc.setTextColor(75,85,99);doc.setFont('helvetica','bold');doc.setFontSize(8);
+    doc.text(l[0],ml+3,y+3.5);
+    doc.setFont('helvetica','normal');doc.setTextColor(17,24,39);
+    doc.text(l[1],ml+45,y+3.5);
+    doc.setDrawColor(229,231,235);doc.setLineWidth(0.2);
+    doc.line(ml,y+5,W-mr,y+5);
+    y+=5;
+  });
+  y+=5;
+
+  // ══ ART 2: OBJECTIFS ══
+  doc.setFillColor(55,65,81);doc.rect(ml,y,pw,7,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+  doc.text("ARTICLE 2 - OBJECTIFS ET VERSEMENTS",ml+3,y+4.5);
+  y+=10;
+
+  var isH=c.freqPaiement==="Hebdomadaire";
+  var objLabel=isH?"Objectif hebdomadaire :":"Objectif journalier :";
+  var objVal=isH?(c.objectifSemaine||0).toLocaleString()+" FCFA":(c.objectifJour||0).toLocaleString()+" FCFA";
+  var lignesObj=[
+    ["Frequence :", isH?"Hebdomadaire":"Journaliere"],
+    [objLabel, objVal],
+    ["Mode de versement :", "Especes / Mobile Money (Wave, Orange Money, MTN)"],
+  ];
+  lignesObj.forEach(function(l,i){
+    if(i%2===0)doc.setFillColor(249,250,251);else doc.setFillColor(255,255,255);
+    doc.rect(ml,y,pw,5,'F');
+    doc.setTextColor(75,85,99);doc.setFont('helvetica','bold');doc.setFontSize(8);
+    doc.text(l[0],ml+3,y+3.5);
+    doc.setFont('helvetica','normal');doc.setTextColor(17,24,39);
+    doc.text(l[1],ml+55,y+3.5);
+    y+=5;
+  });
+  y+=5;
+
+  // ══ ART 3: DURÉE ══
+  doc.setFillColor(29,78,216);doc.rect(ml,y,pw,7,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+  doc.text("ARTICLE 3 - DUREE DU CONTRAT",ml+3,y+4.5);
+  y+=10;
+
+  doc.setFillColor(239,246,255);doc.rect(ml,y,pw,14,'F');
+  doc.setTextColor(17,24,39);doc.setFont('helvetica','normal');doc.setFontSize(8.5);
+  var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
+  var lines=doc.splitTextToSize(texteduree,pw-6);
+  lines.forEach(function(l){doc.text(l,ml+3,y+4);y+=4.5;});
+  doc.setTextColor(220,38,38);doc.setFont('helvetica','bold');doc.setFontSize(8);
+  doc.text("Une alerte automatique sera envoyee 30 jours avant l'echeance via Saloni Manager.",ml+3,y+2);
+  y+=8;
+
+  // ══ CLAUSES PRINCIPALES (compactes) ══
+  var clauses=[
+    {titre:"ARTICLE 4 - RETRAIT DU TRICYCLE",
+     texte:"En cas d'absence de versement pendant 2 jours consecutifs sans justificatif (panne, maladie, vidange) signale des le premier jour d'arret, le tricycle sera retire immediatement sans preavis."},
+    {titre:"ARTICLE 5 - PRIMES DE PERFORMANCE",
+     texte:"Prime de 5.000 a 15.000 FCFA/mois si tous les versements sont effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree dans le mois."},
+    {titre:"ARTICLE 6 - ENTRETIEN",
+     texte:"Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires. Les frais de reparation dus a une negligence sont a la charge du locataire."},
+    {titre:"ARTICLE 7 - INTERDICTIONS",
+     texte:"Il est formellement interdit d'abandonner le tricycle ou de le laisser aller en fourriere sans prevenir le gerant ou un administrateur, sous peine de poursuites pour abandon de bien confie."},
+  ];
+
+  clauses.forEach(function(cl,i){
+    var bgColor=i%2===0?[239,246,255]:[240,253,244];
+    doc.setFillColor(bgColor[0],bgColor[1],bgColor[2]);
+    var textLines=doc.splitTextToSize(cl.texte,pw-8);
+    var hClause=7+textLines.length*4.2;
+    doc.rect(ml,y,pw,hClause,'F');
+    doc.setTextColor(29,78,216);doc.setFont('helvetica','bold');doc.setFontSize(8);
+    doc.text(cl.titre,ml+3,y+4);
+    doc.setTextColor(17,24,39);doc.setFont('helvetica','normal');doc.setFontSize(8);
+    textLines.forEach(function(l,j){doc.text(l,ml+3,y+8+j*4.2);});
+    y+=hClause+2;
+  });
+
+  // ══ SIGNATURES ══
+  y+=4;
+  doc.setDrawColor(229,231,235);doc.setLineWidth(0.5);
+  doc.line(ml,y,W-mr,y);
+  y+=6;
+  doc.setTextColor(55,65,81);doc.setFont('helvetica','bold');doc.setFontSize(10);
+  doc.text("SIGNATURES",W/2,y,{align:'center'});
+  y+=4;
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(107,114,128);
+  doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:'center'});
+  y+=10;
+
+  // Deux colonnes signature
+  var col1=ml,col2=W/2+5,colW=(pw/2)-5;
+  doc.setFillColor(239,246,255);doc.rect(col1,y,colW,6,'F');
+  doc.setFillColor(240,253,244);doc.rect(col2,y,colW,6,'F');
+  doc.setTextColor(29,78,216);doc.setFont('helvetica','bold');doc.setFontSize(8.5);
+  doc.text("Le Bailleur / La Gerante",col1+3,y+4);
+  doc.setTextColor(5,150,105);
+  doc.text("Le Locataire (Chauffeur)",col2+3,y+4);
+  y+=8;
+
+  doc.setTextColor(55,65,81);doc.setFont('helvetica','normal');doc.setFontSize(8);
+  doc.text("DIAKITE Korotum Marceline",col1+3,y);
+  doc.text(nom,col2+3,y);
+  y+=20;
+
+  // Lignes de signature
+  doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
+  doc.line(col1,y,col1+colW,y);
+  doc.line(col2,y,col2+colW,y);
+  y+=4;
+  doc.setFontSize(7);doc.setTextColor(107,114,128);
+  doc.text("Signature & Cachet",col1+3,y);
+  doc.text("Signature (Lu et approuve)",col2+3,y);
+  y+=8;
+
+  doc.setDrawColor(229,231,235);doc.line(ml,y,W-mr,y);
+  y+=4;
+  doc.setFontSize(7);doc.setTextColor(107,114,128);
+  doc.text("Ce contrat est etabli en deux (2) exemplaires originaux, un pour chaque partie.",W/2,y,{align:'center'});
+  doc.text("Genere par Saloni Manager - DIAKITE TRANSPORT",W/2,y+4,{align:'center'});
+
+  // Télécharger
+  var filename="Contrat_"+nom.replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
+  doc.save(filename);
+  jLog("contrat","Contrat PDF genere pour "+nom);
 }
 
 // ══ CHAT INTERNE (gérant ↔ collaborateurs) ══
