@@ -379,6 +379,7 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
   }
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div id="syncBar"></div>
@@ -465,7 +466,7 @@ var ALERTE_KEY="sal_alertes_config";var ALERTE_SENT_KEY="sal_alertes_sent";
 
 
 
-setInterval(function(){if(S.user)checkAlertesAuto();},60000);
+setInterval(function(){if(S.user){checkAlertesAuto();checkMsgsAutos();}},60000);
 
 // ══ PRIMES ══
 
@@ -1646,9 +1647,12 @@ function R(){
   _rDebounce=setTimeout(function(){_rDebounce=null;_R();},50);
 }
 function _R(){
-  if(!S.user){rLogin();return;}
+  if(!S.user){try{rLogin();}catch(e){}return;}
+  try{pingSession();}catch(e){}
+  try{rHD();}catch(e){console.log('rHD err:',e.message);}
+  try{rNAV();}catch(e){console.log('rNAV err:',e.message);}
+  try{rScreen();}catch(e){console.log('rScreen err:',e.message);}
   try{
-  pingSession();rHD();rNAV();rScreen();
   if(S.modal)rModal();
   // Reprendre GPS si chauffeur et GPS était actif
   if(estCompteChauf()&&!_gpsActif){
@@ -1820,6 +1824,16 @@ function rNAV(){
     addItem("rsi","📈","RSI");
     addItem("bi","📉","Business Intelligence");
     addItem("dashboard","📊","Tableau de bord");
+    // Bouton Export Excel avec action directe
+    (function(){
+      var btn=document.createElement("button");
+      btn.className="nb";btn.style.position="relative";
+      var icSpan=document.createElement("span");icSpan.textContent="📥";
+      var lbSpan=document.createElement("span");lbSpan.textContent="Export Excel";
+      btn.appendChild(icSpan);btn.appendChild(lbSpan);
+      btn.onclick=function(){closeNav();exportExcelVersements();};
+      nav.appendChild(btn);
+    })();
 
     // Équipe
     addSep("Gestion équipe","👥","#1d4ed8");
@@ -2280,7 +2294,9 @@ function renderChatChauf(sc,c){
       if(!moi){
         var allC=tousComptes();
         var cc=allC.filter(function(x){return x.pseudo===m.auteur;})[0];
-        if(m.auteur==="gerant"||(!cc&&m.de==="admin")){
+        if(m.auto){
+          expediteur="🤖 Saloni Manager";bulleRecuBg="#fef3c7";bulleRecuBorder="1px solid #fde68a";expediteurColor="#d97706";
+        }else if(m.auteur==="gerant"||(!cc&&m.de==="admin")){
           expediteur="Gérant";bulleRecuBg="#e8f0fb";bulleRecuBorder="1px solid #bfdbfe";expediteurColor="#1d4ed8";
         }else if(cc){
           expediteur=cc.role||cc.pseudo;bulleRecuBg="#f3e8ff";bulleRecuBorder="1px solid #ddd6fe";expediteurColor="#7c3aed";
@@ -3073,7 +3089,7 @@ function rScreenGlobal(sc){
     :CH.map(function(c){var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c);var tC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);var p=pc(val,obj),col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";var stats=[["Saloni",c.saloniId||"—","#64748b"],[isH?"Sem.":"Auj.",fc(val),col],["Total",fc(tC),"#059669"],["Dette",c.dette>0?fc(c.dette):"—",c.dette>0?"#dc2626":"#64748b"]];var docAlerts=getDocAlerts(c);return'<div class="card" style="margin-bottom:10px;border-left:3px solid '+(CHC[c.statut]||"#64748b")+'"><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><div style="display:flex;align-items:center;gap:10px;"><div onclick="pickPhoto('+c.id+')" style="width:46px;height:46px;border-radius:13px;overflow:hidden;flex-shrink:0;cursor:pointer;border:2px solid #dbeafe;position:relative;">'+(getPhoto(c.id)?'<img src="'+getPhoto(c.id)+'" style="width:100%;height:100%;object-fit:cover;"/>':"<div style=\"width:100%;height:100%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;\">"+c.nom.charAt(0)+"</div>")+'<div style="position:absolute;bottom:0;right:0;width:16px;height:16px;background:#1d4ed8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;">📷</div></div><div><div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div><div style="font-size:10px;color:#64748b;">'+(c.tel||"—")+' · '+c.zone+'</div><div style="margin-top:2px;">'+pill(isH?"Hebdo":"Jour",isH?"#7c3aed":"#1d4ed8")+'</div></div></div>'+pill(c.statut,CHC[c.statut]||"#64748b")+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px;">'+stats.map(function(x){return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:8px;padding:5px 6px;text-align:center;"><div style="font-size:8px;color:#64748b;">'+x[0]+'</div><div style="font-size:10px;font-weight:700;color:'+x[2]+';margin-top:1px;">'+x[1]+'</div></div>';}).join("")+'</div>'+(docAlerts.length>0?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">'+docAlerts.map(function(d){var col=d.sev==="expire"?"#dc2626":"#d97706";return'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+(d.sev==="expire"?"#fef2f2":"#fffbeb")+';color:'+col+';border:1px solid '+(d.sev==="expire"?"#fecaca":"#fde68a")+';font-weight:700;">'+(d.sev==="expire"?"🚨":"⚠️")+" "+d.msg+"</span>";}).join("")+'</div>':"")+bar(p,col)+'<div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;">'
 +'<button onclick="oD('+c.id+')" class="bgr" style="flex:1;font-size:11px;padding:8px;min-width:60px;">Détails</button>'
 +(hasPerm("rapport")?'<button onclick="oRp('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">Rapport</button>':"")
-+'<button onclick="modalEntretien('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔧</button>'+(c.simTracker?(function(){
++'<button onclick="modalEntretien('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔧</button>'+'<button onclick="showHistoriqueChauffeur('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">📋</button>'+(c.simTracker?(function(){
   var rawTel=c.simTracker.replace(/[^0-9]/g,'');
   // Forcer indicatif Côte d'Ivoire +225
   if(rawTel.startsWith('225')){rawTel=rawTel;}
@@ -3488,6 +3504,7 @@ function rScreenGlobal(sc){
         items:[
           {ic:"💸",lb:"Dépenses & amendes",sb:"Gérer les dépenses",act:function(){sT("finances");}},
           {ic:"📊",lb:"Rapports",sb:"Performances chauffeurs",act:function(){sT("rapports");}},
+          {ic:"📥",lb:"Export Excel versements",sb:"Télécharger le fichier mensuel",act:function(){exportExcelVersements();}},
           {ic:"📈",lb:"RSI",sb:"Retour sur investissement",act:function(){sT("rsi");}},
           {ic:"📉",lb:"Business Intelligence",sb:"Graphiques & prévisions",act:function(){sT("bi");}},
           {ic:"📊",lb:"Tableau de bord",sb:"Stats & performances",act:function(){sT("dashboard");}},
@@ -4510,7 +4527,24 @@ function savRap(id,type){var c=(S.data.chauffeurs||[]).filter(function(x){return
 function suppVers(id){if(!hasPerm("supprimer")){alert("Accès refusé.");return;}var v=(S.data.versements||[]).filter(function(x){return x.id===id;})[0];if(!v)return;var ch=(S.data.chauffeurs||[]).filter(function(x){return x.id===v.chauffeurId;})[0];if(!confirm("Supprimer ce versement?\n"+fc(v.montant)+" - "+(ch?ch.nom:"?")))return;if(ch){ch.solde=(ch.solde||0)-v.montant;fbSave("chauffeurs",ch);}jLog("versement_suppr","Suppression versement "+fc(v.montant)+" — "+(ch?ch.nom:"?"));S.data.versements=(S.data.versements||[]).filter(function(x){return x.id!==id;});fbDel("versements",id);rScreen();}
 function updRefField(){var mode=gv("vmo");var block=document.getElementById("refBlock");var icon=document.getElementById("refIcon");var hint=document.getElementById("refHint");var label=document.getElementById("refLabel");if(!block)return;var mobileMap={"Wave":{icon:"🔵",color:"#1a9fff",hint:"Référence SMS Wave",label:"Référence Wave"},"Orange Money":{icon:"🟠",color:"#f97316",hint:"Code transaction Orange Money",label:"Référence Orange Money"},"MTN Money":{icon:"🟡",color:"#eab308",hint:"Code transaction MTN Money",label:"Référence MTN Money"},"Virement":{icon:"🏦",color:"#7c3aed",hint:"Numéro de virement",label:"Référence virement"}};var cfg=mobileMap[mode];if(cfg){block.style.display="block";if(icon)icon.textContent=cfg.icon;if(hint)hint.textContent=cfg.hint;if(label)label.textContent=cfg.label;var inp=document.getElementById("vref");if(inp)inp.style.borderColor=cfg.color;}else{block.style.display="none";var inp2=document.getElementById("vref");if(inp2)inp2.value="";}}
 function updRec(){var cid=parseInt(document.getElementById("vc")&&document.getElementById("vc").value);var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===cid;})[0];var rec=document.getElementById("vrec");if(!rec)return;if(c){var isH=c.freqPaiement==="Hebdomadaire";var vj2=(S.data.versements||[]).filter(function(v){return v.date===td();});var val=isH?getVS(c,S.data.versements):getVJ(c,vj2);var obj=isH?getObjS(c):getObjJ(c);rec.style.display="grid";rec.innerHTML=[{l:"Versé",v:fc(val),c:"#1d4ed8"},{l:"Objectif",v:fc(obj),c:"#059669"},{l:"Reste",v:fc(Math.max(0,obj-val)),c:"#dc2626"}].map(function(it){return'<div style="text-align:center;"><div style="font-size:9px;color:#64748b;">'+it.l+'</div><div style="font-weight:800;color:'+it.c+';font-size:12px;">'+it.v+'</div></div>';}).join("");}else rec.style.display="none";}
-function saveVers(){var cid=parseInt(gv("vc")),m=parseFloat(gv("vm"))||0;if(!cid||!m)return;var mode=gv("vmo")||"Especes";var ref=gv("vref")||"";var item={id:Date.now(),chauffeurId:cid,montant:m,date:td(),heure:hr(),mode:mode,ref:ref,note:gv("vn")||""};S.data.versements.push(item);var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===cid;})[0];if(c){c.solde=(c.solde||0)+m;fbSave("chauffeurs",c);}jLog("versement_ajout","Versement "+fc(m)+" — "+(c?c.nom:"?")+" ("+mode+(ref?" | Ref:"+ref:"")+")");fbSave("versements",item);fM();}
+function saveVers(){var cid=parseInt(gv("vc")),m=parseFloat(gv("vm"))||0;if(!cid||!m)return;var mode=gv("vmo")||"Especes";var ref=gv("vref")||"";var item={id:Date.now(),chauffeurId:cid,montant:m,date:td(),heure:hr(),mode:mode,ref:ref,note:gv("vn")||""};S.data.versements.push(item);var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===cid;})[0];if(c){c.solde=(c.solde||0)+m;fbSave("chauffeurs",c);}jLog("versement_ajout","Versement "+fc(m)+" — "+(c?c.nom:"?")+" ("+mode+(ref?" | Ref:"+ref:"")+")");fbSave("versements",item);
+  // Message auto rapport de versement dans le chat du chauffeur
+  if(c){
+    var isH=c.freqPaiement==="Hebdomadaire";
+    var obj=isH?(c.objectifSemaine||0):(c.objectifJour||0);
+    var pct=obj>0?Math.round(m/obj*100):0;
+    var emoji=pct>=100?"✅":pct>=60?"🟡":"🔴";
+    var sep="-------------------";
+    var rapport="Versement enregistre | "+c.nom+
+      " | Montant: "+fc(m)+" FCFA"+
+      " | Objectif: "+fc(obj)+" FCFA"+
+      " | Taux: "+emoji+" "+pct+"%"+
+      " | Mode: "+mode+(ref?" Ref:"+ref:"")+
+      " | "+td()+" "+hr()+
+      " | "+(pct>=100?"Objectif atteint ! Bravo !":pct>=60?"Bon effort, continuez !":"Objectif non atteint");
+    envoyerMsgAuto(cid, rapport);
+  }
+  fM();}
 function saveEditCh(id){
   var nom=gv("cn").trim();if(!nom)return;
   var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===id;})[0];if(!c)return;
@@ -4814,6 +4848,10 @@ function pushSanctionAuto(chauffeur){
   envoyerPush(chauffeur.pseudo||"all", "⚠️ Sanction automatique", chauffeur.nom+": 2 jours sans versement", {tab:"sanctions"});
   // Notifier aussi le gérant
   envoyerPush("gerant", "⚠️ Sanction déclenchée", "Sanction auto: "+chauffeur.nom, {tab:"sanctions"});
+  // Message automatique dans le chat du chauffeur
+  envoyerMsgAuto(chauffeur.id,
+    "⚠️ "+chauffeur.nom+", une sanction automatique a été appliquée suite à 2 jours sans versement. "+
+    "Votre tricycle est suspendu. Contactez le gérant immédiatement.");
   // Coupe-circuit automatique si tracker configuré
   if(chauffeur.simTracker&&chauffeur.imeiTracker){
     var cmd=getCoupeCircuitCmd(chauffeur.imeiTracker,true);
@@ -5139,6 +5177,401 @@ function _genContratPDFInner(c,sal){
 }
 
 
+// ══ EXPORT EXCEL VERSEMENTS PAR MOIS ══
+function exportExcelVersements(){
+  // Sélecteur de mois
+  var mois=new Date();
+  var moisStr=mois.getFullYear()+"-"+(mois.getMonth()+1).toString().padStart(2,'0');
+
+  // Créer modal de sélection
+  var modal=document.createElement("div");
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;display:flex;align-items:center;justify-content:center;";
+  var box=document.createElement("div");
+  box.style.cssText="background:#fff;border-radius:16px;padding:20px;width:300px;box-shadow:0 20px 60px rgba(0,0,0,.3);";
+  box.innerHTML='<div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:14px;">📊 Export Excel Versements</div>'+
+    '<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">Mois</label>'+
+    '<input id="excelMois" type="month" value="'+moisStr+'" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #dbeafe;font-size:14px;background:#f8faff;"/></div>'+
+    '<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">Chauffeur</label>'+
+    '<select id="excelChauf" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #dbeafe;font-size:13px;background:#f8faff;">'+
+    '<option value="tous">Tous les chauffeurs</option>'+
+    (S.data.chauffeurs||[]).map(function(c){return '<option value="'+c.id+'">'+c.nom+'</option>';}).join('')+
+    '</select></div>';
+  var btnRow=document.createElement("div");
+  btnRow.style.cssText="display:flex;gap:8px;margin-top:4px;";
+  var cancelBtn=document.createElement("button");
+  cancelBtn.textContent="Annuler";
+  cancelBtn.style.cssText="flex:1;padding:11px;border-radius:10px;background:#f1f5f9;border:none;font-size:13px;font-weight:700;cursor:pointer;";
+  cancelBtn.onclick=function(){document.body.removeChild(modal);};
+  var exportBtn=document.createElement("button");
+  exportBtn.textContent="📥 Exporter";
+  exportBtn.style.cssText="flex:2;padding:11px;border-radius:10px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer;";
+  exportBtn.onclick=function(){
+    var moisVal=document.getElementById("excelMois").value;
+    var chaufVal=document.getElementById("excelChauf").value;
+    document.body.removeChild(modal);
+    _genExcelVersements(moisVal,chaufVal);
+  };
+  btnRow.appendChild(cancelBtn);btnRow.appendChild(exportBtn);
+  box.appendChild(btnRow);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+function _genExcelVersements(moisStr,chaufId){
+  var VE=S.data.versements||[];
+  var CH=S.data.chauffeurs||[];
+
+  // Filtrer par mois
+  var parts=moisStr.split("-");
+  var annee=parseInt(parts[0]),mois=parseInt(parts[1]);
+  var versFiltres=VE.filter(function(v){
+    var d=v.date;// format dd/mm/yyyy
+    if(!d)return false;
+    var dp=d.split("/");
+    return parseInt(dp[2])===annee&&parseInt(dp[1])===mois;
+  });
+
+  // Filtrer par chauffeur
+  if(chaufId!=="tous"){
+    versFiltres=versFiltres.filter(function(v){return String(v.chauffeurId)===String(chaufId);});
+  }
+
+  // Trier par date
+  versFiltres.sort(function(a,b){
+    var da=a.date.split("/").reverse().join("-");
+    var db=b.date.split("/").reverse().join("-");
+    return da.localeCompare(db);
+  });
+
+  // Préparer les données
+  var nomsMois=["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  var titremois=nomsMois[mois]+" "+annee;
+
+  // En-tête tableau
+  var data=[
+    ["DIAKITE TRANSPORT — Versements "+titremois],
+    [],
+    ["N°","Date","Heure","Chauffeur","Zone","Saloni","Montant (FCFA)","Mode","Référence","Note","Objectif (FCFA)","Taux (%)"]
+  ];
+
+  var totalMontant=0;
+  versFiltres.forEach(function(v,i){
+    var c=CH.filter(function(x){return String(x.id)===String(v.chauffeurId);})[0];
+    var obj=c?(c.freqPaiement==="Hebdomadaire"?c.objectifSemaine:c.objectifJour)||0:0;
+    var pct=obj>0?Math.round(v.montant/obj*100):0;
+    totalMontant+=v.montant;
+    data.push([
+      i+1,
+      v.date||"",
+      v.heure||"",
+      c?c.nom:"Inconnu",
+      c?c.zone:"",
+      c?c.saloniId:"",
+      v.montant||0,
+      v.mode||"Espèces",
+      v.ref||"",
+      v.note||"",
+      obj,
+      pct
+    ]);
+  });
+
+  // Ligne totaux
+  data.push([]);
+  data.push(["","","","","","TOTAL",totalMontant,"","","","",""]);
+  data.push(["","","","","","Nb versements",versFiltres.length,"","","","",""]);
+
+  // Résumé par chauffeur
+  data.push([]);
+  data.push(["RÉSUMÉ PAR CHAUFFEUR"]);
+  data.push(["Chauffeur","Zone","Saloni","Nb versements","Total (FCFA)","Objectif mensuel (FCFA)","Taux moyen (%)"]);
+
+  var chaufIds=[...new Set(versFiltres.map(function(v){return v.chauffeurId;}))];
+  chaufIds.forEach(function(cid){
+    var c=CH.filter(function(x){return String(x.id)===String(cid);})[0];
+    var versC=versFiltres.filter(function(v){return String(v.chauffeurId)===String(cid);});
+    var totalC=versC.reduce(function(s,v){return s+v.montant;},0);
+    var obj=c?(c.freqPaiement==="Hebdomadaire"?c.objectifSemaine*4:c.objectifJour*26)||0:0;
+    var pct=obj>0?Math.round(totalC/obj*100):0;
+    data.push([
+      c?c.nom:"Inconnu",
+      c?c.zone:"",
+      c?c.saloniId:"",
+      versC.length,
+      totalC,
+      obj,
+      pct
+    ]);
+  });
+
+  // Créer le workbook
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet(data);
+
+  // Style largeurs colonnes
+  ws['!cols']=[
+    {wch:4},{wch:12},{wch:8},{wch:20},{wch:12},{wch:8},
+    {wch:15},{wch:12},{wch:12},{wch:15},{wch:15},{wch:10}
+  ];
+
+  // Fusionner le titre
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:11}}];
+
+  XLSX.utils.book_append_sheet(wb,ws,"Versements "+titremois);
+
+  // Télécharger
+  var filename="Versements_"+titremois.replace(" ","_")+"_DiakiteTransport.xlsx";
+  XLSX.writeFile(wb,filename);
+  jLog("export","Export Excel versements: "+titremois+(chaufId!=="tous"?" — chauffeur #"+chaufId:""));
+}
+
+// ══ HISTORIQUE COMPLET CHAUFFEUR ══
+function showHistoriqueChauffeur(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){return;}
+
+  var modal=document.createElement("div");
+  modal.id="modalHistorique";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;overflow-y:auto;";
+
+  var box=document.createElement("div");
+  box.style.cssText="background:var(--bg,#f4f6f9);min-height:100%;max-width:480px;margin:0 auto;";
+
+  // Header
+  var hd=document.createElement("div");
+  hd.style.cssText="background:linear-gradient(135deg,#1d4ed8,#3b82f6);padding:16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;";
+  var backBtn=document.createElement("button");
+  backBtn.textContent="←";
+  backBtn.style.cssText="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:18px;cursor:pointer;";
+  backBtn.onclick=function(){document.body.removeChild(modal);};
+  var hdInfo=document.createElement("div");
+  hdInfo.innerHTML='<div style="font-size:15px;font-weight:800;color:#fff;">'+c.nom+'</div>'+
+    '<div style="font-size:11px;color:rgba(255,255,255,.8);">Historique complet</div>';
+  hd.appendChild(backBtn);hd.appendChild(hdInfo);
+  box.appendChild(hd);
+
+  var content=document.createElement("div");
+  content.style.cssText="padding:12px;";
+
+  // ── Connexions/déconnexions ──
+  var journal=getJournal("tous");
+  var connexions=journal.filter(function(j){
+    return j.auteur===c.nom||(j.msg&&j.msg.indexOf(c.nom)>=0);
+  }).sort(function(a,b){return b.ts-a.ts;});
+
+  // Essayer aussi depuis Firebase sal_journal
+  var journalSection=document.createElement("div");
+  journalSection.style.cssText="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;";
+  journalSection.innerHTML='<div style="font-size:12px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">🔐 Connexions & activités ('+connexions.length+')</div>';
+
+  if(connexions.length===0){
+    journalSection.innerHTML+='<div style="color:#94a3b8;font-size:12px;text-align:center;padding:10px;">Aucune activité enregistrée</div>';
+  }else{
+    connexions.slice(0,50).forEach(function(j){
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f2f5;";
+      var ico=j.type==="connexion"?"🟢":j.type==="deconnexion"?"🔴":"📝";
+      row.innerHTML='<span style="font-size:14px;">'+ico+'</span>'+
+        '<div style="flex:1;">'+
+        '<div style="font-size:11px;color:#0f172a;font-weight:600;">'+j.msg+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;">'+j.date+' '+j.heure+'</div>'+
+        '</div>';
+      journalSection.appendChild(row);
+    });
+  }
+  content.appendChild(journalSection);
+
+  // ── Versements ──
+  var vers=(S.data.versements||[]).filter(function(v){return String(v.chauffeurId)===String(c.id);})
+    .sort(function(a,b){return b.ts-a.ts;});
+  var versSection=document.createElement("div");
+  versSection.style.cssText="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;";
+  var totalVers=vers.reduce(function(s,v){return s+v.montant;},0);
+  versSection.innerHTML='<div style="font-size:12px;font-weight:800;color:#059669;margin-bottom:10px;">💵 Versements ('+vers.length+') — Total: '+fc(totalVers)+' FCFA</div>';
+
+  if(vers.length===0){
+    versSection.innerHTML+='<div style="color:#94a3b8;font-size:12px;text-align:center;padding:10px;">Aucun versement</div>';
+  }else{
+    vers.forEach(function(v){
+      var obj=c.freqPaiement==="Hebdomadaire"?(c.objectifSemaine||0):(c.objectifJour||0);
+      var pct=obj>0?Math.round(v.montant/obj*100):0;
+      var col=pct>=100?"#059669":pct>=60?"#d97706":"#dc2626";
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f2f5;";
+      row.innerHTML='<div>'+
+        '<div style="font-size:12px;font-weight:700;color:#0f172a;">'+fc(v.montant)+' FCFA</div>'+
+        '<div style="font-size:10px;color:#64748b;">'+v.date+' '+v.heure+' • '+v.mode+'</div>'+
+        '</div>'+
+        '<div style="background:'+col+'15;color:'+col+';border-radius:8px;padding:3px 8px;font-size:11px;font-weight:800;">'+pct+'%</div>';
+      versSection.appendChild(row);
+    });
+  }
+  content.appendChild(versSection);
+
+  // ── Sanctions ──
+  var sanctions=getSanctionsChauffeur(c.id).sort(function(a,b){return b.ts-a.ts;});
+  if(sanctions.length>0){
+    var sanctSection=document.createElement("div");
+    sanctSection.style.cssText="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;";
+    sanctSection.innerHTML='<div style="font-size:12px;font-weight:800;color:#dc2626;margin-bottom:10px;">⚠️ Sanctions ('+sanctions.length+')</div>';
+    sanctions.forEach(function(s){
+      var row=document.createElement("div");
+      row.style.cssText="padding:7px 0;border-bottom:1px solid #f0f2f5;";
+      row.innerHTML='<div style="font-size:12px;font-weight:700;color:#0f172a;">'+s.motif+'</div>'+
+        '<div style="font-size:10px;color:#64748b;">'+s.date+' — '+s.type+'</div>';
+      sanctSection.appendChild(row);
+    });
+    content.appendChild(sanctSection);
+  }
+
+  // ── Entretiens ──
+  var entretiens=(S.data.entretiens||[]).filter(function(e){return String(e.chauffeurId)===String(c.id);})
+    .sort(function(a,b){return b.ts-a.ts;});
+  if(entretiens.length>0){
+    var entSection=document.createElement("div");
+    entSection.style.cssText="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;";
+    entSection.innerHTML='<div style="font-size:12px;font-weight:800;color:#d97706;margin-bottom:10px;">🔧 Entretiens ('+entretiens.length+')</div>';
+    entretiens.forEach(function(e){
+      var row=document.createElement("div");
+      row.style.cssText="padding:7px 0;border-bottom:1px solid #f0f2f5;";
+      row.innerHTML='<div style="font-size:12px;font-weight:700;color:#0f172a;">'+e.type+'</div>'+
+        '<div style="font-size:10px;color:#64748b;">'+e.date+' — '+(e.note||"")+'</div>';
+      entSection.appendChild(row);
+    });
+    content.appendChild(entSection);
+  }
+
+  // ── Primes ──
+  var primes=getPrimesData().filter(function(p){return String(p.chauffeurId)===String(c.id);})
+    .sort(function(a,b){return b.ts-a.ts;});
+  if(primes.length>0){
+    var primeSection=document.createElement("div");
+    primeSection.style.cssText="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;";
+    primeSection.innerHTML='<div style="font-size:12px;font-weight:800;color:#7c3aed;margin-bottom:10px;">⭐ Primes ('+primes.length+')</div>';
+    primes.forEach(function(p){
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f2f5;";
+      row.innerHTML='<div>'+
+        '<div style="font-size:12px;font-weight:700;color:#0f172a;">'+fc(p.montant)+' FCFA</div>'+
+        '<div style="font-size:10px;color:#64748b;">'+(p.periode||"")+'</div>'+
+        '</div>'+
+        '<div style="font-size:11px;font-weight:700;color:'+(p.paye?"#059669":"#d97706")+'">'+(p.paye?"Payé":"En attente")+'</div>';
+      primeSection.appendChild(row);
+    });
+    content.appendChild(primeSection);
+  }
+
+  box.appendChild(content);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+// ══ MESSAGES AUTOMATIQUES CHAT ══
+function envoyerMsgAuto(chauffeurId, texte){
+  // Trouver le sous-compte du chauffeur
+  var sc=(S.data.sousComptes||[]).filter(function(x){return String(x.chauffeurId)===String(chauffeurId);})[0];
+  var convId="conv_"+String(chauffeurId);
+  var item={
+    id:Date.now()+Math.random(),
+    convId:convId,
+    de:"admin",
+    auteur:"gerant",
+    texte:texte,
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false,
+    auto:true // marqueur message automatique
+  };
+  if(!S.data.chats)S.data.chats=[];
+  S.data.chats.push(item);
+  fbSave("chats",item);
+  // Notifier le chauffeur
+  if(sc)pushNouveauMessage(sc.pseudo,"gerant");
+  jLog("auto","Message auto envoyé à chauffeur #"+chauffeurId+": "+texte.substring(0,50));
+}
+
+function checkMsgsAutos(){
+  if(!S.user||S.user.niveau<2)return;
+  var today=new Date();
+  var t=td();
+
+  (S.data.chauffeurs||[]).forEach(function(c){
+    if(c.statut!=="actif")return;
+    var msgs=S.data.chats||[];
+
+    // ── 1. Alerte versement manquant (2 jours sans payer) ──
+    var VE=S.data.versements||[];
+    var hier=new Date(today);hier.setDate(hier.getDate()-1);
+    var avantHier=new Date(today);avantHier.setDate(avantHier.getDate()-2);
+    var fmtDate=function(d){return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();};
+    var hierStr=fmtDate(hier);
+    var avantHierStr=fmtDate(avantHier);
+
+    if(c.freqPaiement!=="Hebdomadaire"){
+      var vHier=VE.filter(function(v){return String(v.chauffeurId)===String(c.id)&&v.date===hierStr;});
+      var vAvantHier=VE.filter(function(v){return String(v.chauffeurId)===String(c.id)&&v.date===avantHierStr;});
+      if(vHier.length===0&&vAvantHier.length===0){
+        // 2 jours sans versement - vérifier si le message n'a pas déjà été envoyé aujourd'hui
+        var dejaEnvoye=msgs.some(function(m){
+          return m.convId==="conv_"+c.id&&m.auto&&m.date===t&&m.texte.indexOf("versement")>=0;
+        });
+        if(!dejaEnvoye){
+          envoyerMsgAuto(c.id,
+            "⚠️ Bonjour "+c.nom+", aucun versement n'a été enregistré depuis 2 jours ("+avantHierStr+" et "+hierStr+"). "+
+            "Merci de régulariser ou de signaler un justificatif (panne, maladie, vidange) au gérant.");
+        }
+      }
+    }
+
+    // ── 2. Alerte fin de contrat (30 jours) ──
+    if(c.contratFin){
+      try{
+        var parts=c.contratFin.split('/');
+        var dateFin=new Date(parts[2]+'-'+parts[1]+'-'+parts[0]);
+        var diffJours=Math.round((dateFin-today)/(1000*60*60*24));
+        if(diffJours===30||diffJours===7||diffJours===1){
+          var dejaEnvoye2=msgs.some(function(m){
+            return m.convId==="conv_"+c.id&&m.auto&&m.date===t&&m.texte.indexOf("contrat")>=0;
+          });
+          if(!dejaEnvoye2){
+            envoyerMsgAuto(c.id,
+              "📋 Bonjour "+c.nom+", votre contrat arrive à échéance dans "+diffJours+" jour"+(diffJours>1?"s":"")+
+              " (le "+c.contratFin+"). Contactez le gérant pour le renouvellement.");
+          }
+        }
+      }catch(e){}
+    }
+
+    // ── 3. Félicitation prime accordée ──
+    var primes=getPrimesData().filter(function(p){
+      return String(p.chauffeurId)===String(c.id)&&p.statut==="active"&&p.paye&&p.datePaiement===t;
+    });
+    primes.forEach(function(p){
+      var dejaEnvoye3=msgs.some(function(m){
+        return m.convId==="conv_"+c.id&&m.auto&&m.date===t&&m.texte.indexOf("prime")>=0;
+      });
+      if(!dejaEnvoye3){
+        envoyerMsgAuto(c.id,
+          "🎉 Félicitations "+c.nom+" ! Une prime de "+fc(p.montant)+" FCFA vous a été accordée ce mois. "+
+          "Continuez comme ça !");
+      }
+    });
+
+    // ── 4. Message coupe-circuit automatique ──
+    if(c.moteurCoupe&&c.moteurCoupeDate===t){
+      var dejaCoupMsg=msgs.some(function(m){
+        return m.convId==="conv_"+c.id&&m.auto&&m.date===t&&m.texte.indexOf("coupe-circuit")>=0;
+      });
+      if(!dejaCoupMsg){
+        envoyerMsgAuto(c.id,
+          "🔴 "+c.nom+", le coupe-circuit de votre tricycle a été activé suite à un non-versement. "+
+          "Contactez le gérant immédiatement pour régulariser.");
+      }
+    }
+  });
+}
+
 // ══ CHAT INTERNE (gérant ↔ collaborateurs) ══
 function getInternalConvId(pseudo1, pseudo2){
   // Toujours même ordre alphabétique pour avoir le même ID des 2 côtés
@@ -5178,7 +5611,7 @@ function marquerChatInterneOuvert(convId){
 
 
 
-function navTo(tab){closeNav();sT(tab);}
+function navTo(tab){closeNav();if(tab==="exportExcel"){exportExcelVersements();return;}sT(tab);}
 
 load();checkEtAppliquerSanctions();R();showInstallBanner();
 // Re-render sur resize (mobile <-> desktop)
