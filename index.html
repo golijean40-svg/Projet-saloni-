@@ -5355,29 +5355,76 @@ function showHistoriqueChauffeur(chauffeurId){
 
   // ── Connexions/déconnexions ──
   var journal=getJournal("tous");
+  // Trouver le sous-compte du chauffeur pour avoir son pseudo
+  var scCh=(S.data.sousComptes||[]).filter(function(x){return String(x.chauffeurId)===String(c.id);})[0];
+  var pseudoCh=scCh?scCh.pseudo:"";
   var connexions=journal.filter(function(j){
-    return j.auteur===c.nom||(j.msg&&j.msg.indexOf(c.nom)>=0);
+    // Chercher par pseudo du sous-compte, par nom, ou par chauffeurId dans le detail
+    return (pseudoCh&&j.user===pseudoCh)||
+           (j.detail&&j.detail.indexOf("chauffeur #"+c.id)>=0)||
+           (j.detail&&c.nom&&j.detail.indexOf(c.nom)>=0)||
+           (j.user&&c.nom&&j.user.toLowerCase()===c.nom.toLowerCase());
   }).sort(function(a,b){return b.ts-a.ts;});
 
   // Essayer aussi depuis Firebase sal_journal
+  // Charger aussi depuis Firebase pour les connexions des autres appareils
+  if(db){
+    db.collection("sal_journal").where("detail","array-contains","chauffeur #"+c.id).get().catch(function(){});
+    // Requête alternative
+    db.collection("sal_journal").orderBy("ts","desc").limit(200).get().then(function(snap){
+      var fbLogs=snap.docs.map(function(d){return d.data();});
+      var fbConnexions=fbLogs.filter(function(j){
+        return (pseudoCh&&j.user===pseudoCh)||
+               (j.detail&&j.detail.indexOf("chauffeur #"+c.id)>=0)||
+               (j.detail&&c.nom&&j.detail.indexOf(c.nom)>=0);
+      });
+      // Fusionner avec les logs locaux
+      fbConnexions.forEach(function(fj){
+        if(!connexions.some(function(lj){return lj.id===fj.id;})){
+          connexions.push(fj);
+        }
+      });
+      connexions.sort(function(a,b){return b.ts-a.ts;});
+      // Mettre à jour l'affichage
+      var countEl=document.getElementById("histConnexionsCount_"+c.id);
+      if(countEl)countEl.textContent="🔐 Connexions & activités ("+connexions.length+")";
+      var listEl=document.getElementById("histConnexionsList_"+c.id);
+      if(listEl&&connexions.length>0){
+        listEl.innerHTML="";
+        connexions.slice(0,50).forEach(function(j){
+          var row=document.createElement("div");
+          row.style.cssText="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f2f5;";
+          var ico=j.type==="connexion"?"🟢":j.type==="deconnexion"?"🔴":"📝";
+          row.innerHTML='<span style="font-size:14px;">'+ico+'</span>'+
+            '<div style="flex:1;">'+
+            '<div style="font-size:11px;color:#0f172a;font-weight:600;">'+(j.detail||j.type)+'</div>'+
+            '<div style="font-size:10px;color:#94a3b8;">'+(j.date||"")+" "+(j.heure||"")+' — '+(j.role||"")+'</div>'+
+            '</div>';
+          listEl.appendChild(row);
+        });
+      }
+    }).catch(function(){});
+  }
   var journalSection=document.createElement("div");
   journalSection.style.cssText="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;";
-  journalSection.innerHTML='<div style="font-size:12px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">🔐 Connexions & activités ('+connexions.length+')</div>';
+  journalSection.innerHTML='<div id="histConnexionsCount_'+c.id+'" style="font-size:12px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">🔐 Connexions & activités ('+connexions.length+')</div>';
 
   if(connexions.length===0){
-    journalSection.innerHTML+='<div style="color:#94a3b8;font-size:12px;text-align:center;padding:10px;">Aucune activité enregistrée</div>';
+    journalSection.innerHTML+='<div id="histConnexionsList_'+c.id+'" style="color:#94a3b8;font-size:12px;text-align:center;padding:10px;">Chargement...</div>';
   }else{
+    var listDiv=document.createElement("div");listDiv.id="histConnexionsList_"+c.id;
     connexions.slice(0,50).forEach(function(j){
       var row=document.createElement("div");
       row.style.cssText="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f2f5;";
       var ico=j.type==="connexion"?"🟢":j.type==="deconnexion"?"🔴":"📝";
       row.innerHTML='<span style="font-size:14px;">'+ico+'</span>'+
         '<div style="flex:1;">'+
-        '<div style="font-size:11px;color:#0f172a;font-weight:600;">'+j.msg+'</div>'+
-        '<div style="font-size:10px;color:#94a3b8;">'+j.date+' '+j.heure+'</div>'+
+        '<div style="font-size:11px;color:#0f172a;font-weight:600;">'+( j.detail||j.msg||j.type)+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;">'+j.date+' '+j.heure+' — '+j.role+'</div>'+
         '</div>';
-      journalSection.appendChild(row);
+      listDiv.appendChild(row);
     });
+    journalSection.appendChild(listDiv);
   }
   content.appendChild(journalSection);
 
@@ -5417,8 +5464,8 @@ function showHistoriqueChauffeur(chauffeurId){
     sanctions.forEach(function(s){
       var row=document.createElement("div");
       row.style.cssText="padding:7px 0;border-bottom:1px solid #f0f2f5;";
-      row.innerHTML='<div style="font-size:12px;font-weight:700;color:#0f172a;">'+s.motif+'</div>'+
-        '<div style="font-size:10px;color:#64748b;">'+s.date+' — '+s.type+'</div>';
+      row.innerHTML='<div style="font-size:12px;font-weight:700;color:#0f172a;">'+( s.motif||s.raison||s.type||"Sanction")+'</div>'+
+        '<div style="font-size:10px;color:#64748b;">'+( s.date||"")+' — '+(s.type||"")+' — '+(s.statut||"")+'</div>';
       sanctSection.appendChild(row);
     });
     content.appendChild(sanctSection);
@@ -5640,4 +5687,4 @@ setTimeout(function(){
 
 </script>
 </body>
-</html>
+</html>m
