@@ -4963,218 +4963,181 @@ function genContratPDF(chauffeurId){
   });
 }
 function _genContratPDFInner(c,sal){
+  var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
+  var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,ml=15,mr=15,pw=180;
+  var y=15;
 
-  // Calculer dates contrat
+  // ── Helpers ──
   var today=new Date();
   var fin=new Date(today);fin.setMonth(fin.getMonth()+6);
   var fmt=function(d){return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();};
-  var dateDebut=fmt(today);
-  var dateFin=fmt(fin);
+  var dateDebut=fmt(today),dateFin=fmt(fin);
+  var nom=c.nom||"";
+  var isH=c.freqPaiement==="Hebdomadaire";
+  var objVal=isH?(c.objectifSemaine||0).toLocaleString()+" FCFA":(c.objectifJour||0).toLocaleString()+" FCFA";
+  var objLabel=isH?"Hebdomadaire":"Journalier";
+  var salInfo=sal?"Saloni "+(sal.nom||sal.id||c.saloniId):(c.saloniId||"N/A");
 
-  var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
-  var W=210,H=297;
-  var ml=15,mr=15,pw=W-ml-mr;
-  var y=15;
+  function setFont(size,style,r,g,b){
+    doc.setFontSize(size);
+    doc.setFont('helvetica',style||'normal');
+    doc.setTextColor(r||0,g||0,b||0);
+  }
+  function fillRect(x,y,w,h,r,g,b){
+    doc.setFillColor(r,g,b);doc.rect(x,y,w,h,'F');
+  }
+  function hline(y2,r,g,b,thick){
+    doc.setDrawColor(r||200,g||200,b||200);
+    doc.setLineWidth(thick||0.3);
+    doc.line(ml,y2,W-mr,y2);
+  }
+  function sectionTitle(title,y2,r,g,b){
+    fillRect(ml,y2,pw,7,r||29,g||78,b||216);
+    setFont(9,'bold',255,255,255);
+    doc.text(title,ml+3,y2+4.8);
+    return y2+9;
+  }
+  function tableRow(label,val,y2,shade){
+    if(shade)fillRect(ml,y2,pw,5.5,245,247,250);
+    setFont(8,'bold',75,85,99);doc.text(label,ml+3,y2+3.8);
+    setFont(8,'normal',17,24,39);doc.text(val,ml+50,y2+3.8);
+    hline(y2+5.5,229,231,235,0.2);
+    return y2+5.5;
+  }
+  function clauseBox(title,text,y2,r,g,b){
+    var lines=doc.splitTextToSize(text,pw-8);
+    var h=8+lines.length*4.5;
+    fillRect(ml,y2,pw,h,r||239,g||246,b||255);
+    setFont(8,'bold',29,78,216);doc.text(title,ml+3,y2+5);
+    setFont(8,'normal',17,24,39);
+    lines.forEach(function(l,i){doc.text(l,ml+3,y2+9+i*4.5);});
+    hline(y2+h,229,231,235,0.2);
+    return y2+h+3;
+  }
 
-  // ── Couleurs ──
-  var BLEU=[29,78,216];
-  var VERT=[5,150,105];
-  var GRIS=[55,65,81];
-  var LGRIS=[243,244,246];
-  var LBLEU=[239,246,255];
-
-  // ── Header ──
-  doc.setFillColor(29,78,216);
-  doc.rect(0,0,W,28,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(16);doc.setFont('helvetica','bold');
-  doc.text("DIAKITE TRANSPORT",W/2,12,{align:'center'});
-  doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text("Adjame St Michel, Lot 611, Abidjan",W/2,18,{align:'center'});
-  doc.text("Gestion de Flotte Saloni Manager",W/2,23,{align:'center'});
+  // ══ HEADER ══
+  fillRect(0,0,W,30,29,78,216);
+  setFont(17,'bold',255,255,255);
+  doc.text("DIAKITE TRANSPORT",W/2,11,{align:'center'});
+  setFont(8,'normal',200,220,255);
+  doc.text("Adjame St Michel, Lot 611, Abidjan",W/2,17,{align:'center'});
+  doc.text("Gestion de Flotte — Saloni Manager",W/2,22,{align:'center'});
+  // Pastille bleue foncée
+  fillRect(0,28,W,1,17,55,170);
   y=36;
 
-  // ── Titre contrat ──
-  doc.setTextColor(17,24,39);
-  doc.setFontSize(13);doc.setFont('helvetica','bold');
+  // ══ TITRE ══
+  setFont(13,'bold',17,24,39);
   doc.text("CONTRAT DE LOCATION DE TRICYCLE (SALONI)",W/2,y,{align:'center'});
   y+=6;
-  doc.setFontSize(9);doc.setFont('helvetica','italic');
-  doc.setTextColor(107,114,128);
-  doc.text("Contrat a Duree Determinee - 6 mois",W/2,y,{align:'center'});
+  setFont(9,'italic',107,114,128);
+  doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:'center'});
   y+=5;
-  doc.setDrawColor(29,78,216);doc.setLineWidth(0.5);
-  doc.line(ml,y,W-mr,y);
-  y+=6;
+  hline(y,29,78,216,0.6);y+=7;
 
   // ══ ART 1: PARTIES ══
+  y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT",y);
   // Bailleur
-  doc.setFillColor(29,78,216);
-  doc.rect(ml,y,pw,7,'F');
-  doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
-  doc.text("ARTICLE 1 - PARTIES AU CONTRAT",ml+3,y+4.5);
-  y+=10;
-
-  // Tableau bailleur
-  doc.setFillColor(239,246,255);doc.rect(ml,y,pw,5,'F');
-  doc.setTextColor(29,78,216);doc.setFont('helvetica','bold');doc.setFontSize(8.5);
-  doc.text("BAILLEUR (Proprietaire)",ml+3,y+3.5);
-  y+=5;
-
-  var lignesBailleur=[
-    ["Entreprise :", "DIAKITE TRANSPORT"],
-    ["Representee par :", "DIAKITE Korotum Marceline - Gerante"],
-    ["Adresse :", "Adjame St Michel, Lot 611, Abidjan"],
-  ];
-  lignesBailleur.forEach(function(l){
-    doc.setTextColor(75,85,99);doc.setFont('helvetica','bold');doc.setFontSize(8);
-    doc.text(l[0],ml+3,y+3.5);
-    doc.setFont('helvetica','normal');doc.setTextColor(17,24,39);
-    doc.text(l[1],ml+45,y+3.5);
-    doc.setDrawColor(229,231,235);doc.setLineWidth(0.2);
-    doc.line(ml,y+5,W-mr,y+5);
-    y+=5;
-  });
+  fillRect(ml,y,pw,5.5,239,246,255);
+  setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire)",ml+3,y+4);y+=5.5;
+  y=tableRow("Entreprise :",  "DIAKITE TRANSPORT",y,false);
+  y=tableRow("Representee par :","DIAKITE Korotum Marceline — Gerante",y,true);
+  y=tableRow("Adresse :","Adjame St Michel, Lot 611, Abidjan",y,false);
   y+=3;
-
   // Locataire
-  doc.setFillColor(5,150,105);doc.rect(ml,y,pw,5,'F');
-  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8.5);
-  doc.text("LOCATAIRE (Chauffeur)",ml+3,y+3.5);
-  y+=5;
-
-  var nom=c.nom||"";var tel=c.tel||"N/A";
-  var lignesChauf=[
-    ["Nom & Prenom :", nom],
-    ["Telephone :", tel],
-    ["N° Permis :", c.permisExp?"Exp: "+c.permisExp:"N/A"],
-    ["Saloni attribue :", sal?"Saloni #"+(sal.nom||sal.id||c.saloniId)+" ("+( sal.immat||"")+")":(c.saloniId||"N/A")],
-  ];
-  lignesChauf.forEach(function(l){
-    doc.setFillColor(240,253,244);doc.rect(ml,y,pw,5,'F');
-    doc.setTextColor(75,85,99);doc.setFont('helvetica','bold');doc.setFontSize(8);
-    doc.text(l[0],ml+3,y+3.5);
-    doc.setFont('helvetica','normal');doc.setTextColor(17,24,39);
-    doc.text(l[1],ml+45,y+3.5);
-    doc.setDrawColor(229,231,235);doc.setLineWidth(0.2);
-    doc.line(ml,y+5,W-mr,y+5);
-    y+=5;
-  });
+  fillRect(ml,y,pw,5.5,5,150,105);
+  setFont(8.5,'bold',255,255,255);doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4);y+=5.5;
+  y=tableRow("Nom & Prenom :",nom,y,false);
+  y=tableRow("Telephone :",c.tel||"N/A",y,true);
+  y=tableRow("N° Permis :",c.permisExp||"N/A",y,false);
+  y=tableRow("Saloni attribue :",salInfo,y,true);
   y+=5;
 
   // ══ ART 2: OBJECTIFS ══
-  doc.setFillColor(55,65,81);doc.rect(ml,y,pw,7,'F');
-  doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
-  doc.text("ARTICLE 2 - OBJECTIFS ET VERSEMENTS",ml+3,y+4.5);
-  y+=10;
-
-  var isH=c.freqPaiement==="Hebdomadaire";
-  var objLabel=isH?"Objectif hebdomadaire :":"Objectif journalier :";
-  var objVal=isH?(c.objectifSemaine||0).toLocaleString()+" FCFA":(c.objectifJour||0).toLocaleString()+" FCFA";
-  var lignesObj=[
-    ["Frequence :", isH?"Hebdomadaire":"Journaliere"],
-    [objLabel, objVal],
-    ["Mode de versement :", "Especes / Mobile Money (Wave, Orange Money, MTN)"],
-  ];
-  lignesObj.forEach(function(l,i){
-    if(i%2===0)doc.setFillColor(249,250,251);else doc.setFillColor(255,255,255);
-    doc.rect(ml,y,pw,5,'F');
-    doc.setTextColor(75,85,99);doc.setFont('helvetica','bold');doc.setFontSize(8);
-    doc.text(l[0],ml+3,y+3.5);
-    doc.setFont('helvetica','normal');doc.setTextColor(17,24,39);
-    doc.text(l[1],ml+55,y+3.5);
-    y+=5;
-  });
+  y=sectionTitle("ARTICLE 2 — OBJECTIFS ET VERSEMENTS",y,55,65,81);
+  y=tableRow("Frequence :",objLabel,y,false);
+  y=tableRow("Objectif :",objVal,y,true);
+  y=tableRow("Mode de paiement :","Especes / Wave / Orange Money / MTN",y,false);
   y+=5;
 
-  // ══ ART 3: DURÉE ══
-  doc.setFillColor(29,78,216);doc.rect(ml,y,pw,7,'F');
-  doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
-  doc.text("ARTICLE 3 - DUREE DU CONTRAT",ml+3,y+4.5);
-  y+=10;
-
-  doc.setFillColor(239,246,255);doc.rect(ml,y,pw,14,'F');
-  doc.setTextColor(17,24,39);doc.setFont('helvetica','normal');doc.setFontSize(8.5);
+  // ══ ART 3: DUREE ══
+  y=sectionTitle("ARTICLE 3 — DUREE DU CONTRAT",y);
+  fillRect(ml,y,pw,16,239,246,255);
+  setFont(8.5,'normal',17,24,39);
   var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
-  var lines=doc.splitTextToSize(texteduree,pw-6);
-  lines.forEach(function(l){doc.text(l,ml+3,y+4);y+=4.5;});
-  doc.setTextColor(220,38,38);doc.setFont('helvetica','bold');doc.setFontSize(8);
-  doc.text("Une alerte automatique sera envoyee 30 jours avant l'echeance via Saloni Manager.",ml+3,y+2);
-  y+=8;
+  var linesD=doc.splitTextToSize(texteduree,pw-8);
+  linesD.forEach(function(l){doc.text(l,ml+3,y+4.5);y+=4.5;});
+  setFont(8,'bold',220,38,38);
+  doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.",ml+3,y+3);
+  y+=9;
 
-  // ══ CLAUSES PRINCIPALES (compactes) ══
-  var clauses=[
-    {titre:"ARTICLE 4 - RETRAIT DU TRICYCLE",
-     texte:"En cas d'absence de versement pendant 2 jours consecutifs sans justificatif (panne, maladie, vidange) signale des le premier jour d'arret, le tricycle sera retire immediatement sans preavis."},
-    {titre:"ARTICLE 5 - PRIMES DE PERFORMANCE",
-     texte:"Prime de 5.000 a 15.000 FCFA/mois si tous les versements sont effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree dans le mois."},
-    {titre:"ARTICLE 6 - ENTRETIEN",
-     texte:"Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires. Les frais de reparation dus a une negligence sont a la charge du locataire."},
-    {titre:"ARTICLE 7 - INTERDICTIONS",
-     texte:"Il est formellement interdit d'abandonner le tricycle ou de le laisser aller en fourriere sans prevenir le gerant ou un administrateur, sous peine de poursuites pour abandon de bien confie."},
-  ];
+  // ══ CLAUSES ══
+  y=clauseBox(
+    "ARTICLE 4 — RETRAIT DU TRICYCLE",
+    "En cas d'absence de versement pendant 2 jours consecutifs sans justificatif valable (panne, maladie, vidange) signale des le premier jour d'arret au gerant ou a un administrateur via l'application, le tricycle sera retire immediatement sans preavis.",
+    y,239,246,255);
 
-  clauses.forEach(function(cl,i){
-    var bgColor=i%2===0?[239,246,255]:[240,253,244];
-    doc.setFillColor(bgColor[0],bgColor[1],bgColor[2]);
-    var textLines=doc.splitTextToSize(cl.texte,pw-8);
-    var hClause=7+textLines.length*4.2;
-    doc.rect(ml,y,pw,hClause,'F');
-    doc.setTextColor(29,78,216);doc.setFont('helvetica','bold');doc.setFontSize(8);
-    doc.text(cl.titre,ml+3,y+4);
-    doc.setTextColor(17,24,39);doc.setFont('helvetica','normal');doc.setFontSize(8);
-    textLines.forEach(function(l,j){doc.text(l,ml+3,y+8+j*4.2);});
-    y+=hClause+2;
-  });
+  y=clauseBox(
+    "ARTICLE 5 — PRIMES DE PERFORMANCE",
+    "Le locataire beneficie d'une prime mensuelle de 5.000 a 15.000 FCFA si tous les versements du mois ont ete effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree durant le mois concerne.",
+    y,240,253,244);
+
+  y=clauseBox(
+    "ARTICLE 6 — ENTRETIEN DU TRICYCLE",
+    "Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires aux intervalles requis. Les frais de reparation resultant d'une negligence d'entretien sont integralement a la charge du locataire.",
+    y,255,251,235);
+
+  y=clauseBox(
+    "ARTICLE 7 — INTERDICTIONS ET OBLIGATIONS",
+    "Il est formellement interdit : (1) d'abandonner le tricycle sans en informer le gerant ou un administrateur — tout abandon caracterise constituera un abandon de bien confie et fera l'objet de poursuites judiciaires ; (2) de laisser le tricycle aller en fourriere sans avertissement — les frais sont a la charge du locataire ; (3) de sous-louer ou preter le tricycle sans autorisation ecrite.",
+    y,254,242,242);
+
+  // ══ RÉSILIATION ══
+  y=clauseBox(
+    "ARTICLE 8 — RESILIATION",
+    "Le contrat peut etre resilie de plein droit, sans preavis, en cas de: non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, ou fausse declaration lors de la signature.",
+    y,243,244,246);
 
   // ══ SIGNATURES ══
   y+=4;
-  doc.setDrawColor(229,231,235);doc.setLineWidth(0.5);
-  doc.line(ml,y,W-mr,y);
-  y+=6;
-  doc.setTextColor(55,65,81);doc.setFont('helvetica','bold');doc.setFontSize(10);
+  hline(y,229,231,235,0.5);y+=6;
+  setFont(11,'bold',55,65,81);
   doc.text("SIGNATURES",W/2,y,{align:'center'});
-  y+=4;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(107,114,128);
+  y+=5;
+  setFont(8,'normal',107,114,128);
   doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:'center'});
   y+=10;
 
-  // Deux colonnes signature
-  var col1=ml,col2=W/2+5,colW=(pw/2)-5;
-  doc.setFillColor(239,246,255);doc.rect(col1,y,colW,6,'F');
-  doc.setFillColor(240,253,244);doc.rect(col2,y,colW,6,'F');
-  doc.setTextColor(29,78,216);doc.setFont('helvetica','bold');doc.setFontSize(8.5);
-  doc.text("Le Bailleur / La Gerante",col1+3,y+4);
-  doc.setTextColor(5,150,105);
-  doc.text("Le Locataire (Chauffeur)",col2+3,y+4);
+  // Colonnes signatures
+  var c1=ml,c2=W/2+5,cw=(pw/2)-5;
+  fillRect(c1,y,cw,6,239,246,255);
+  fillRect(c2,y,cw,6,240,253,244);
+  setFont(8.5,'bold',29,78,216);doc.text("Le Bailleur / La Gerante",c1+3,y+4.2);
+  setFont(8.5,'bold',5,150,105);doc.text("Le Locataire (Chauffeur)",c2+3,y+4.2);
   y+=8;
-
-  doc.setTextColor(55,65,81);doc.setFont('helvetica','normal');doc.setFontSize(8);
-  doc.text("DIAKITE Korotum Marceline",col1+3,y);
-  doc.text(nom,col2+3,y);
-  y+=20;
-
-  // Lignes de signature
+  setFont(8.5,'normal',55,65,81);
+  doc.text("DIAKITE Korotum Marceline",c1+3,y);
+  doc.text(nom,c2+3,y);
+  y+=22;
   doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
-  doc.line(col1,y,col1+colW,y);
-  doc.line(col2,y,col2+colW,y);
+  doc.line(c1,y,c1+cw,y);doc.line(c2,y,c2+cw,y);
   y+=4;
-  doc.setFontSize(7);doc.setTextColor(107,114,128);
-  doc.text("Signature & Cachet",col1+3,y);
-  doc.text("Signature (Lu et approuve)",col2+3,y);
+  setFont(7,'normal',107,114,128);
+  doc.text("Signature & Cachet",c1+3,y);
+  doc.text("Signature (Lu et approuve)",c2+3,y);
   y+=8;
 
-  doc.setDrawColor(229,231,235);doc.line(ml,y,W-mr,y);
-  y+=4;
-  doc.setFontSize(7);doc.setTextColor(107,114,128);
-  doc.text("Ce contrat est etabli en deux (2) exemplaires originaux, un pour chaque partie.",W/2,y,{align:'center'});
-  doc.text("Genere par Saloni Manager - DIAKITE TRANSPORT",W/2,y+4,{align:'center'});
+  hline(y,229,231,235,0.5);y+=4;
+  setFont(7,'normal',107,114,128);
+  doc.text("Contrat etabli en 2 exemplaires originaux — Genere par Saloni Manager",W/2,y,{align:'center'});
 
-  // Télécharger
+  // ══ TÉLÉCHARGEMENT ══
   var filename="Contrat_"+nom.replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
   doc.save(filename);
   jLog("contrat","Contrat PDF genere pour "+nom);
 }
+
 
 // ══ CHAT INTERNE (gérant ↔ collaborateurs) ══
 function getInternalConvId(pseudo1, pseudo2){
