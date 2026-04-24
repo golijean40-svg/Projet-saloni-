@@ -4575,7 +4575,12 @@ function saveEditCh(id){
   jLog("chauffeur_ajout","Modification chauffeur: "+nom);
   fM();
 }
-function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""}};S.data.chauffeurs.push(item);jLog("chauffeur_ajout","Nouveau chauffeur: "+nom+" ("+gv("cz")+")");fbSave("chauffeurs",item);fM();}
+function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""},
+  creePar:S.user?S.user.pseudo:"gerant",
+  creeParRole:S.user?S.user.role:"Gerant",
+  creeParNiveau:S.user?S.user.niveau:3,
+  dateCreation:td()
+};S.data.chauffeurs.push(item);jLog("chauffeur_ajout","Nouveau chauffeur: "+nom+" ("+gv("cz")+")");fbSave("chauffeurs",item);fM();}
 function saveSal(){var id=gv("si").trim();if(!id)return;var item={id:id,marque:gv("sm"),immat:gv("sr"),km:parseInt(gv("sk"))||0,chauffeurId:parseInt(gv("sch"))||null,statut:"en service",prixAchat:parseFloat(gv("sprix"))||0,dateAchat:gv("sdateachat")||""};S.data.salonis.push(item);jLog("saloni_ajout","Nouveau saloni: "+id+" ("+gv("sm")+")");fbSave("salonis",item);fM();}
 function saveDep(){var m=parseFloat(gv("dm"))||0;if(!m)return;var item={id:Date.now(),categorie:gv("dc"),saloniId:gv("ds"),montant:m,date:td()};S.data.depenses.push(item);jLog("depense_ajout","Dépense "+gv("dc")+" : "+fc(m));fbSave("depenses",item);fM();}
 function saveAm(){var m=parseFloat(gv("amo"))||0;if(!m)return;var item={id:Date.now(),chauffeurId:parseInt(gv("ac"))||0,montant:m,date:td(),motif:gv("am2"),statut:"impayee"};S.data.amendes.push(item);var ch=(S.data.chauffeurs||[]).filter(function(x){return x.id===item.chauffeurId;})[0];jLog("amende_ajout","Amende "+gv("am2")+" : "+fc(m)+(ch?" — "+ch.nom:""));fbSave("amendes",item);fM();}
@@ -5092,7 +5097,12 @@ function _genContratPDFInner(c,sal){
   fillRect(ml,y,pw,5.5,239,246,255);
   setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire)",ml+3,y+4);y+=5.5;
   y=tableRow("Entreprise :",  "DIAKITE TRANSPORT",y,false);
-  y=tableRow("Representee par :","DIAKITE Korotum Marceline — Gerante",y,true);
+  // Si le chauffeur a été créé par un admin, le mentionner
+  var creeParInfo=c.creePar&&c.creeParNiveau<3?"DIAKITE Korotum Marceline — Gerante":"DIAKITE Korotum Marceline — Gerante";
+  y=tableRow("Representee par :",creeParInfo,y,true);
+  if(c.creePar&&c.creeParNiveau<3){
+    y=tableRow("Administrateur :",c.creePar+" ("+( c.creeParRole||"Admin")+")",y,false);
+  }
   y=tableRow("Adresse :","Adjame St Michel, Lot 611, Abidjan",y,false);
   y+=3;
   // Locataire
@@ -5150,7 +5160,13 @@ function _genContratPDFInner(c,sal){
     y,243,244,246);
 
   // ══ SIGNATURES ══
-  y+=4;
+  // Nouvelle page si pas assez d'espace (signatures nécessitent ~80mm)
+  if(y>200){
+    doc.addPage();
+    y=15;
+  }else{
+    y+=4;
+  }
   hline(y,229,231,235,0.5);y+=6;
   setFont(11,'bold',55,65,81);
   doc.text("SIGNATURES",W/2,y,{align:'center'});
@@ -5159,12 +5175,18 @@ function _genContratPDFInner(c,sal){
   doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:'center'});
   y+=8;
 
-  // Identifier le signataire bailleur (gérant ou admin qui crée le contrat)
+  // Identifier le signataire bailleur
+  // Utiliser creePar si disponible, sinon l'utilisateur actuel
   var signataireBailleur="DIAKITE Korotum Marceline";
   var titreBailleur="Gerant & Proprietaire";
-  var isAdmin=S.user&&S.user.niveau<3&&S.user.niveau>=2;
-  if(isAdmin){
-    signataireBailleur=S.user.pseudo;
+  var isAdmin=false;
+  var creePar=c.creePar||S.user.pseudo;
+  var creeParRole=c.creeParRole||S.user.role;
+  var creeParNiveau=c.creeParNiveau||S.user.niveau;
+  if(creeParNiveau<3&&creeParNiveau>=2){
+    // C'est un admin qui a créé ce contrat
+    isAdmin=true;
+    signataireBailleur=creePar;
     titreBailleur="Administrateur Garant";
   }
 
@@ -5186,9 +5208,11 @@ function _genContratPDFInner(c,sal){
   y+=5;
   if(isAdmin){
     setFont(8,'normal',29,78,216);
-    doc.text("Representee par: "+signataireBailleur,c1+3,y);
-    doc.text("(Administrateur Garant)",c1+3,y+4);
-    y+=9;
+    doc.text("Administrateur Garant: "+signataireBailleur,c1+3,y);
+    y+=4;
+    setFont(7,'italic',107,114,128);
+    doc.text("(Agissant au nom de DIAKITE Korotum Marceline, Gerante)",c1+3,y);
+    y+=6;
   }else{y+=2;}
 
   // Ligne signature bailleur
