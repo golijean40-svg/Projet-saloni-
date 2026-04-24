@@ -1506,7 +1506,16 @@ function load(){try{var d=localStorage.getItem("sal_v2");if(d)S.data=JSON.parse(
 function applyDark(){if(S.darkMode)document.body.classList.add("dark");else document.body.classList.remove("dark");}
 function toggleDark(){S.darkMode=!S.darkMode;try{localStorage.setItem("sal_dark",S.darkMode?"1":"0");}catch(e){}applyDark();rHD();}
 function save(){try{localStorage.setItem("sal_v2",JSON.stringify(S.data));}catch(e){}}
-function pingSession(){if(!S.user)return;try{var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}
+function pingSession(){if(!S.user)return;try{
+  // Vérifier intégrité de la session
+  var sessionToken=localStorage.getItem("sal_session_token");
+  var expectedToken=btoa(S.user.pseudo+"_"+S.user.niveau+"_saloni2024");
+  if(sessionToken&&sessionToken!==expectedToken){
+    // Token invalide - déconnecter
+    console.warn("Session token invalide");
+    S.user=null;rLogin();return;
+  }
+  var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}
   // Sync presence Firebase
   if(db&&S.user){try{
     var tsNow=Date.now();
@@ -1751,7 +1760,7 @@ function rHD(){
   var logoutBtn=document.createElement("button");
   logoutBtn.textContent="🚪";
   logoutBtn.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:6px 9px;color:#fff;font-size:14px;cursor:pointer;";
-  logoutBtn.onclick=function(){jLog("deconnexion","Déconnexion de "+S.user.pseudo);setOffline();S.user=null;R();};
+  logoutBtn.onclick=function(){jLog("deconnexion","Déconnexion de "+S.user.pseudo);setOffline();localStorage.removeItem("sal_session_token");S.user=null;R();};
   mRight.appendChild(logoutBtn);
   row.appendChild(mLeft);row.appendChild(mRight);
   wrap.appendChild(row);
@@ -1864,7 +1873,7 @@ function rNAV(){
     logBtn.className="nb";
     logBtn.style.cssText="color:#dc2626 !important;width:100%;";
     logBtn.innerHTML='<span>🚪</span><span>Déconnexion</span>';
-    logBtn.onclick=function(){closeNav();jLog("deconnexion","Déconnexion");setOffline();S.user=null;R();};
+    logBtn.onclick=function(){closeNav();jLog("deconnexion","Déconnexion");setOffline();localStorage.removeItem("sal_session_token");S.user=null;R();};
     sep2.appendChild(logBtn);
     nav.appendChild(sep2);
   }
@@ -4623,7 +4632,10 @@ function login(){
         if(need2FA){
           S.user=c;show2FA(c,function(){secResetTimer();pingSession();checkRetards();load();jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+") — 2FA validée");R();setTimeout(initFirebase,200);});
         }else{
-          S.user=c;secResetTimer();pingSession();checkRetards();load();
+          S.user=c;
+          // Créer token de session
+          localStorage.setItem("sal_session_token",btoa(c.pseudo+"_"+c.niveau+"_saloni2024"));
+          secResetTimer();pingSession();checkRetards();load();
           jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+(c.typeCompte==="chauffeur"?" — Chauffeur":"")+")"+(c.chauffeurId?" — chauffeur #"+c.chauffeurId:""));
           R();setTimeout(function(){initFirebase();setTimeout(function(){pingSession();startPresenceSync();},2000);},200);
         }
@@ -5145,26 +5157,94 @@ function _genContratPDFInner(c,sal){
   y+=5;
   setFont(8,'normal',107,114,128);
   doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:'center'});
-  y+=10;
+  y+=8;
 
-  // Colonnes signatures
+  // Identifier le signataire bailleur (gérant ou admin qui crée le contrat)
+  var signataireBailleur="DIAKITE Korotum Marceline";
+  var titreBailleur="Gerant & Proprietaire";
+  var isAdmin=S.user&&S.user.niveau<3&&S.user.niveau>=2;
+  if(isAdmin){
+    signataireBailleur=S.user.pseudo;
+    titreBailleur="Administrateur Garant";
+  }
+
+  // ── Colonne Bailleur (gauche) ──
   var c1=ml,c2=W/2+5,cw=(pw/2)-5;
-  fillRect(c1,y,cw,6,239,246,255);
-  fillRect(c2,y,cw,6,240,253,244);
-  setFont(8.5,'bold',29,78,216);doc.text("Le Bailleur / La Gerante",c1+3,y+4.2);
-  setFont(8.5,'bold',5,150,105);doc.text("Le Locataire (Chauffeur)",c2+3,y+4.2);
+
+  // Header colonne bailleur
+  fillRect(c1,y,cw,6,29,78,216);
+  setFont(8,'bold',255,255,255);
+  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
   y+=8;
-  setFont(8.5,'normal',55,65,81);
-  doc.text("DIAKITE Korotum Marceline",c1+3,y);
-  doc.text(nom,c2+3,y);
-  y+=22;
+
+  // Nom + titre
+  setFont(8.5,'bold',17,24,39);
+  doc.text("DIAKITE Transport",c1+3,y);
+  y+=5;
+  setFont(8,'normal',55,65,81);
+  doc.text("Proprietaire: DIAKITE Korotum Marceline",c1+3,y);
+  y+=5;
+  if(isAdmin){
+    setFont(8,'normal',29,78,216);
+    doc.text("Representee par: "+signataireBailleur,c1+3,y);
+    doc.text("(Administrateur Garant)",c1+3,y+4);
+    y+=9;
+  }else{y+=2;}
+
+  // Ligne signature bailleur
   doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
-  doc.line(c1,y,c1+cw,y);doc.line(c2,y,c2+cw,y);
-  y+=4;
+  doc.line(c1,y+14,c1+cw-5,y+14);
   setFont(7,'normal',107,114,128);
-  doc.text("Signature & Cachet",c1+3,y);
-  doc.text("Signature (Lu et approuve)",c2+3,y);
-  y+=8;
+  doc.text("Signature & Cachet",c1+3,y+18);
+  y+=22;
+
+  // ── Colonne Chauffeur (droite) ──
+  var yChauf=y-22; // Aligner avec le bailleur
+
+  // Header colonne chauffeur
+  fillRect(c2,yChauf-22,cw,6,5,150,105);
+  setFont(8,'bold',255,255,255);
+  doc.text("LE LOCATAIRE (CHAUFFEUR)",c2+3,yChauf-22+4.2);
+  yChauf-=14;
+
+  // Nom chauffeur
+  setFont(8.5,'bold',17,24,39);
+  doc.text(nom,c2+3,yChauf);
+  yChauf+=5;
+
+  // Mention "Lu et approuvé" pré-imprimée
+  fillRect(c2,yChauf,cw,8,240,253,244);
+  setFont(7.5,'bold',5,150,105);
+  doc.text("Lu et approuve :",c2+3,yChauf+3.5);
+  setFont(7,'italic',55,65,81);
+  doc.text("Je certifie avoir lu et accepte les termes",c2+3,yChauf+7);
+  yChauf+=10;
+
+  // Ligne signature chauffeur
+  doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
+  doc.line(c2,yChauf+10,c2+cw-5,yChauf+10);
+  setFont(7,'normal',107,114,128);
+  doc.text("Signature du chauffeur",c2+3,yChauf+14);
+  doc.text("(Faire preceder de: Lu et approuve)",c2+3,yChauf+18);
+
+  // ── Si admin: ajouter aussi ligne signature gérant ──
+  if(isAdmin){
+    y+=8;
+    hline(y,229,231,235,0.3);y+=6;
+    setFont(8,'bold',17,24,39);
+    doc.text("VISA DU GERANT PROPRIETAIRE",ml+3,y);
+    y+=6;
+    setFont(8,'normal',55,65,81);
+    doc.text("DIAKITE Korotum Marceline — Gerante & Proprietaire",ml+3,y);
+    y+=10;
+    doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
+    doc.line(ml,y,ml+80,y);
+    setFont(7,'normal',107,114,128);
+    doc.text("Signature & Cachet du Gerant",ml+3,y+4);
+    y+=8;
+  }else{
+    y+=8;
+  }
 
   hline(y,229,231,235,0.5);y+=4;
   setFont(7,'normal',107,114,128);
@@ -5687,4 +5767,4 @@ setTimeout(function(){
 
 </script>
 </body>
-</html>m
+</html>
