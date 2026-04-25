@@ -5101,7 +5101,7 @@ function _genContratPDFInner(c,sal){
   var creeParInfo=c.creePar&&c.creeParNiveau<3?"DIAKITE Korotum Marceline — Gerante":"DIAKITE Korotum Marceline — Gerante";
   y=tableRow("Representee par :",creeParInfo,y,true);
   if(c.creePar&&c.creeParNiveau<3){
-    y=tableRow("Administrateur :",c.creePar+" ("+( c.creeParRole||"Admin")+")",y,false);
+    y=tableRow("Administrateur :",nomCompletCreateur,y,false);
   }
   y=tableRow("Adresse :","Adjame St Michel, Lot 611, Abidjan",y,false);
   y+=3;
@@ -5176,17 +5176,22 @@ function _genContratPDFInner(c,sal){
   y+=8;
 
   // Identifier le signataire bailleur
-  // Utiliser creePar si disponible, sinon l'utilisateur actuel
   var signataireBailleur="DIAKITE Korotum Marceline";
   var titreBailleur="Gerant & Proprietaire";
   var isAdmin=false;
   var creePar=c.creePar||S.user.pseudo;
-  var creeParRole=c.creeParRole||S.user.role;
   var creeParNiveau=c.creeParNiveau||S.user.niveau;
+
+  // Chercher le sous-compte du créateur pour avoir son nom complet (role actuel)
+  var scCreateur=(S.data.sousComptes||[]).filter(function(x){
+    return x.pseudo===creePar;
+  })[0];
+  var nomCompletCreateur=scCreateur?(scCreateur.role||scCreateur.pseudo):creePar;
+
   if(creeParNiveau<3&&creeParNiveau>=2){
-    // C'est un admin qui a créé ce contrat
     isAdmin=true;
-    signataireBailleur=creePar;
+    // Utiliser le rôle actuel du sous-compte (nom complet)
+    signataireBailleur=nomCompletCreateur;
     titreBailleur="Administrateur Garant";
   }
 
