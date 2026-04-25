@@ -5187,6 +5187,7 @@ function _genContratPDFInner(c,sal){
     return x.pseudo===creePar;
   })[0];
   var nomCompletCreateur=scCreateur?(scCreateur.role||scCreateur.pseudo):creePar;
+  alert("DEBUG - creePar:"+creePar+" | scCreateur:"+(scCreateur?scCreateur.pseudo:"non trouvé")+" | role:"+(scCreateur?scCreateur.role:"N/A")+" | nomComplet:"+nomCompletCreateur);
 
   if(creeParNiveau<3&&creeParNiveau>=2){
     isAdmin=true;
