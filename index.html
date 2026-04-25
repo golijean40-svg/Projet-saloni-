@@ -5013,7 +5013,7 @@ function genContratPDF(chauffeurId){
   var sal=(S.data.salonis||[]).filter(function(x){return String(x.id)===String(c.saloniId);})[0];
   showPdfLoader(true);
   loadJsPDF(function(){
-    try{_genContratPDFInner(c,sal);}catch(e){alert("Erreur PDF: "+e.message+"\nLigne: "+e.stack);}
+    try{_genContratPDFInner(c,sal);}catch(e){alert("Erreur PDF: "+e.message);showPdfLoader(false);}
     showPdfLoader(false);
   });
 }
@@ -5055,13 +5055,15 @@ function _genContratPDFInner(c,sal){
   }
   function tableRow(label,val,y2,shade){
     if(shade)fillRect(ml,y2,pw,5.5,245,247,250);
-    setFont(8,'bold',75,85,99);doc.text(label,ml+3,y2+3.8);
-    setFont(8,'normal',17,24,39);doc.text(val,ml+50,y2+3.8);
+    var safeLabel=String(label||"");
+    var safeVal=String(val||"—");
+    setFont(8,'bold',75,85,99);doc.text(safeLabel,ml+3,y2+3.8);
+    setFont(8,'normal',17,24,39);doc.text(safeVal,ml+50,y2+3.8);
     hline(y2+5.5,229,231,235,0.2);
     return y2+5.5;
   }
   function clauseBox(title,text,y2,r,g,b){
-    var lines=doc.splitTextToSize(text,pw-8);
+    var lines=doc.splitTextToSize(String(text||""),pw-8);
     var h=8+lines.length*4.5;
     fillRect(ml,y2,pw,h,r||239,g||246,b||255);
     setFont(8,'bold',29,78,216);doc.text(title,ml+3,y2+5);
@@ -5186,7 +5188,7 @@ function _genContratPDFInner(c,sal){
   var scCreateur=(S.data.sousComptes||[]).filter(function(x){
     return x.pseudo===creePar;
   })[0];
-  var nomCompletCreateur=scCreateur?(scCreateur.role||scCreateur.pseudo):creePar;
+  var nomCompletCreateur=String(scCreateur?(scCreateur.role||scCreateur.pseudo||creePar):creePar)||"N/A";
 
 
   if(creeParNiveau<3&&creeParNiveau>=2){
