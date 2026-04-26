@@ -1506,16 +1506,7 @@ function load(){try{var d=localStorage.getItem("sal_v2");if(d)S.data=JSON.parse(
 function applyDark(){if(S.darkMode)document.body.classList.add("dark");else document.body.classList.remove("dark");}
 function toggleDark(){S.darkMode=!S.darkMode;try{localStorage.setItem("sal_dark",S.darkMode?"1":"0");}catch(e){}applyDark();rHD();}
 function save(){try{localStorage.setItem("sal_v2",JSON.stringify(S.data));}catch(e){}}
-function pingSession(){if(!S.user)return;try{
-  // Vérifier intégrité de la session
-  var sessionToken=localStorage.getItem("sal_session_token");
-  var expectedToken=btoa(S.user.pseudo+"_"+S.user.niveau+"_saloni2024");
-  if(sessionToken&&sessionToken!==expectedToken){
-    // Token invalide - déconnecter
-    console.warn("Session token invalide");
-    S.user=null;rLogin();return;
-  }
-  var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}
+function pingSession(){if(!S.user)return;try{var now=Date.now();var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");sess=sess.filter(function(s){return now-s.ts<1800000;});var found=false;for(var i=0;i<sess.length;i++){if(sess[i].pseudo===S.user.pseudo){sess[i].ts=now;found=true;break;}}if(!found)sess.push({pseudo:S.user.pseudo,role:S.user.role,ts:now});localStorage.setItem("sal_sess",JSON.stringify(sess));}catch(e){}
   // Sync presence Firebase
   if(db&&S.user){try{
     var tsNow=Date.now();
@@ -1760,7 +1751,7 @@ function rHD(){
   var logoutBtn=document.createElement("button");
   logoutBtn.textContent="🚪";
   logoutBtn.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:6px 9px;color:#fff;font-size:14px;cursor:pointer;";
-  logoutBtn.onclick=function(){jLog("deconnexion","Déconnexion de "+S.user.pseudo);setOffline();localStorage.removeItem("sal_session_token");S.user=null;R();};
+  logoutBtn.onclick=function(){jLog("deconnexion","Déconnexion de "+S.user.pseudo);setOffline();S.user=null;R();};
   mRight.appendChild(logoutBtn);
   row.appendChild(mLeft);row.appendChild(mRight);
   wrap.appendChild(row);
@@ -1873,7 +1864,7 @@ function rNAV(){
     logBtn.className="nb";
     logBtn.style.cssText="color:#dc2626 !important;width:100%;";
     logBtn.innerHTML='<span>🚪</span><span>Déconnexion</span>';
-    logBtn.onclick=function(){closeNav();jLog("deconnexion","Déconnexion");setOffline();localStorage.removeItem("sal_session_token");S.user=null;R();};
+    logBtn.onclick=function(){closeNav();jLog("deconnexion","Déconnexion");setOffline();S.user=null;R();};
     sep2.appendChild(logBtn);
     nav.appendChild(sep2);
   }
@@ -4575,12 +4566,7 @@ function saveEditCh(id){
   jLog("chauffeur_ajout","Modification chauffeur: "+nom);
   fM();
 }
-function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""},
-  creePar:S.user?S.user.pseudo:"gerant",
-  creeParRole:S.user?S.user.role:"Gerant",
-  creeParNiveau:S.user?S.user.niveau:3,
-  dateCreation:td()
-};S.data.chauffeurs.push(item);jLog("chauffeur_ajout","Nouveau chauffeur: "+nom+" ("+gv("cz")+")");fbSave("chauffeurs",item);fM();}
+function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""}};S.data.chauffeurs.push(item);jLog("chauffeur_ajout","Nouveau chauffeur: "+nom+" ("+gv("cz")+")");fbSave("chauffeurs",item);fM();}
 function saveSal(){var id=gv("si").trim();if(!id)return;var item={id:id,marque:gv("sm"),immat:gv("sr"),km:parseInt(gv("sk"))||0,chauffeurId:parseInt(gv("sch"))||null,statut:"en service",prixAchat:parseFloat(gv("sprix"))||0,dateAchat:gv("sdateachat")||""};S.data.salonis.push(item);jLog("saloni_ajout","Nouveau saloni: "+id+" ("+gv("sm")+")");fbSave("salonis",item);fM();}
 function saveDep(){var m=parseFloat(gv("dm"))||0;if(!m)return;var item={id:Date.now(),categorie:gv("dc"),saloniId:gv("ds"),montant:m,date:td()};S.data.depenses.push(item);jLog("depense_ajout","Dépense "+gv("dc")+" : "+fc(m));fbSave("depenses",item);fM();}
 function saveAm(){var m=parseFloat(gv("amo"))||0;if(!m)return;var item={id:Date.now(),chauffeurId:parseInt(gv("ac"))||0,montant:m,date:td(),motif:gv("am2"),statut:"impayee"};S.data.amendes.push(item);var ch=(S.data.chauffeurs||[]).filter(function(x){return x.id===item.chauffeurId;})[0];jLog("amende_ajout","Amende "+gv("am2")+" : "+fc(m)+(ch?" — "+ch.nom:""));fbSave("amendes",item);fM();}
@@ -4637,10 +4623,7 @@ function login(){
         if(need2FA){
           S.user=c;show2FA(c,function(){secResetTimer();pingSession();checkRetards();load();jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+") — 2FA validée");R();setTimeout(initFirebase,200);});
         }else{
-          S.user=c;
-          // Créer token de session
-          localStorage.setItem("sal_session_token",btoa(c.pseudo+"_"+c.niveau+"_saloni2024"));
-          secResetTimer();pingSession();checkRetards();load();
+          S.user=c;secResetTimer();pingSession();checkRetards();load();
           jLog("connexion","Connexion de "+c.pseudo+" ("+c.role+(c.typeCompte==="chauffeur"?" — Chauffeur":"")+")"+(c.chauffeurId?" — chauffeur #"+c.chauffeurId:""));
           R();setTimeout(function(){initFirebase();setTimeout(function(){pingSession();startPresenceSync();},2000);},200);
         }
@@ -5013,7 +4996,7 @@ function genContratPDF(chauffeurId){
   var sal=(S.data.salonis||[]).filter(function(x){return String(x.id)===String(c.saloniId);})[0];
   showPdfLoader(true);
   loadJsPDF(function(){
-    try{_genContratPDFInner(c,sal);}catch(e){alert("Erreur PDF: "+e.message);showPdfLoader(false);}
+    try{_genContratPDFInner(c,sal);}catch(e){alert("Erreur PDF: "+e.message);}
     showPdfLoader(false);
   });
 }
@@ -5055,15 +5038,13 @@ function _genContratPDFInner(c,sal){
   }
   function tableRow(label,val,y2,shade){
     if(shade)fillRect(ml,y2,pw,5.5,245,247,250);
-    var safeLabel=String(label||"");
-    var safeVal=String(val||"—");
-    setFont(8,'bold',75,85,99);doc.text(safeLabel,ml+3,y2+3.8);
-    setFont(8,'normal',17,24,39);doc.text(safeVal,ml+50,y2+3.8);
+    setFont(8,'bold',75,85,99);doc.text(label,ml+3,y2+3.8);
+    setFont(8,'normal',17,24,39);doc.text(val,ml+50,y2+3.8);
     hline(y2+5.5,229,231,235,0.2);
     return y2+5.5;
   }
   function clauseBox(title,text,y2,r,g,b){
-    var lines=doc.splitTextToSize(String(text||""),pw-8);
+    var lines=doc.splitTextToSize(text,pw-8);
     var h=8+lines.length*4.5;
     fillRect(ml,y2,pw,h,r||239,g||246,b||255);
     setFont(8,'bold',29,78,216);doc.text(title,ml+3,y2+5);
@@ -5099,12 +5080,7 @@ function _genContratPDFInner(c,sal){
   fillRect(ml,y,pw,5.5,239,246,255);
   setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire)",ml+3,y+4);y+=5.5;
   y=tableRow("Entreprise :",  "DIAKITE TRANSPORT",y,false);
-  // Si le chauffeur a été créé par un admin, le mentionner
-  var creeParInfo=c.creePar&&c.creeParNiveau<3?"DIAKITE Korotum Marceline — Gerante":"DIAKITE Korotum Marceline — Gerante";
-  y=tableRow("Representee par :",creeParInfo,y,true);
-  if(c.creePar&&c.creeParNiveau<3){
-    y=tableRow("Administrateur :",nomCompletCreateur,y,false);
-  }
+  y=tableRow("Representee par :","DIAKITE Korotum Marceline — Gerante",y,true);
   y=tableRow("Adresse :","Adjame St Michel, Lot 611, Abidjan",y,false);
   y+=3;
   // Locataire
@@ -5162,121 +5138,33 @@ function _genContratPDFInner(c,sal){
     y,243,244,246);
 
   // ══ SIGNATURES ══
-  // Nouvelle page si pas assez d'espace (signatures nécessitent ~80mm)
-  if(y>200){
-    doc.addPage();
-    y=15;
-  }else{
-    y+=4;
-  }
+  y+=4;
   hline(y,229,231,235,0.5);y+=6;
   setFont(11,'bold',55,65,81);
   doc.text("SIGNATURES",W/2,y,{align:'center'});
   y+=5;
   setFont(8,'normal',107,114,128);
   doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:'center'});
-  y+=8;
+  y+=10;
 
-  // Identifier le signataire bailleur
-  var signataireBailleur="DIAKITE Korotum Marceline";
-  var titreBailleur="Gerant & Proprietaire";
-  var isAdmin=false;
-  var creePar=c.creePar||S.user.pseudo;
-  var creeParNiveau=c.creeParNiveau||S.user.niveau;
-
-  // Chercher le sous-compte du créateur pour avoir son nom complet (role actuel)
-  var scCreateur=(S.data.sousComptes||[]).filter(function(x){
-    return x.pseudo===creePar;
-  })[0];
-  var nomCompletCreateur=String(scCreateur?(scCreateur.role||scCreateur.pseudo||creePar):creePar)||"N/A";
-
-
-  if(creeParNiveau<3&&creeParNiveau>=2){
-    isAdmin=true;
-    // Utiliser le rôle actuel du sous-compte (nom complet)
-    signataireBailleur=nomCompletCreateur;
-    titreBailleur="Administrateur Garant";
-  }
-
-  // ── Colonne Bailleur (gauche) ──
+  // Colonnes signatures
   var c1=ml,c2=W/2+5,cw=(pw/2)-5;
-
-  // Header colonne bailleur
-  fillRect(c1,y,cw,6,29,78,216);
-  setFont(8,'bold',255,255,255);
-  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
+  fillRect(c1,y,cw,6,239,246,255);
+  fillRect(c2,y,cw,6,240,253,244);
+  setFont(8.5,'bold',29,78,216);doc.text("Le Bailleur / La Gerante",c1+3,y+4.2);
+  setFont(8.5,'bold',5,150,105);doc.text("Le Locataire (Chauffeur)",c2+3,y+4.2);
   y+=8;
-
-  // Nom + titre
-  setFont(8.5,'bold',17,24,39);
-  doc.text("DIAKITE Transport",c1+3,y);
-  y+=5;
-  setFont(8,'normal',55,65,81);
-  doc.text("Proprietaire: DIAKITE Korotum Marceline",c1+3,y);
-  y+=5;
-  if(isAdmin){
-    setFont(8,'normal',29,78,216);
-    doc.text("Administrateur Garant: "+signataireBailleur,c1+3,y);
-    y+=4;
-    setFont(7,'italic',107,114,128);
-    doc.text("(Agissant au nom de DIAKITE Korotum Marceline, Gerante)",c1+3,y);
-    y+=6;
-  }else{y+=2;}
-
-  // Ligne signature bailleur
-  doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
-  doc.line(c1,y+14,c1+cw-5,y+14);
-  setFont(7,'normal',107,114,128);
-  doc.text("Signature & Cachet",c1+3,y+18);
+  setFont(8.5,'normal',55,65,81);
+  doc.text("DIAKITE Korotum Marceline",c1+3,y);
+  doc.text(nom,c2+3,y);
   y+=22;
-
-  // ── Colonne Chauffeur (droite) ──
-  var yChauf=y-22; // Aligner avec le bailleur
-
-  // Header colonne chauffeur
-  fillRect(c2,yChauf-22,cw,6,5,150,105);
-  setFont(8,'bold',255,255,255);
-  doc.text("LE LOCATAIRE (CHAUFFEUR)",c2+3,yChauf-22+4.2);
-  yChauf-=14;
-
-  // Nom chauffeur
-  setFont(8.5,'bold',17,24,39);
-  doc.text(nom,c2+3,yChauf);
-  yChauf+=5;
-
-  // Mention "Lu et approuvé" pré-imprimée
-  fillRect(c2,yChauf,cw,8,240,253,244);
-  setFont(7.5,'bold',5,150,105);
-  doc.text("Lu et approuve :",c2+3,yChauf+3.5);
-  setFont(7,'italic',55,65,81);
-  doc.text("Je certifie avoir lu et accepte les termes",c2+3,yChauf+7);
-  yChauf+=10;
-
-  // Ligne signature chauffeur
   doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
-  doc.line(c2,yChauf+10,c2+cw-5,yChauf+10);
+  doc.line(c1,y,c1+cw,y);doc.line(c2,y,c2+cw,y);
+  y+=4;
   setFont(7,'normal',107,114,128);
-  doc.text("Signature du chauffeur",c2+3,yChauf+14);
-  doc.text("(Faire preceder de: Lu et approuve)",c2+3,yChauf+18);
-
-  // ── Si admin: ajouter aussi ligne signature gérant ──
-  if(isAdmin){
-    y+=8;
-    hline(y,229,231,235,0.3);y+=6;
-    setFont(8,'bold',17,24,39);
-    doc.text("VISA DU GERANT PROPRIETAIRE",ml+3,y);
-    y+=6;
-    setFont(8,'normal',55,65,81);
-    doc.text("DIAKITE Korotum Marceline — Gerante & Proprietaire",ml+3,y);
-    y+=10;
-    doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
-    doc.line(ml,y,ml+80,y);
-    setFont(7,'normal',107,114,128);
-    doc.text("Signature & Cachet du Gerant",ml+3,y+4);
-    y+=8;
-  }else{
-    y+=8;
-  }
+  doc.text("Signature & Cachet",c1+3,y);
+  doc.text("Signature (Lu et approuve)",c2+3,y);
+  y+=8;
 
   hline(y,229,231,235,0.5);y+=4;
   setFont(7,'normal',107,114,128);
@@ -5799,4 +5687,4 @@ setTimeout(function(){
 
 </script>
 </body>
-</html>
+</html>m
