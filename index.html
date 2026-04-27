@@ -1829,6 +1829,7 @@ function rNAV(){
     addItem("chat","💬","Chat",nbChat);
     addItem("primes","⭐","Primes",getPrimeActive(S.user.chauffeurId).length);
     addItem("entretien","🔧","Entretien");
+    addItem("signalement","🚨","Signalement");
     addItem("monprofil","👤","Profil");
   }else{
     var al2=getAl();
@@ -2186,6 +2187,7 @@ function rScreen(){
     else if(S.tab==="chat")renderChatChauf(sc,chMoi);
     else if(S.tab==="primes")renderPrimesChauf(sc,chMoi);
     else if(S.tab==="monprofil")renderProfilChauf(sc,chMoi);
+    else if(S.tab==="signalement")renderSignalementChauf(sc,chMoi);
     else if(S.tab==="entretien")renderEntretienChauf(sc,chMoi);
     else renderHomeChauf(sc,chMoi);
     // Pas de FAB pour chauffeurs
@@ -3961,7 +3963,16 @@ function rScreenGlobal(sc){
   else if(S.tab==="ia"){
     if(S.user.niveau<2){html='<div class="sec"><div class="card" style="text-align:center;padding:30px;color:#dc2626;">❌ Accès réservé Gérant + Admin</div></div>';}
     else{
-    var suggestions=["Analyse mes performances cette semaine","Quels chauffeurs ont des problèmes ?","Comment améliorer mes recettes ?","Quel est mon RSI actuel ?","Génère un rapport de synthèse","Conseils pour réduire les dettes"];
+    var suggestions=[
+  "📊 Analyse mes performances cette semaine",
+  "⚠️ Quels chauffeurs ont des problèmes ?",
+  "💰 Comment améliorer mes recettes ?",
+  "📈 Quel est mon bénéfice ce mois ?",
+  "🏆 Qui est mon meilleur chauffeur ?",
+  "💡 Conseils pour réduire les dettes",
+  "📋 Génère un rapport de synthèse",
+  "🔧 Quels entretiens sont urgents ?"
+];
     var msgsHtml=S.iaHist.length===0?'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">🤖</div><div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px;">Assistant Saloni IA</div><div style="font-size:12px;color:#64748b;line-height:1.6;margin-bottom:16px;">Je connais toutes vos données en temps réel.<br>Posez-moi n\'importe quelle question !</div><div style="display:flex;flex-wrap:wrap;gap:7px;justify-content:center;">'+suggestions.map(function(s){return'<button onclick="iaEnvoyer(\''+s+'\')" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:7px 12px;font-size:11px;color:#1d4ed8;font-weight:600;cursor:pointer;">'+s+'</button>';}).join("")+'</div></div>'
     :S.iaHist.map(function(m){var moi=m.role==="user";return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:10px;"><div style="max-width:85%;background:'+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:11px 14px;font-size:13px;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.08);border:'+(moi?"none":"1px solid #dbeafe")+';">'+m.content.replace(/\n/g,"<br>")+'</div></div>';}).join("")+(S.iaLoading?'<div style="display:flex;justify-content:flex-start;margin-bottom:10px;"><div style="background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:11px 16px;"><div style="display:flex;gap:5px;align-items:center;"><div style="width:8px;height:8px;border-radius:50%;background:#1d4ed8;animation:pulse 1s infinite;"></div><div style="width:8px;height:8px;border-radius:50%;background:#1d4ed8;animation:pulse 1s infinite .2s;"></div><div style="width:8px;height:8px;border-radius:50%;background:#1d4ed8;animation:pulse 1s infinite .4s;"></div></div></div></div>':"");
     html='<div style="display:flex;flex-direction:column;height:calc(100vh - 130px);">'
@@ -4625,9 +4636,15 @@ function iaEnvoyerInput(){var inp=document.getElementById("iaInput");if(!inp||!i
 function iaEnvoyer(question){
   if(S.iaLoading)return;
   S.iaHist.push({role:"user",content:question});S.iaLoading=true;rScreen();
+  var systemPrompt="Tu es l'assistant IA de DIAKITE TRANSPORT, gestionnaire de flotte saloni (tricycles-taxis) à Abidjan, Côte d'Ivoire. Tu analyses les données en temps réel et donnes des conseils pratiques. Réponds en français, sois concis et utilise des emojis. Voici les données actuelles: "+buildContext();
   function buildContext(){var t=td();var vj=(S.data.versements||[]).filter(function(v){return v.date===t;});var tJ=vj.reduce(function(s,v){return s+v.montant;},0);var tR=(S.data.versements||[]).reduce(function(s,v){return s+v.montant;},0);var tD=(S.data.depenses||[]).reduce(function(s,v){return s+v.montant;},0);var tA=(S.data.amendes||[]).filter(function(a){return a.statut==="impayee";}).reduce(function(s,a){return s+a.montant;},0);var actifs=(S.data.chauffeurs||[]).filter(function(c){return c.statut==="actif";}).length;var sem=getSem();var tSem=(S.data.versements||[]).filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);var perf=(S.data.chauffeurs||[]).map(function(c){var tot=(S.data.versements||[]).filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(sm,v){return sm+v.montant;},0);var pJ=(S.data.versements||[]).filter(function(v){return String(v.chauffeurId)===String(c.id)&&v.date===t;}).reduce(function(sm,v){return sm+v.montant;},0);return c.nom+": total="+fc(tot)+", auj="+fc(pJ)+"/"+fc(getObjJ(c))+", statut="+c.statut+(c.dette>0?", dette="+fc(c.dette):"");}).join("\n  ");return "Tu es un assistant expert en gestion de flotte de tricycles-taxis (salonis) à Abidjan, Côte d'Ivoire.\n"+"Réponds en français, concis et pratique pour mobile. Utilise des emojis.\n\n=== DONNÉES ("+t+") ===\n"+"Flotte: "+(S.data.salonis||[]).length+" salonis | "+(S.data.chauffeurs||[]).length+" chauffeurs ("+actifs+" actifs)\n"+"Recettes aujourd'hui: "+fc(tJ)+" | Semaine: "+fc(tSem)+"\n"+"Total: "+fc(tR)+" | Dépenses: "+fc(tD)+" | Bénéfice: "+fc(tR-tD-tA)+"\n"+"Performances:\n  "+perf+"\n";}
-  var msgs=[{role:"user",content:buildContext()+"\n\n=== QUESTION ===\n"+question}];
-  fetch("https://corsproxy.io/?"+encodeURIComponent("https://api.anthropic.com/v1/messages"),{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"","anthropic-version":"2023-06-01"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:800,system:"Assistant gestion flotte tricycles Abidjan. Réponds en français, concis, mobile-friendly, avec emojis.",messages:msgs})}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(data){var rep=(data.content&&data.content[0]&&data.content[0].text)||"Désolé, je n'ai pas pu répondre.";S.iaHist.push({role:"assistant",content:rep});S.iaLoading=false;rScreen();setTimeout(function(){var b=document.getElementById("iaBox");if(b)b.scrollTop=b.scrollHeight;},100);}).catch(function(){S.iaHist.push({role:"assistant",content:"📊 Résumé rapide\n\n"+analyseLocale(question,"")});S.iaLoading=false;rScreen();});
+  // Utiliser l'historique complet pour la conversation
+  var msgs=S.iaHist.map(function(m){return{role:m.role,content:m.content};});
+  fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:1000,system:systemPrompt,messages:msgs})}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(data){var rep=(data.content&&data.content[0]&&data.content[0].text)||"Désolé, je n'ai pas pu répondre.";S.iaHist.push({role:"assistant",content:rep});S.iaLoading=false;rScreen();setTimeout(function(){var b=document.getElementById("iaBox");if(b)b.scrollTop=b.scrollHeight;},100);}).catch(function(e){
+    var errMsg="⚠️ Connexion IA impossible ("+e.message+").\n\nVoici une analyse locale:\n\n"+analyseLocale(question,"");
+    S.iaHist.push({role:"assistant",content:errMsg});
+    S.iaLoading=false;rScreen();
+  });
 }
 function analyseLocale(question,ctx){var t=td();var vj=(S.data.versements||[]).filter(function(v){return v.date===t;});var tJ=vj.reduce(function(s,v){return s+v.montant;},0);var tR=(S.data.versements||[]).reduce(function(s,v){return s+v.montant;},0);var tD=(S.data.depenses||[]).reduce(function(s,v){return s+v.montant;},0);var tA=(S.data.amendes||[]).filter(function(a){return a.statut==="impayee";}).reduce(function(s,a){return s+a.montant;},0);var bn=tR-tD-tA;var sem=getSem();var tSem=(S.data.versements||[]).filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);var actifs=(S.data.chauffeurs||[]).filter(function(c){return c.statut==="actif";});var dettes=(S.data.chauffeurs||[]).filter(function(c){return c.dette>0;});return "💰 Aujourd'hui: "+fc(tJ)+"\n📅 Semaine: "+fc(tSem)+"\n💵 Total: "+fc(tR)+" | Bénéfice: "+fc(bn)+"\n👥 "+actifs.length+" chauffeurs actifs\n"+(dettes.length>0?"⚠️ "+dettes.length+" chauffeur(s) avec dettes\n":"")+"\n💡 Posez une question précise pour une analyse détaillée.";}
 
@@ -5635,6 +5652,144 @@ function showHistoriqueChauffeur(chauffeurId){
   box.appendChild(content);
   modal.appendChild(box);
   document.body.appendChild(modal);
+}
+
+// ══ SIGNALEMENT CHAUFFEUR ══
+function renderSignalementChauf(sc,c){
+  if(!c){sc.innerHTML="";return;}
+  var wrap=document.createElement("div");
+  wrap.style.cssText="background:var(--bg,#f4f6f9);min-height:100%;padding-bottom:30px;";
+
+  // Header
+  var hd=document.createElement("div");
+  hd.style.cssText="background:linear-gradient(135deg,#dc2626,#ef4444);padding:18px 16px 20px;border-radius:0 0 16px 16px;margin-bottom:12px;";
+  hd.innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Signalement</div>'+
+    '<div style="font-size:20px;font-weight:900;color:#fff;">🚨 Déclarer un problème</div>'+
+    '<div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:4px;">Le gérant sera notifié immédiatement</div>';
+  wrap.appendChild(hd);
+
+  // Historique signalements
+  var signalements=(S.data.chats||[]).filter(function(m){
+    return m.convId==="conv_"+c.id&&m.signalement&&m.de==="chauffeur";
+  }).sort(function(a,b){return b.ts-a.ts;});
+
+  // ── Formulaire nouveau signalement ──
+  var formCard=document.createElement("div");
+  formCard.style.cssText="background:#fff;border-radius:14px;padding:16px;margin:0 12px 12px;box-shadow:0 2px 8px rgba(0,0,0,.07);";
+  formCard.innerHTML='<div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:14px;">📋 Nouveau signalement</div>';
+
+  // Type de signalement
+  var typeLabel=document.createElement("div");
+  typeLabel.style.cssText="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px;";
+  typeLabel.textContent="Type de problème";
+  formCard.appendChild(typeLabel);
+
+  // Boutons de type
+  var types=[
+    {id:"panne",ic:"🔧",lb:"Panne mécanique",col:"#d97706",bg:"#fffbeb"},
+    {id:"maladie",ic:"🏥",lb:"Maladie / Blessure",col:"#dc2626",bg:"#fef2f2"},
+    {id:"accident",ic:"💥",lb:"Accident",col:"#7c3aed",bg:"#f5f3ff"},
+    {id:"fourriere",ic:"🚗",lb:"Fourrière",col:"#0284c7",bg:"#f0f9ff"},
+    {id:"autre",ic:"📝",lb:"Autre",col:"#64748b",bg:"#f8faff"},
+  ];
+
+  var selectedType={val:""};
+  var typeBtns=document.createElement("div");
+  typeBtns.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;";
+  types.forEach(function(t){
+    var btn=document.createElement("button");
+    btn.style.cssText="padding:10px 8px;border-radius:10px;border:2px solid "+t.col+"30;background:"+t.bg+";color:"+t.col+";font-size:12px;font-weight:700;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;";
+    btn.innerHTML='<span style="font-size:18px;">'+t.ic+'</span><span>'+t.lb+'</span>';
+    btn.onclick=function(){
+      selectedType.val=t.id;
+      typeBtns.querySelectorAll("button").forEach(function(b){b.style.borderWidth="2px";});
+      btn.style.borderWidth="3px";
+      btn.style.borderColor=t.col;
+    };
+    typeBtns.appendChild(btn);
+  });
+  formCard.appendChild(typeBtns);
+
+  // Description
+  var descLabel=document.createElement("div");
+  descLabel.style.cssText="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;";
+  descLabel.textContent="Description (optionnel)";
+  formCard.appendChild(descLabel);
+
+  var descInput=document.createElement("textarea");
+  descInput.id="signalDesc";
+  descInput.placeholder="Décrivez le problème en détail...";
+  descInput.rows=3;
+  descInput.style.cssText="width:100%;padding:10px;border-radius:10px;border:1.5px solid #dbeafe;background:#f8faff;font-size:13px;font-family:inherit;resize:none;margin-bottom:12px;";
+  formCard.appendChild(descInput);
+
+  // Lieu
+  var lieuLabel=document.createElement("div");
+  lieuLabel.style.cssText="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;";
+  lieuLabel.textContent="Lieu (optionnel)";
+  formCard.appendChild(lieuLabel);
+
+  var lieuInput=document.createElement("input");
+  lieuInput.id="signalLieu";
+  lieuInput.type="text";
+  lieuInput.placeholder="Ex: Adjamé carrefour Liberté";
+  lieuInput.style.cssText="width:100%;padding:10px;border-radius:10px;border:1.5px solid #dbeafe;background:#f8faff;font-size:13px;margin-bottom:14px;";
+  formCard.appendChild(lieuInput);
+
+  // Bouton envoyer
+  var sendBtn=document.createElement("button");
+  sendBtn.textContent="🚨 Envoyer le signalement";
+  sendBtn.style.cssText="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#dc2626,#ef4444);border:none;color:#fff;font-size:14px;font-weight:800;cursor:pointer;";
+  sendBtn.onclick=function(){
+    if(!selectedType.val){alert("Choisissez un type de problème");return;}
+    var desc=document.getElementById("signalDesc").value.trim();
+    var lieu=document.getElementById("signalLieu").value.trim();
+    var typeInfo=types.filter(function(t){return t.id===selectedType.val;})[0];
+    var texte=typeInfo.ic+" SIGNALEMENT: "+typeInfo.lb+
+      (lieu?" | Lieu: "+lieu:"")+
+      (desc?" | "+desc:"");
+    // Envoyer comme message dans le chat avec flag signalement
+    var item={
+      id:Math.floor(Date.now()),
+      convId:"conv_"+String(c.id),
+      de:"chauffeur",
+      auteur:S.user.pseudo,
+      texte:texte,
+      date:td(),heure:hr(),ts:Date.now(),lu:false,
+      signalement:true,
+      typeSignal:selectedType.val
+    };
+    if(!S.data.chats)S.data.chats=[];
+    S.data.chats.push(item);
+    fbSave("chats",item);
+    playSound("send");
+    // Notifier le gérant
+    pushNouveauMessage("gerant",S.user.pseudo);
+    // Aussi envoyer push
+    envoyerPush("gerant","🚨 Signalement: "+typeInfo.lb,c.nom+" — "+(lieu||desc||"Voir le chat"),{tab:"chat"});
+    jLog("signalement","Signalement "+typeInfo.lb+" par "+c.nom+(lieu?" à "+lieu:""));
+    alert("✅ Signalement envoyé au gérant !");
+    sT("chat");
+  };
+  formCard.appendChild(sendBtn);
+  wrap.appendChild(formCard);
+
+  // ── Historique des signalements ──
+  if(signalements.length>0){
+    var histCard=document.createElement("div");
+    histCard.style.cssText="background:#fff;border-radius:14px;padding:16px;margin:0 12px;box-shadow:0 2px 8px rgba(0,0,0,.07);";
+    histCard.innerHTML='<div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">📋 Historique ('+signalements.length+')</div>';
+    signalements.forEach(function(s){
+      var row=document.createElement("div");
+      row.style.cssText="padding:10px;background:#f8faff;border-radius:10px;margin-bottom:8px;border-left:3px solid #dc2626;";
+      row.innerHTML='<div style="font-size:12px;font-weight:700;color:#0f172a;">'+s.texte+'</div>'+
+        '<div style="font-size:10px;color:#64748b;margin-top:4px;">'+s.date+' à '+s.heure+'</div>';
+      histCard.appendChild(row);
+    });
+    wrap.appendChild(histCard);
+  }
+
+  sc.innerHTML="";sc.appendChild(wrap);
 }
 
 // ══ MESSAGES AUTOMATIQUES CHAT ══
