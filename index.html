@@ -391,6 +391,15 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
 </div>
 <nav id="nav"></nav>
 <script>
+// Gestionnaire d'erreur global pour Safari
+window.onerror = function(msg, src, line, col, err) {
+  console.log("ERREUR GLOBALE: " + msg + " | Ligne: " + line + " | " + (err ? err.stack : ""));
+  return true; // Empêcher l'affichage de "Script error"
+};
+window.onunhandledrejection = function(e) {
+  console.log("PROMISE REJETÉE: " + (e.reason ? e.reason.message || e.reason : "inconnue"));
+  return true;
+};
 // ══ DONNÉES DE BASE ══
 var COMPTES_BASE=[
   {pseudo:"gerant",mdp:"Cedric10@",role:"Gerant",niveau:3},
@@ -466,7 +475,7 @@ var ALERTE_KEY="sal_alertes_config";var ALERTE_SENT_KEY="sal_alertes_sent";
 
 
 
-setInterval(function(){if(S.user){checkAlertesAuto();checkMsgsAutos();}},60000);
+setInterval(function(){if(S.user){try{checkAlertesAuto();}catch(e){}try{checkMsgsAutos();}catch(e){}}},60000);
 
 // ══ PRIMES ══
 
@@ -1539,8 +1548,7 @@ function pingSession(){if(!S.user)return;try{
 function getConx(){try{var sess=JSON.parse(localStorage.getItem("sal_sess")||"[]");return sess.filter(function(s){return Date.now()-s.ts<1800000;});}catch(e){return[];}}
 // Présence temps réel Firebase
 var _presenceOnline=[];
-function startPresenceSync(){
-  if(!db)return;
+function startPresenceSync(){try{  if(!db)return;
   db.collection("sal_presence").onSnapshot(function(snap){
     var allPresence=snap.docs.map(function(d){var x=d.data();return x;});
     _presenceOnline=allPresence;// Garder tous pour last seen, isUserOnline filtre par ts
@@ -1557,7 +1565,7 @@ function startPresenceSync(){
     // Rafraîchir le badge chat si on est sur cet onglet
     if(S.user&&(S.tab==="chat"||S.tab==="home"))rNAV();
   });
-}
+}catch(e){}}
 function getOnlineUsers(){return _presenceOnline.filter(function(p){return !S.user||p.pseudo!==S.user.pseudo;});}
 function isUserOnline(pseudo){return _presenceOnline.some(function(p){return p.pseudo===pseudo&&p.online!==false&&Date.now()-p.ts<120000;});}
 function getLastSeen(pseudo){
@@ -1861,6 +1869,7 @@ function rNAV(){
     addSep("Gestion équipe","👥","#1d4ed8");
     addItem("chauffeurs","👥","Mon équipe");
     addItem("versements","💵","Versements");
+    addItem("ia","🤖","Assistant IA");
     addItem("salonis","🛺","Ma flotte");
     addItem("primes","⭐","Primes",nbP);
     addItem("entretiens","🔧","Entretiens");
