@@ -1,0 +1,106 @@
+name: Remplacer IA par Gemini
+
+on:
+  workflow_dispatch:
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remplacer renderIA
+        run: |
+          python3 - << 'PYEOF'
+          import re
+
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
+
+          # Nouvelle fonction renderIA avec Gemini
+          new_render_ia = (
+              'function renderIA(sc){'
+              'var wrap=document.createElement("div");'
+              'wrap.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 115px);";'
+              'var iaBox=document.createElement("div");'
+              'iaBox.id="iaBox";'
+              'iaBox.style.cssText="flex:1;overflow-y:auto;padding:14px;background:#f8faff;";'
+              'wrap.appendChild(iaBox);'
+              'var sug=document.createElement("div");'
+              'sug.style.cssText="padding:8px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:6px;overflow-x:auto;";'
+              '["Qui n a pas verse ?","Mon benefice ?","Conseils recettes","Resume du jour"].forEach(function(s){'
+              'var btn=document.createElement("button");'
+              'btn.style.cssText="padding:6px 12px;border-radius:20px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;";'
+              'btn.textContent=s;'
+              'btn.onclick=function(){var inp=document.getElementById("iaInput");if(inp){inp.value=s;envoyerMessageIA();}};'
+              'sug.appendChild(btn);});'
+              'wrap.appendChild(sug);'
+              'var inputDiv=document.createElement("div");'
+              'inputDiv.style.cssText="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;";'
+              'var ta=document.createElement("textarea");'
+              'ta.id="iaInput";'
+              'ta.placeholder="Posez votre question...";'
+              'ta.rows=1;'
+              'ta.style.cssText="flex:1;min-height:42px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;";'
+              'ta.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerMessageIA();}};'
+              'var sendBtn=document.createElement("button");'
+              'sendBtn.textContent="Envoyer";'
+              'sendBtn.style.cssText="padding:0 14px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer;";'
+              'sendBtn.onclick=function(){envoyerMessageIA();};'
+              'var clearBtn=document.createElement("button");'
+              'clearBtn.textContent="X";'
+              'clearBtn.style.cssText="width:44px;height:44px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:14px;font-weight:700;cursor:pointer;";'
+              'clearBtn.onclick=function(){S.iaHist=[];renderIAMessages();};'
+              'inputDiv.appendChild(ta);inputDiv.appendChild(sendBtn);inputDiv.appendChild(clearBtn);'
+              'wrap.appendChild(inputDiv);'
+              'sc.innerHTML="";sc.appendChild(wrap);'
+              'renderIAMessages();}'
+          )
+
+          # Trouver et remplacer la fonction renderIA existante
+          pattern = r'function renderIA\(sc\)\{.*?\n\}'
+          match = re.search(pattern, content, re.DOTALL)
+          if match:
+              old_func = match.group(0)
+              content = content.replace(old_func, new_render_ia, 1)
+              print("OK: renderIA remplace!")
+          else:
+              # Essayer pattern plus simple
+              pattern2 = r'function renderIA\([^)]*\)\s*\{'
+              match2 = re.search(pattern2, content)
+              if match2:
+                  print("Trouve renderIA a position:", match2.start())
+                  # Trouver la fin de la fonction
+                  start = match2.start()
+                  depth = 0
+                  i = match2.end() - 1
+                  while i < len(content):
+                      if content[i] == '{':
+                          depth += 1
+                      elif content[i] == '}':
+                          depth -= 1
+                          if depth == 0:
+                              end = i + 1
+                              break
+                      i += 1
+                  old_func = content[start:end]
+                  content = content.replace(old_func, new_render_ia, 1)
+                  print("OK: renderIA remplace avec methode 2!")
+              else:
+                  print("ERREUR: renderIA non trouve")
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(content)
+          print("OK: index.html mis a jour!")
+          PYEOF
+
+      - name: Commit et push
+        run: |
+          git config user.name "Saloni Bot"
+          git config user.email "bot@saloni.app"
+          git add index.html
+          git commit -m "Remplacement renderIA par Gemini" || echo "Rien a committer"
+          git push
