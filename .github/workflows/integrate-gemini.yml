@@ -41,7 +41,7 @@ jobs:
           print("renderIA present:", "function renderIA" in content)
 print("OK: index.html mis a jour!")
 
-          PYEOF
+         PYEOF
 
       - name: Commit et push
         run: |
