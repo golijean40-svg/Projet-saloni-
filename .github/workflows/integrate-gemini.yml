@@ -38,7 +38,9 @@ jobs:
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
-          print("OK: index.html mis a jour!")
+          print("renderIA present:", "function renderIA" in content)
+print("OK: index.html mis a jour!")
+
           PYEOF
 
       - name: Commit et push
