@@ -5976,8 +5976,8 @@ var GK="AIzaSyBopTBeO0olelWJ084nVhNkjGgoCEt4HZo";
 var GU="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
 if(!S.gh)S.gh=[];
 function gCtx(){var CH=S.data.chauffeurs||[];var VE=S.data.versements||[];var DE=S.data.depenses||[];var t=td();var vj=VE.filter(function(v){return v.date===t;});var tJ=vj.reduce(function(s,v){return s+v.montant;},0);var tR=VE.reduce(function(s,v){return s+v.montant;},0);var tD=DE.reduce(function(s,v){return s+v.montant;},0);var ac=CH.filter(function(c){return c.statut==="actif";});var op=ac.filter(function(c){return vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});var np=ac.filter(function(c){return!vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});return "Tu es l assistant IA Saloni Manager, flotte tricycles-taxis Abidjan. Actifs:"+ac.length+". Verse:"+op.map(function(c){return c.nom;}).join(",")+". Pas verse:"+np.map(function(c){return c.nom;}).join(",")+". Jour:"+tJ+" FCFA. Total:"+tR+" FCFA. Depenses:"+tD+". Benefice:"+(tR-tD)+". Reponds en francais concis.";}
-async function iaEnvoyer(question){if(!question)return;if(!S.gh)S.gh=[];S.gh.push({r:"user",t:question});S.iaLoading=true;rScreen();try{var msgs=S.gh.slice(-8).map(function(m){return{role:m.r==="user"?"user":"model",parts:[{text:m.t}]};});var res=await fetch(GU+GK,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system_instruction:{parts:[{text:gCtx()}]},contents:msgs})});var d=await res.json();var rep=d.candidates&&d.candidates[0]?d.candidates[0].content.parts[0].text:"Desole, erreur.";S.gh.push({r:"model",t:rep});}catch(e){S.gh.push({r:"model",t:"Erreur: "+e.message});}S.iaLoading=false;rScreen();setTimeout(function(){var b=document.getElementById("iaBox");if(b)b.scrollTop=b.scrollHeight;},100);}
-function iaEnvoyerInput(){var inp=document.getElementById("iaInput");if(!inp||!inp.value.trim())return;var q=inp.value.trim();inp.value="";iaEnvoyer(q);}
+async 
+
 
 </script>
 </body>
