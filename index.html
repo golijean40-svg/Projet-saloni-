@@ -5972,7 +5972,7 @@ setTimeout(function(){
 
 
 // === GEMINI IA SALONI ===
-var GK="AIzaSyAkRRS-b99r0_PcJ9zIm4z2qoYq0Kui_to";
+var GK="AIzaSyBopTBeO0olelWJ084nVhNkjGgoCEt4HZo";
 var GU="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
 if(!S.gh)S.gh=[];
 function gCtx(){var CH=S.data.chauffeurs||[];var VE=S.data.versements||[];var DE=S.data.depenses||[];var t=td();var vj=VE.filter(function(v){return v.date===t;});var tJ=vj.reduce(function(s,v){return s+v.montant;},0);var tR=VE.reduce(function(s,v){return s+v.montant;},0);var tD=DE.reduce(function(s,v){return s+v.montant;},0);var ac=CH.filter(function(c){return c.statut==="actif";});var op=ac.filter(function(c){return vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});var np=ac.filter(function(c){return!vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});return "Tu es l assistant IA Saloni Manager, flotte tricycles-taxis Abidjan. Actifs:"+ac.length+". Verse:"+op.map(function(c){return c.nom;}).join(",")+". Pas verse:"+np.map(function(c){return c.nom;}).join(",")+". Jour:"+tJ+" FCFA. Total:"+tR+" FCFA. Depenses:"+tD+". Benefice:"+(tR-tD)+". Reponds en francais concis.";}
