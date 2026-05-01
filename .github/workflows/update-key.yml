@@ -1,0 +1,51 @@
+name: Update Gemini Key
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mettre a jour la cle Gemini
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        run: |
+          python3 - << 'PYEOF'
+          import os
+          import re
+
+          new_key = os.environ.get("GEMINI_KEY", "")
+          if not new_key:
+              print("ERREUR: Clé manquante!")
+              exit(1)
+
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
+
+          # Remplacer l'ancienne clé par la nouvelle
+          old_pattern = r'var GK="[^"]*";'
+          new_line = 'var GK="' + new_key + '";'
+          new_content = re.sub(old_pattern, new_line, content)
+
+          if new_content == content:
+              print("ATTENTION: Cle non trouvee dans le code!")
+          else:
+              print("OK: Cle mise a jour!")
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(new_content)
+          print("OK: index.html sauvegarde!")
+          PYEOF
+
+      - name: Push
+        run: |
+          git config user.name "Saloni Bot"
+          git config user.email "bot@saloni.app"
+          git add index.html
+          git commit -m "Update Gemini key" || echo "Rien"
+          git push
