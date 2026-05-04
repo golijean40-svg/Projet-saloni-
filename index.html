@@ -6036,16 +6036,20 @@ function demanderCleIA() {
 
 async function gEnvoyer(question) {
   if (!question || !question.trim()) return;
-  var gk = getGK();
+  var gk = localStorage.getItem("sal_gemini_key") || "";
   if (!gk) {
-    gk = demanderCleIA();
-    if (!gk) {
+    var saisie = prompt("Entrez votre clé Gemini API (aistudio.google.com) :");
+    if (saisie && saisie.trim().length > 10) {
+      gk = saisie.trim();
+      localStorage.setItem("sal_gemini_key", gk);
+    } else {
       window._claudeHist.push({ role: "user", content: question.trim() });
-      window._claudeHist.push({ role: "model", content: "⚠️ Clé API manquante. Rechargez et entrez votre clé Gemini." });
+      window._claudeHist.push({ role: "model", content: "⚠️ Clé API non configurée. Cliquez sur 🔑 Clé pour l'ajouter." });
       renderIAPanel();
       return;
     }
   }
+  window._claudeLoading = true;
   window._claudeHist.push({ role: "user", content: question.trim() });
   renderIAPanel();
   try {
@@ -6053,7 +6057,7 @@ async function gEnvoyer(question) {
       return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
     });
     msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
-    var res = await fetch(GU + getGK(), {
+    var res = await fetch(GU + gk, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -6062,14 +6066,26 @@ async function gEnvoyer(question) {
       })
     });
     var d = await res.json();
-    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : (d.error ? "Erreur: "+d.error.message : "Pas de réponse.");
+    var rep = "Pas de réponse.";
+    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0]) {
+      rep = d.candidates[0].content.parts[0].text;
+    } else if (d.error) {
+      rep = "Erreur: " + d.error.message;
+      // Si quota dépassé, effacer la clé pour forcer nouvelle saisie
+      if (d.error.message && d.error.message.indexOf("quota") >= 0) {
+        localStorage.removeItem("sal_gemini_key");
+        rep = "⚠️ Quota dépassé ou clé invalide. Cliquez 🔑 Clé pour entrer une nouvelle clé.";
+      }
+    }
     window._claudeHist.push({ role: "model", content: rep });
   } catch(e) {
     window._claudeHist.push({ role: "model", content: "Erreur: " + (e.message || String(e)) });
   }
+  window._claudeLoading = false;
   renderIAPanel();
   setTimeout(function() { var b = document.getElementById("gBox"); if (b) b.scrollTop = b.scrollHeight; }, 100);
 }
+
 
 function gEnvoyerInput() {
   var inp = document.getElementById("gInp");
@@ -6271,45 +6287,7 @@ function renderIAPanel() {
   }
 }
 
-// Remplacer gEnvoyer pour gérer loading
-var _gEnvoyerOrig = gEnvoyer;
-gEnvoyer = async function(question) {
-  if (!question || !question.trim()) return;
-  var gk = getGK();
-  if (!gk) {
-    gk = demanderCleIA();
-    if (!gk) {
-      window._claudeHist.push({ role: "user", content: question.trim() });
-      window._claudeHist.push({ role: "model", content: "⚠️ Clé API manquante. Rechargez et entrez votre clé Gemini." });
-      renderIAPanel();
-      return;
-    }
-  }
-  window._claudeLoading = true;
-  window._claudeHist.push({ role: "user", content: question.trim() });
-  renderIAPanel();
-  try {
-    var msgs = window._claudeHist.slice(-10).map(function(m) {
-      return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
-    });
-    msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
-    var res = await fetch(GU + getGK(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: gCtx() }] },
-        contents: msgs
-      })
-    });
-    var d = await res.json();
-    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : (d.error ? "Erreur: "+d.error.message : "Pas de réponse.");
-    window._claudeHist.push({ role: "model", content: rep });
-  } catch(e) {
-    window._claudeHist.push({ role: "model", content: "Erreur: " + (e.message||String(e)) });
-  }
-  window._claudeLoading = false;
-  renderIAPanel();
-};
+
 
 // Lancer le bouton flottant au démarrage
 setTimeout(creerBoutonIA, 1000);
