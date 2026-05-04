@@ -6019,11 +6019,33 @@ function gCtx() {
 // Historique conversation Claude
 if (!window._claudeHist) window._claudeHist = [];
 
-var GK = "AIzaSyCOsSGruoLb-jWEHc9Zto7JbZWubgbLZ24";
 var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+
+function getGK() {
+  return localStorage.getItem("sal_gemini_key") || "";
+}
+
+function demanderCleIA() {
+  var cle = prompt("Entrez votre clé Gemini API (aistudio.google.com) :");
+  if (cle && cle.trim().startsWith("AIza")) {
+    localStorage.setItem("sal_gemini_key", cle.trim());
+    return cle.trim();
+  }
+  return null;
+}
 
 async function gEnvoyer(question) {
   if (!question || !question.trim()) return;
+  var gk = getGK();
+  if (!gk) {
+    gk = demanderCleIA();
+    if (!gk) {
+      window._claudeHist.push({ role: "user", content: question.trim() });
+      window._claudeHist.push({ role: "model", content: "⚠️ Clé API manquante. Rechargez et entrez votre clé Gemini." });
+      renderIAPanel();
+      return;
+    }
+  }
   window._claudeHist.push({ role: "user", content: question.trim() });
   renderIAPanel();
   try {
@@ -6031,7 +6053,7 @@ async function gEnvoyer(question) {
       return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
     });
     msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
-    var res = await fetch(GU + GK, {
+    var res = await fetch(GU + getGK(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -6135,6 +6157,7 @@ function ouvrirPanelIA() {
   hd.innerHTML = [
     '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:600;flex-shrink:0;">S</div>',
     '<div style="flex:1"><div style="font-weight:600;font-size:14px;color:#1a1a1a;letter-spacing:-0.01em;">Assistant Saloni</div><div style="font-size:11px;color:#4ade80;">🟢 En ligne</div></div>',
+    '<button onclick="var k=prompt(\"Clé Gemini API:\");if(k&&k.trim().startsWith(\"AIza\")){localStorage.setItem(\"sal_gemini_key\",k.trim());alert(\"Clé sauvegardée ✅\");}" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 10px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;">🔑 Clé</button>',
     '<button onclick="window._claudeHist=[];renderIAPanel();" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 10px;font-size:11px;color:#666;cursor:pointer;font-family:inherit;">Effacer</button>',
     '<button onclick="document.getElementById(\'iaPanelOverlay\').remove();" style="background:none;border:none;font-size:18px;color:#999;cursor:pointer;line-height:1;padding:0 4px;">×</button>'
   ].join("");
@@ -6252,6 +6275,16 @@ function renderIAPanel() {
 var _gEnvoyerOrig = gEnvoyer;
 gEnvoyer = async function(question) {
   if (!question || !question.trim()) return;
+  var gk = getGK();
+  if (!gk) {
+    gk = demanderCleIA();
+    if (!gk) {
+      window._claudeHist.push({ role: "user", content: question.trim() });
+      window._claudeHist.push({ role: "model", content: "⚠️ Clé API manquante. Rechargez et entrez votre clé Gemini." });
+      renderIAPanel();
+      return;
+    }
+  }
   window._claudeLoading = true;
   window._claudeHist.push({ role: "user", content: question.trim() });
   renderIAPanel();
@@ -6260,7 +6293,7 @@ gEnvoyer = async function(question) {
       return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
     });
     msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
-    var res = await fetch(GU + GK, {
+    var res = await fetch(GU + getGK(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
