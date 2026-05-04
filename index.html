@@ -6030,6 +6030,7 @@ async function gEnvoyer(question) {
     var msgs = window._claudeHist.slice(-10).map(function(m) {
       return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
     });
+    msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
     var res = await fetch(GU + GK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -6039,10 +6040,10 @@ async function gEnvoyer(question) {
       })
     });
     var d = await res.json();
-    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : "Pas de réponse.";
-    window._claudeHist.push({ role: "assistant", content: rep });
+    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : (d.error ? "Erreur: "+d.error.message : "Pas de réponse.");
+    window._claudeHist.push({ role: "model", content: rep });
   } catch(e) {
-    window._claudeHist.push({ role: "assistant", content: "Erreur : " + (e.message || String(e)) });
+    window._claudeHist.push({ role: "model", content: "Erreur: " + (e.message || String(e)) });
   }
   renderIAPanel();
   setTimeout(function() { var b = document.getElementById("gBox"); if (b) b.scrollTop = b.scrollHeight; }, 100);
@@ -6258,6 +6259,7 @@ gEnvoyer = async function(question) {
     var msgs = window._claudeHist.slice(-10).map(function(m) {
       return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
     });
+    msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
     var res = await fetch(GU + GK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -6267,10 +6269,10 @@ gEnvoyer = async function(question) {
       })
     });
     var d = await res.json();
-    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : "Pas de réponse.";
-    window._claudeHist.push({ role: "assistant", content: rep });
+    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : (d.error ? "Erreur: "+d.error.message : "Pas de réponse.");
+    window._claudeHist.push({ role: "model", content: rep });
   } catch(e) {
-    window._claudeHist.push({ role: "assistant", content: "Erreur: " + (e.message||String(e)) });
+    window._claudeHist.push({ role: "model", content: "Erreur: " + (e.message||String(e)) });
   }
   window._claudeLoading = false;
   renderIAPanel();
