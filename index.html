@@ -5976,61 +5976,79 @@ async
 
 
 
-// === GEMINI IA SALONI MANAGER ===
-var GK = "AIzaSyAkRRS-b99r0_PcJ9zIm4z2qoYq0Kui_to";
-var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+// === CLAUDE IA SALONI MANAGER ===
 
+// Contexte dynamique avec les vraies données
 function gCtx() {
   var CH = S.data.chauffeurs || [];
   var VE = S.data.versements || [];
   var DE = S.data.depenses || [];
   var t = td();
   var vj = VE.filter(function(v) { return v.date === t; });
-  var tJ = vj.reduce(function(s, v) { return s + v.montant; }, 0);
-  var tR = VE.reduce(function(s, v) { return s + v.montant; }, 0);
-  var tD = DE.reduce(function(s, v) { return s + v.montant; }, 0);
+  var tJ = vj.reduce(function(s, v) { return s + (v.montant||0); }, 0);
+  var tR = VE.reduce(function(s, v) { return s + (v.montant||0); }, 0);
+  var tD = DE.reduce(function(s, v) { return s + (v.montant||0); }, 0);
   var ac = CH.filter(function(c) { return c.statut === "actif"; });
   var op = ac.filter(function(c) { return vj.some(function(v) { return String(v.chauffeurId) === String(c.id); }); });
   var np = ac.filter(function(c) { return !vj.some(function(v) { return String(v.chauffeurId) === String(c.id); }); });
-  return "Tu es l assistant IA Saloni Manager, flotte tricycles-taxis Abidjan. " +
-    "Actifs:" + ac.length + ". " +
-    "Ont verse aujourd hui:" + op.map(function(c) { return c.nom; }).join(",") + ". " +
-    "N ont pas verse:" + np.map(function(c) { return c.nom; }).join(",") + ". " +
-    "Total jour:" + tJ + " FCFA. Global:" + tR + " FCFA. Depenses:" + tD + " FCFA. Benefice:" + (tR - tD) + " FCFA. " +
-    "Reponds en francais concis et pratique.";
+
+  // Paiements en retard (pas versé depuis 2+ jours)
+  var hier = new Date(); hier.setDate(hier.getDate()-1);
+  var avantHier = new Date(); avantHier.setDate(avantHier.getDate()-2);
+  var fmt = function(d){ return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate(); };
+  var retard = ac.filter(function(c){
+    var recent = VE.filter(function(v){ return String(v.chauffeurId)===String(c.id) && (v.date===t||v.date===fmt(hier)); });
+    return recent.length === 0;
+  });
+
+  return "Tu es l'assistant IA de Saloni Manager, application de gestion de flotte de tricycles-taxis (salonis) à Abidjan, Côte d'Ivoire. Tu travailles pour JC, le gérant.\n\n" +
+    "=== DONNÉES EN TEMPS RÉEL ===\n" +
+    "Date aujourd'hui : " + t + "\n" +
+    "Chauffeurs actifs : " + ac.length + " (" + ac.map(function(c){return c.nom;}).join(", ") + ")\n" +
+    "Ont versé aujourd'hui (" + tJ.toLocaleString() + " FCFA) : " + (op.length ? op.map(function(c){return c.nom;}).join(", ") : "Personne") + "\n" +
+    "N'ont PAS versé aujourd'hui : " + (np.length ? np.map(function(c){return c.nom;}).join(", ") : "Tous ont versé ✅") + "\n" +
+    "En retard (2+ jours sans versement) : " + (retard.length ? retard.map(function(c){return c.nom;}).join(", ") : "Aucun ✅") + "\n" +
+    "Total versements global : " + tR.toLocaleString() + " FCFA\n" +
+    "Total dépenses : " + tD.toLocaleString() + " FCFA\n" +
+    "Bénéfice net : " + (tR - tD).toLocaleString() + " FCFA\n\n" +
+    "=== TES CAPACITÉS ===\n" +
+    "- Voir et analyser les données des chauffeurs\n" +
+    "- Identifier les paiements en retard et suggérer des actions\n" +
+    "- Calculer et analyser les revenus, dépenses et bénéfices\n" +
+    "- Rédiger des messages WhatsApp professionnels pour les chauffeurs\n" +
+    "- Donner des conseils de gestion de flotte adaptés au contexte ivoirien\n\n" +
+    "Réponds toujours en français, de manière concise et pratique. Pour les messages WhatsApp, fournis un texte prêt à copier-coller.";
 }
+
+// Historique conversation Claude
+if (!window._claudeHist) window._claudeHist = [];
 
 async function gEnvoyer(question) {
   if (!question || !question.trim()) return;
-  if (!S.gh) S.gh = [];
-  S.gh.push({ r: "user", t: question.trim() });
-  S.iaLoading = true;
-  renderIA(document.getElementById("screen"));
+  window._claudeHist.push({ role: "user", content: question.trim() });
+  renderIAPanel();
   try {
-    var msgs = S.gh.slice(-8).map(function(m) {
-      return { role: m.r === "user" ? "user" : "model", parts: [{ text: m.t }] };
-    });
-    var res = await fetch(GU + GK, {
+    var msgs = window._claudeHist.slice(-10);
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: gCtx() }] },
-        contents: msgs
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: gCtx(),
+        messages: msgs
       })
     });
-    if (!res.ok) {
-      var errText = await res.text();
-      throw new Error("HTTP " + res.status + ": " + errText.substring(0, 100));
-    }
     var d = await res.json();
-    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : "Pas de reponse.";
-    S.gh.push({ r: "model", t: rep });
+    var rep = d.content && d.content[0] ? d.content[0].text : (d.error ? d.error.message : "Pas de réponse.");
+    window._claudeHist.push({ role: "assistant", content: rep });
   } catch(e) {
-    S.gh.push({ r: "model", t: "Erreur: " + (e.message || String(e)) });
+    window._claudeHist.push({ role: "assistant", content: "Erreur : " + (e.message || String(e)) });
   }
-  S.iaLoading = false;
-  renderIA(document.getElementById("screen"));
+  renderIAPanel();
   setTimeout(function() { var b = document.getElementById("gBox"); if (b) b.scrollTop = b.scrollHeight; }, 100);
 }
 
@@ -6039,8 +6057,241 @@ function gEnvoyerInput() {
   if (!inp || !inp.value.trim()) return;
   var q = inp.value.trim();
   inp.value = "";
+  inp.style.height = "auto";
   gEnvoyer(q);
 }
+
+// ── BOUTON FLOTTANT ──
+function creerBoutonIA() {
+  if (document.getElementById("iaBoutonFlottant")) return;
+  var fab = document.createElement("button");
+  fab.id = "iaBoutonFlottant";
+  fab.innerHTML = "🤖";
+  fab.title = "Assistant IA";
+  fab.style.cssText = [
+    "position:fixed",
+    "bottom:80px",
+    "right:16px",
+    "width:54px",
+    "height:54px",
+    "border-radius:50%",
+    "background:linear-gradient(135deg,#0066cc,#0052a3)",
+    "border:none",
+    "color:white",
+    "font-size:22px",
+    "cursor:pointer",
+    "z-index:800",
+    "box-shadow:0 4px 16px rgba(0,102,204,0.4)",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "transition:transform .15s"
+  ].join(";");
+  fab.onmouseenter = function(){ fab.style.transform = "scale(1.1)"; };
+  fab.onmouseleave = function(){ fab.style.transform = "scale(1)"; };
+  fab.onclick = function() {
+    var panel = document.getElementById("iaPanelOverlay");
+    if (panel) { panel.remove(); return; }
+    ouvrirPanelIA();
+  };
+  document.body.appendChild(fab);
+}
+
+// ── PANEL IA ──
+function ouvrirPanelIA() {
+  if (document.getElementById("iaPanelOverlay")) return;
+
+  var overlay = document.createElement("div");
+  overlay.id = "iaPanelOverlay";
+  overlay.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:700",
+    "display:flex",
+    "align-items:flex-end",
+    "justify-content:flex-end",
+    "pointer-events:none"
+  ].join(";");
+
+  var panel = document.createElement("div");
+  panel.style.cssText = [
+    "pointer-events:all",
+    "position:fixed",
+    "bottom:145px",
+    "right:16px",
+    "width:min(380px, calc(100vw - 32px))",
+    "height:min(520px, calc(100vh - 160px))",
+    "background:#ffffff",
+    "border-radius:20px",
+    "box-shadow:0 8px 40px rgba(0,0,0,0.18)",
+    "border:1px solid #e5e5e5",
+    "display:flex",
+    "flex-direction:column",
+    "overflow:hidden",
+    "font-family:system-ui,-apple-system,sans-serif",
+    "animation:slideUp .25s ease"
+  ].join(";");
+
+  // Header
+  var hd = document.createElement("div");
+  hd.style.cssText = "display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #e5e5e5;background:#fff;flex-shrink:0;";
+  hd.innerHTML = [
+    '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:600;flex-shrink:0;">S</div>',
+    '<div style="flex:1"><div style="font-weight:600;font-size:14px;color:#1a1a1a;letter-spacing:-0.01em;">Assistant Saloni</div><div style="font-size:11px;color:#4ade80;">🟢 En ligne</div></div>',
+    '<button onclick="window._claudeHist=[];renderIAPanel();" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 10px;font-size:11px;color:#666;cursor:pointer;font-family:inherit;">Effacer</button>',
+    '<button onclick="document.getElementById(\'iaPanelOverlay\').remove();" style="background:none;border:none;font-size:18px;color:#999;cursor:pointer;line-height:1;padding:0 4px;">×</button>'
+  ].join("");
+  panel.appendChild(hd);
+
+  // Zone messages
+  var box = document.createElement("div");
+  box.id = "gBox";
+  box.style.cssText = "flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px;";
+  panel.appendChild(box);
+
+  // Suggestions
+  var sq = document.createElement("div");
+  sq.id = "gSugg";
+  sq.style.cssText = "padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #f0f0f0;flex-shrink:0;";
+  panel.appendChild(sq);
+
+  // Input
+  var inputRow = document.createElement("div");
+  inputRow.style.cssText = "display:flex;gap:8px;padding:10px 14px 14px;align-items:flex-end;flex-shrink:0;";
+
+  var ta = document.createElement("textarea");
+  ta.id = "gInp";
+  ta.placeholder = "Posez votre question...";
+  ta.rows = 1;
+  ta.style.cssText = "flex:1;border:1.5px solid #e0e0e0;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;min-height:40px;max-height:80px;font-family:inherit;background:#f8f8f8;outline:none;color:#1a1a1a;letter-spacing:-0.01em;transition:border-color .2s;";
+  ta.onfocus = function(){ ta.style.borderColor="#0066cc"; };
+  ta.onblur = function(){ ta.style.borderColor="#e0e0e0"; };
+  ta.oninput = function() {
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 80) + "px";
+  };
+  ta.onkeydown = function(e) {
+    if (e.keyCode === 13 && !e.shiftKey) { e.preventDefault(); gEnvoyerInput(); }
+  };
+
+  var sb = document.createElement("button");
+  sb.style.cssText = "width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;";
+  sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+  sb.onclick = function() { gEnvoyerInput(); };
+
+  inputRow.appendChild(ta);
+  inputRow.appendChild(sb);
+  panel.appendChild(inputRow);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  renderIAPanel();
+  setTimeout(function(){ if(ta) ta.focus(); }, 200);
+}
+
+function renderIAPanel() {
+  var box = document.getElementById("gBox");
+  var sq = document.getElementById("gSugg");
+  if (!box) return;
+  if (!window._claudeHist) window._claudeHist = [];
+
+  // Messages
+  box.innerHTML = "";
+  if (window._claudeHist.length === 0) {
+    box.innerHTML = '<div style="text-align:center;padding:24px 10px;color:#999;font-size:13px;">👋 Bonjour JC !<br><br>Je suis votre assistant Saloni Manager.<br>Je connais vos données en temps réel.</div>';
+  }
+  window._claudeHist.forEach(function(m) {
+    var isUser = m.role === "user";
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "display:flex;flex-direction:column;align-items:" + (isUser ? "flex-end" : "flex-start") + ";";
+
+    var lbl = document.createElement("div");
+    lbl.style.cssText = "font-size:10px;color:#aaa;margin-bottom:3px;" + (isUser ? "" : "padding-left:2px;");
+    lbl.textContent = isUser ? "Vous" : "Assistant";
+    wrap.appendChild(lbl);
+
+    var bubble = document.createElement("div");
+    bubble.style.cssText = [
+      isUser ? "background:#f0f0f0;border-radius:18px 18px 4px 18px;padding:9px 14px;max-width:85%;" : "background:transparent;padding:0;max-width:95%;",
+      "font-size:13.5px;line-height:1.65;color:#1a1a1a;white-space:pre-wrap;letter-spacing:-0.01em;"
+    ].join("");
+    bubble.textContent = m.content;
+    wrap.appendChild(bubble);
+    box.appendChild(wrap);
+  });
+
+  // Indicateur chargement
+  if (window._claudeLoading) {
+    var ld = document.createElement("div");
+    ld.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;";
+    ld.innerHTML = '<div style="font-size:10px;color:#aaa;margin-bottom:3px;">Assistant</div><div style="display:flex;gap:5px;padding:4px 0;">' +
+      [0,1,2].map(function(i){ return '<div style="width:7px;height:7px;border-radius:50%;background:#ccc;animation:iaDot 1.2s '+( i*0.2)+'s ease-in-out infinite;"></div>'; }).join("") +
+      '</div>';
+    box.appendChild(ld);
+  }
+
+  box.scrollTop = box.scrollHeight;
+
+  // Suggestions
+  if (sq) {
+    sq.innerHTML = "";
+    var suggs = [
+      "Qui n'a pas versé ?",
+      "Bénéfice du mois",
+      "Message retard WhatsApp",
+      "Conseils gestion flotte"
+    ];
+    suggs.forEach(function(s) {
+      var btn = document.createElement("button");
+      btn.style.cssText = "background:#f0f5ff;border:1px solid #dbeafe;border-radius:12px;padding:4px 10px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;white-space:nowrap;";
+      btn.textContent = s;
+      btn.onclick = function() { gEnvoyer(s); };
+      sq.appendChild(btn);
+    });
+  }
+}
+
+// Remplacer gEnvoyer pour gérer loading
+var _gEnvoyerOrig = gEnvoyer;
+gEnvoyer = async function(question) {
+  if (!question || !question.trim()) return;
+  window._claudeLoading = true;
+  window._claudeHist.push({ role: "user", content: question.trim() });
+  renderIAPanel();
+  try {
+    var msgs = window._claudeHist.slice(-10);
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: gCtx(),
+        messages: msgs
+      })
+    });
+    var d = await res.json();
+    var rep = d.content && d.content[0] ? d.content[0].text : (d.error ? "Erreur: "+d.error.message : "Pas de réponse.");
+    window._claudeHist.push({ role: "assistant", content: rep });
+  } catch(e) {
+    window._claudeHist.push({ role: "assistant", content: "Erreur: " + (e.message||String(e)) });
+  }
+  window._claudeLoading = false;
+  renderIAPanel();
+};
+
+// Lancer le bouton flottant au démarrage
+setTimeout(creerBoutonIA, 1000);
+
+// CSS animations
+(function(){
+  var st = document.createElement("style");
+  st.textContent = [
+    "@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}",
+    "@keyframes iaDot{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-5px);opacity:1}}"
+  ].join("");
+  document.head.appendChild(st);
+})();
 
 function renderIA(sc) {
   if (!sc) return;
@@ -6142,4 +6393,4 @@ function renderIA(sc) {
 
 </script>
 </body>
-</html>
+</html>mm 
