@@ -5978,12 +5978,11 @@ setTimeout(function(){
 // === ASSISTANT IA SALONI MANAGER ===
 
 var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
-var GK = "AIzaSyBREY_bPyxVUMmXM6bqaME2O-TamhqFrTE";
 if (!window._iaHist) window._iaHist = [];
 window._iaLoading = false;
 
 function iaGetKey() {
-  return localStorage.getItem("sal_gemini_key") || GK;
+  return localStorage.getItem("sal_gemini_key") || "";
 }
 
 function iaCtx() {
