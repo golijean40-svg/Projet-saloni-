@@ -5972,433 +5972,251 @@ setTimeout(function(){
 
 
 
-// === CLAUDE IA SALONI MANAGER ===
 
-// Contexte dynamique avec les vraies données
-function gCtx() {
+
+
+// === ASSISTANT IA SALONI MANAGER ===
+
+var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+if (!window._iaHist) window._iaHist = [];
+window._iaLoading = false;
+
+function iaGetKey() {
+  return localStorage.getItem("sal_gemini_key") || "";
+}
+
+function iaCtx() {
   var CH = S.data.chauffeurs || [];
   var VE = S.data.versements || [];
   var DE = S.data.depenses || [];
   var t = td();
   var vj = VE.filter(function(v) { return v.date === t; });
-  var tJ = vj.reduce(function(s, v) { return s + (v.montant||0); }, 0);
-  var tR = VE.reduce(function(s, v) { return s + (v.montant||0); }, 0);
-  var tD = DE.reduce(function(s, v) { return s + (v.montant||0); }, 0);
-  var ac = CH.filter(function(c) { return c.statut === "actif"; });
-  var op = ac.filter(function(c) { return vj.some(function(v) { return String(v.chauffeurId) === String(c.id); }); });
-  var np = ac.filter(function(c) { return !vj.some(function(v) { return String(v.chauffeurId) === String(c.id); }); });
-
-  // Paiements en retard (pas versé depuis 2+ jours)
-  var hier = new Date(); hier.setDate(hier.getDate()-1);
-  var avantHier = new Date(); avantHier.setDate(avantHier.getDate()-2);
-  var fmt = function(d){ return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate(); };
-  var retard = ac.filter(function(c){
-    var recent = VE.filter(function(v){ return String(v.chauffeurId)===String(c.id) && (v.date===t||v.date===fmt(hier)); });
-    return recent.length === 0;
-  });
-
-  return "Tu es l'assistant IA de Saloni Manager, application de gestion de flotte de tricycles-taxis (salonis) à Abidjan, Côte d'Ivoire. Tu travailles pour JC, le gérant.\n\n" +
-    "=== DONNÉES EN TEMPS RÉEL ===\n" +
-    "Date aujourd'hui : " + t + "\n" +
-    "Chauffeurs actifs : " + ac.length + " (" + ac.map(function(c){return c.nom;}).join(", ") + ")\n" +
-    "Ont versé aujourd'hui (" + tJ.toLocaleString() + " FCFA) : " + (op.length ? op.map(function(c){return c.nom;}).join(", ") : "Personne") + "\n" +
-    "N'ont PAS versé aujourd'hui : " + (np.length ? np.map(function(c){return c.nom;}).join(", ") : "Tous ont versé ✅") + "\n" +
-    "En retard (2+ jours sans versement) : " + (retard.length ? retard.map(function(c){return c.nom;}).join(", ") : "Aucun ✅") + "\n" +
-    "Total versements global : " + tR.toLocaleString() + " FCFA\n" +
-    "Total dépenses : " + tD.toLocaleString() + " FCFA\n" +
-    "Bénéfice net : " + (tR - tD).toLocaleString() + " FCFA\n\n" +
-    "=== TES CAPACITÉS ===\n" +
-    "- Voir et analyser les données des chauffeurs\n" +
-    "- Identifier les paiements en retard et suggérer des actions\n" +
-    "- Calculer et analyser les revenus, dépenses et bénéfices\n" +
-    "- Rédiger des messages WhatsApp professionnels pour les chauffeurs\n" +
-    "- Donner des conseils de gestion de flotte adaptés au contexte ivoirien\n\n" +
-    "Réponds toujours en français, de manière concise et pratique. Pour les messages WhatsApp, fournis un texte prêt à copier-coller.";
+  var tJ = vj.reduce(function(s,v){ return s+(v.montant||0); }, 0);
+  var tR = VE.reduce(function(s,v){ return s+(v.montant||0); }, 0);
+  var tD = DE.reduce(function(s,v){ return s+(v.montant||0); }, 0);
+  var ac = CH.filter(function(c){ return c.statut==="actif"; });
+  var op = ac.filter(function(c){ return vj.some(function(v){ return String(v.chauffeurId)===String(c.id); }); });
+  var np = ac.filter(function(c){ return !vj.some(function(v){ return String(v.chauffeurId)===String(c.id); }); });
+  return "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan. Tu travailles pour JC le gerant.\n" +
+    "Chauffeurs actifs: " + ac.map(function(c){return c.nom;}).join(", ") + "\n" +
+    "Ont verse aujourd hui: " + (op.length ? op.map(function(c){return c.nom;}).join(", ") : "Personne") + "\n" +
+    "N ont pas verse: " + (np.length ? np.map(function(c){return c.nom;}).join(", ") : "Tous ont verse") + "\n" +
+    "Total jour: " + tJ + " FCFA. Total global: " + tR + " FCFA. Depenses: " + tD + " FCFA. Benefice: " + (tR-tD) + " FCFA.\n" +
+    "Reponds en francais, de facon concise et pratique. Pour les messages WhatsApp fournis un texte pret a copier.";
 }
 
-// Historique conversation Claude
-if (!window._claudeHist) window._claudeHist = [];
-
-var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
-
-function getGK() {
-  return localStorage.getItem("sal_gemini_key") || "";
-}
-
-function demanderCleIA() {
-  var cle = prompt("Entrez votre clé Gemini API (aistudio.google.com) :");
-  if (cle && cle.trim().startsWith("AIza")) {
-    localStorage.setItem("sal_gemini_key", cle.trim());
-    return cle.trim();
-  }
-  return null;
-}
-
-async function gEnvoyer(question) {
+async function iaEnvoyer(question) {
   if (!question || !question.trim()) return;
-  var gk = localStorage.getItem("sal_gemini_key") || "";
+  var gk = iaGetKey();
   if (!gk) {
-    var saisie = prompt("Entrez votre clé Gemini API (aistudio.google.com) :");
-    if (saisie && saisie.trim().length > 10) {
-      gk = saisie.trim();
-      localStorage.setItem("sal_gemini_key", gk);
-    } else {
-      window._claudeHist.push({ role: "user", content: question.trim() });
-      window._claudeHist.push({ role: "model", content: "⚠️ Clé API non configurée. Cliquez sur 🔑 Clé pour l'ajouter." });
-      renderIAPanel();
-      return;
-    }
+    window._iaHist.push({ role: "user", content: question.trim() });
+    window._iaHist.push({ role: "model", content: "Cliquez sur Configurer cle pour entrer votre cle Gemini." });
+    iaRender();
+    return;
   }
-  window._claudeLoading = true;
-  window._claudeHist.push({ role: "user", content: question.trim() });
-  renderIAPanel();
+  window._iaLoading = true;
+  window._iaHist.push({ role: "user", content: question.trim() });
+  iaRender();
   try {
-    var msgs = window._claudeHist.slice(-10).map(function(m) {
+    var msgs = window._iaHist.slice(-10).map(function(m) {
       return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
     });
     msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
     var res = await fetch(GU + gk, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: gCtx() }] },
-        contents: msgs
-      })
+      body: JSON.stringify({ system_instruction: { parts: [{ text: iaCtx() }] }, contents: msgs })
     });
     var d = await res.json();
-    var rep = "Pas de réponse.";
-    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0]) {
+    var rep = "Pas de reponse.";
+    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) {
       rep = d.candidates[0].content.parts[0].text;
     } else if (d.error) {
       rep = "Erreur: " + d.error.message;
-      // Si quota dépassé, effacer la clé pour forcer nouvelle saisie
       if (d.error.message && d.error.message.indexOf("quota") >= 0) {
         localStorage.removeItem("sal_gemini_key");
-        rep = "⚠️ Quota dépassé ou clé invalide. Cliquez 🔑 Clé pour entrer une nouvelle clé.";
+        rep = "Quota depasse ou cle invalide. Cliquez Configurer cle pour en entrer une nouvelle.";
       }
     }
-    window._claudeHist.push({ role: "model", content: rep });
+    window._iaHist.push({ role: "model", content: rep });
   } catch(e) {
-    window._claudeHist.push({ role: "model", content: "Erreur: " + (e.message || String(e)) });
+    window._iaHist.push({ role: "model", content: "Erreur: " + (e.message || String(e)) });
   }
-  window._claudeLoading = false;
-  renderIAPanel();
-  setTimeout(function() { var b = document.getElementById("gBox"); if (b) b.scrollTop = b.scrollHeight; }, 100);
+  window._iaLoading = false;
+  iaRender();
+  setTimeout(function(){ var b=document.getElementById("iaBox"); if(b) b.scrollTop=b.scrollHeight; }, 100);
 }
 
-
-function gEnvoyerInput() {
-  var inp = document.getElementById("gInp");
-  if (!inp || !inp.value.trim()) return;
-  var q = inp.value.trim();
-  inp.value = "";
-  inp.style.height = "auto";
-  gEnvoyer(q);
-}
-
-// ── BOUTON FLOTTANT ──
-function creerBoutonIA() {
-  if (document.getElementById("iaBoutonFlottant")) return;
-  var fab = document.createElement("button");
-  fab.id = "iaBoutonFlottant";
-  fab.innerHTML = "🤖";
-  fab.title = "Assistant IA";
-  fab.style.cssText = [
-    "position:fixed",
-    "bottom:80px",
-    "right:16px",
-    "width:54px",
-    "height:54px",
-    "border-radius:50%",
-    "background:linear-gradient(135deg,#0066cc,#0052a3)",
-    "border:none",
-    "color:white",
-    "font-size:22px",
-    "cursor:pointer",
-    "z-index:800",
-    "box-shadow:0 4px 16px rgba(0,102,204,0.4)",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "transition:transform .15s"
-  ].join(";");
-  fab.onmouseenter = function(){ fab.style.transform = "scale(1.1)"; };
-  fab.onmouseleave = function(){ fab.style.transform = "scale(1)"; };
-  fab.onclick = function() {
-    var panel = document.getElementById("iaPanelOverlay");
-    if (panel) { panel.remove(); return; }
-    ouvrirPanelIA();
-  };
-  document.body.appendChild(fab);
-}
-
-// ── PANEL IA ──
-function ouvrirPanelIA() {
-  if (document.getElementById("iaPanelOverlay")) return;
-
-  var overlay = document.createElement("div");
-  overlay.id = "iaPanelOverlay";
-  overlay.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:700",
-    "display:flex",
-    "align-items:flex-end",
-    "justify-content:flex-end",
-    "pointer-events:none"
-  ].join(";");
-
-  var panel = document.createElement("div");
-  panel.style.cssText = [
-    "pointer-events:all",
-    "position:fixed",
-    "bottom:145px",
-    "right:16px",
-    "width:min(380px, calc(100vw - 32px))",
-    "height:min(520px, calc(100vh - 160px))",
-    "background:#ffffff",
-    "border-radius:20px",
-    "box-shadow:0 8px 40px rgba(0,0,0,0.18)",
-    "border:1px solid #e5e5e5",
-    "display:flex",
-    "flex-direction:column",
-    "overflow:hidden",
-    "font-family:system-ui,-apple-system,sans-serif",
-    "animation:slideUp .25s ease"
-  ].join(";");
-
-  // Header
-  var hd = document.createElement("div");
-  hd.style.cssText = "display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #e5e5e5;background:#fff;flex-shrink:0;";
-  hd.innerHTML = [
-    '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:600;flex-shrink:0;">S</div>',
-    '<div style="flex:1"><div style="font-weight:600;font-size:14px;color:#1a1a1a;letter-spacing:-0.01em;">Assistant Saloni</div><div style="font-size:11px;color:#4ade80;">🟢 En ligne</div></div>',
-    '<button onclick="var k=prompt(\"Clé Gemini API:\");if(k&&k.trim().startsWith(\"AIza\")){localStorage.setItem(\"sal_gemini_key\",k.trim());alert(\"Clé sauvegardée ✅\");}" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 10px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;">🔑 Clé</button>',
-    '<button onclick="window._claudeHist=[];renderIAPanel();" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 10px;font-size:11px;color:#666;cursor:pointer;font-family:inherit;">Effacer</button>',
-    '<button onclick="document.getElementById(\'iaPanelOverlay\').remove();" style="background:none;border:none;font-size:18px;color:#999;cursor:pointer;line-height:1;padding:0 4px;">×</button>'
-  ].join("");
-  panel.appendChild(hd);
-
-  // Zone messages
-  var box = document.createElement("div");
-  box.id = "gBox";
-  box.style.cssText = "flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px;";
-  panel.appendChild(box);
-
-  // Suggestions
-  var sq = document.createElement("div");
-  sq.id = "gSugg";
-  sq.style.cssText = "padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #f0f0f0;flex-shrink:0;";
-  panel.appendChild(sq);
-
-  // Input
-  var inputRow = document.createElement("div");
-  inputRow.style.cssText = "display:flex;gap:8px;padding:10px 14px 14px;align-items:flex-end;flex-shrink:0;";
-
-  var ta = document.createElement("textarea");
-  ta.id = "gInp";
-  ta.placeholder = "Posez votre question...";
-  ta.rows = 1;
-  ta.style.cssText = "flex:1;border:1.5px solid #e0e0e0;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;min-height:40px;max-height:80px;font-family:inherit;background:#f8f8f8;outline:none;color:#1a1a1a;letter-spacing:-0.01em;transition:border-color .2s;";
-  ta.onfocus = function(){ ta.style.borderColor="#0066cc"; };
-  ta.onblur = function(){ ta.style.borderColor="#e0e0e0"; };
-  ta.oninput = function() {
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 80) + "px";
-  };
-  ta.onkeydown = function(e) {
-    if (e.keyCode === 13 && !e.shiftKey) { e.preventDefault(); gEnvoyerInput(); }
-  };
-
-  var sb = document.createElement("button");
-  sb.style.cssText = "width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;";
-  sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
-  sb.onclick = function() { gEnvoyerInput(); };
-
-  inputRow.appendChild(ta);
-  inputRow.appendChild(sb);
-  panel.appendChild(inputRow);
-  overlay.appendChild(panel);
-  document.body.appendChild(overlay);
-
-  renderIAPanel();
-  setTimeout(function(){ if(ta) ta.focus(); }, 200);
-}
-
-function renderIAPanel() {
-  var box = document.getElementById("gBox");
-  var sq = document.getElementById("gSugg");
+function iaRender() {
+  var box = document.getElementById("iaBox");
+  var sugg = document.getElementById("iaSugg");
   if (!box) return;
-  if (!window._claudeHist) window._claudeHist = [];
 
-  // Messages
   box.innerHTML = "";
-  if (window._claudeHist.length === 0) {
-    box.innerHTML = '<div style="text-align:center;padding:24px 10px;color:#999;font-size:13px;">👋 Bonjour JC !<br><br>Je suis votre assistant Saloni Manager.<br>Je connais vos données en temps réel.</div>';
+  if (window._iaHist.length === 0) {
+    box.innerHTML = '<div style="text-align:center;padding:24px 10px;color:#999;font-size:13px;">Bonjour JC !<br><br>Je connais vos donnees en temps reel.<br>Posez votre question.</div>';
   }
-  window._claudeHist.forEach(function(m) {
+  window._iaHist.forEach(function(m) {
     var isUser = m.role === "user";
     var wrap = document.createElement("div");
-    wrap.style.cssText = "display:flex;flex-direction:column;align-items:" + (isUser ? "flex-end" : "flex-start") + ";";
-
+    wrap.style.cssText = "display:flex;flex-direction:column;align-items:" + (isUser?"flex-end":"flex-start") + ";margin-bottom:10px;";
     var lbl = document.createElement("div");
-    lbl.style.cssText = "font-size:10px;color:#aaa;margin-bottom:3px;" + (isUser ? "" : "padding-left:2px;");
+    lbl.style.cssText = "font-size:10px;color:#aaa;margin-bottom:3px;";
     lbl.textContent = isUser ? "Vous" : "Assistant";
+    var bub = document.createElement("div");
+    bub.style.cssText = isUser
+      ? "background:#f0f0f0;border-radius:18px 18px 4px 18px;padding:9px 14px;max-width:85%;font-size:13.5px;line-height:1.65;color:#1a1a1a;white-space:pre-wrap;"
+      : "padding:0;max-width:95%;font-size:13.5px;line-height:1.65;color:#1a1a1a;white-space:pre-wrap;";
+    bub.textContent = m.content;
     wrap.appendChild(lbl);
-
-    var bubble = document.createElement("div");
-    bubble.style.cssText = [
-      isUser ? "background:#f0f0f0;border-radius:18px 18px 4px 18px;padding:9px 14px;max-width:85%;" : "background:transparent;padding:0;max-width:95%;",
-      "font-size:13.5px;line-height:1.65;color:#1a1a1a;white-space:pre-wrap;letter-spacing:-0.01em;"
-    ].join("");
-    bubble.textContent = m.content;
-    wrap.appendChild(bubble);
+    wrap.appendChild(bub);
     box.appendChild(wrap);
   });
 
-  // Indicateur chargement
-  if (window._claudeLoading) {
+  if (window._iaLoading) {
     var ld = document.createElement("div");
-    ld.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;";
-    ld.innerHTML = '<div style="font-size:10px;color:#aaa;margin-bottom:3px;">Assistant</div><div style="display:flex;gap:5px;padding:4px 0;">' +
-      [0,1,2].map(function(i){ return '<div style="width:7px;height:7px;border-radius:50%;background:#ccc;animation:iaDot 1.2s '+( i*0.2)+'s ease-in-out infinite;"></div>'; }).join("") +
-      '</div>';
+    ld.style.cssText = "display:flex;gap:5px;align-items:center;padding:8px 0;";
+    for (var i=0;i<3;i++) {
+      var dot = document.createElement("div");
+      dot.style.cssText = "width:7px;height:7px;border-radius:50%;background:#ccc;animation:iaDot 1.2s " + (i*0.2) + "s ease-in-out infinite;";
+      ld.appendChild(dot);
+    }
     box.appendChild(ld);
   }
 
   box.scrollTop = box.scrollHeight;
 
-  // Suggestions
-  if (sq) {
-    sq.innerHTML = "";
-    var suggs = [
-      "Qui n'a pas versé ?",
-      "Bénéfice du mois",
-      "Message retard WhatsApp",
-      "Conseils gestion flotte"
-    ];
-    suggs.forEach(function(s) {
+  if (sugg) {
+    sugg.innerHTML = "";
+    ["Qui n a pas verse ?","Benefice du mois","Message retard WhatsApp","Conseils flotte"].forEach(function(s) {
       var btn = document.createElement("button");
-      btn.style.cssText = "background:#f0f5ff;border:1px solid #dbeafe;border-radius:12px;padding:4px 10px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;white-space:nowrap;";
+      btn.style.cssText = "background:#f0f5ff;border:1px solid #dbeafe;border-radius:12px;padding:5px 11px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;white-space:nowrap;";
       btn.textContent = s;
-      btn.onclick = function() { gEnvoyer(s); };
-      sq.appendChild(btn);
+      btn.onclick = function() { iaEnvoyer(s); };
+      sugg.appendChild(btn);
     });
   }
 }
 
+function iaAfficherSaisieKey() {
+  var box = document.getElementById("iaBox");
+  if (!box) return;
+  var old = document.getElementById("iaKeyForm");
+  if (old) old.remove();
 
+  var form = document.createElement("div");
+  form.id = "iaKeyForm";
+  form.style.cssText = "background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:14px;padding:14px;margin-top:8px;";
+  form.innerHTML = '<div style="font-size:12px;font-weight:600;color:#1d4ed8;margin-bottom:6px;">Configurer la cle Gemini API</div>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">Obtenez-la gratuitement sur aistudio.google.com</div>' +
+    '<input id="iaKeyInp" type="text" placeholder="AIzaSy..." style="width:100%;border:1.5px solid #bfdbfe;border-radius:9px;padding:9px 11px;font-size:13px;outline:none;margin-bottom:8px;box-sizing:border-box;" />' +
+    '<div style="display:flex;gap:6px;">' +
+    '<button onclick="iaSauvegarderKey()" style="flex:1;background:#1d4ed8;border:none;border-radius:9px;padding:9px;color:white;font-size:13px;font-weight:600;cursor:pointer;">Sauvegarder</button>' +
+    '<button onclick="document.getElementById("iaKeyForm").remove();" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:9px;padding:9px 14px;color:#64748b;font-size:13px;cursor:pointer;">Annuler</button>' +
+    '</div>';
+  box.appendChild(form);
+  box.scrollTop = box.scrollHeight;
+  setTimeout(function(){ var inp=document.getElementById("iaKeyInp"); if(inp) inp.focus(); }, 200);
+}
 
-// Lancer le bouton flottant au démarrage
-setTimeout(creerBoutonIA, 1000);
+function iaSauvegarderKey() {
+  var inp = document.getElementById("iaKeyInp");
+  if (!inp) return;
+  var cle = inp.value.trim();
+  if (cle.length > 10) {
+    localStorage.setItem("sal_gemini_key", cle);
+    var form = document.getElementById("iaKeyForm");
+    if (form) form.remove();
+    window._iaHist.push({ role: "model", content: "Cle sauvegardee ! Posez votre question." });
+    iaRender();
+  } else {
+    inp.style.borderColor = "#ef4444";
+  }
+}
 
-// CSS animations
-(function(){
-  var st = document.createElement("style");
-  st.textContent = [
-    "@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}",
-    "@keyframes iaDot{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-5px);opacity:1}}"
-  ].join("");
-  document.head.appendChild(st);
-})();
-
-function renderIA(sc) {
-  if (!sc) return;
-  if (!S.gh) S.gh = [];
-
-  var suggestions = [
-    "Qui n a pas verse aujourd hui ?",
-    "Mon benefice ce mois ?",
-    "Chauffeur le plus actif",
-    "Conseils pour ameliorer mes recettes"
-  ];
+function iaOuvrirPanel() {
+  if (document.getElementById("iaPanelWrap")) return;
 
   var wrap = document.createElement("div");
-  wrap.style.cssText = "display:flex;flex-direction:column;height:calc(100vh - 115px);background:#f8faff;";
+  wrap.id = "iaPanelWrap";
+  wrap.style.cssText = "position:fixed;bottom:145px;right:16px;width:min(380px,calc(100vw - 32px));height:min(520px,calc(100vh - 160px));background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.18);border:1px solid #e5e5e5;display:flex;flex-direction:column;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;z-index:700;animation:iaSlide .25s ease;";
 
-  // Zone messages
+  // Header
+  var hd = document.createElement("div");
+  hd.style.cssText = "display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid #e5e5e5;flex-shrink:0;";
+  hd.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:600;flex-shrink:0;">S</div>' +
+    '<div style="flex:1;"><div style="font-weight:600;font-size:14px;color:#1a1a1a;">Assistant Saloni</div><div style="font-size:11px;color:#4ade80;">En ligne</div></div>' +
+    '<button onclick="iaAfficherSaisieKey()" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 8px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;white-space:nowrap;">Cle API</button>' +
+    '<button onclick="window._iaHist=[];iaRender();" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 8px;font-size:11px;color:#666;cursor:pointer;font-family:inherit;margin-left:4px;">Effacer</button>' +
+    '<button onclick="document.getElementById(\"iaPanelWrap\").remove();" style="background:none;border:none;font-size:20px;color:#999;cursor:pointer;margin-left:4px;line-height:1;">x</button>';
+  wrap.appendChild(hd);
+
+  // Messages
   var box = document.createElement("div");
-  box.id = "gBox";
-  box.style.cssText = "flex:1;overflow-y:auto;padding:12px;";
-
-  if (S.gh.length === 0) {
-    box.innerHTML = "<div style='text-align:center;padding:30px 16px;color:#94a3b8;'>" +
-      "<div style='font-size:48px;margin-bottom:12px;'>&#x1F916;</div>" +
-      "<div style='font-size:15px;font-weight:700;color:#1d4ed8;margin-bottom:8px;'>Assistant Gemini IA</div>" +
-      "<div style='font-size:12px;line-height:1.8;'>Posez vos questions sur votre flotte</div>" +
-      "</div>";
-  } else {
-    S.gh.forEach(function(m) {
-      var u = m.r === "user";
-      var d = document.createElement("div");
-      d.style.cssText = "display:flex;justify-content:" + (u ? "flex-end" : "flex-start") + ";margin-bottom:10px;";
-      var p = document.createElement("div");
-      p.style.cssText = "max-width:85%;padding:11px 14px;border-radius:" +
-        (u ? "16px 16px 4px 16px" : "16px 16px 16px 4px") +
-        ";background:" + (u ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "#fff") +
-        ";color:" + (u ? "#fff" : "#0f172a") +
-        ";font-size:13px;line-height:1.6;box-shadow:0 2px 8px rgba(0,0,0,.08);" +
-        "border:" + (u ? "none" : "1px solid #dbeafe") + ";white-space:pre-wrap;";
-      p.textContent = m.t;
-      d.appendChild(p);
-      box.appendChild(d);
-    });
-
-    if (S.iaLoading) {
-      var ld = document.createElement("div");
-      ld.style.cssText = "display:flex;justify-content:flex-start;margin-bottom:10px;";
-      ld.innerHTML = "<div style='padding:12px 16px;background:#fff;border:1px solid #dbeafe;border-radius:16px;font-size:18px;'>&#x23F3;</div>";
-      box.appendChild(ld);
-    }
-  }
+  box.id = "iaBox";
+  box.style.cssText = "flex:1;overflow-y:auto;padding:14px 14px;display:flex;flex-direction:column;";
   wrap.appendChild(box);
 
   // Suggestions
-  var sq = document.createElement("div");
-  sq.style.cssText = "padding:6px 10px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:6px;overflow-x:auto;flex-shrink:0;";
-  suggestions.forEach(function(s) {
-    var btn = document.createElement("button");
-    btn.style.cssText = "padding:5px 11px;border-radius:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;";
-    btn.textContent = s;
-    btn.onclick = function() { gEnvoyer(s); };
-    sq.appendChild(btn);
-  });
-  wrap.appendChild(sq);
+  var sugg = document.createElement("div");
+  sugg.id = "iaSugg";
+  sugg.style.cssText = "padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #f0f0f0;flex-shrink:0;";
+  wrap.appendChild(sugg);
 
   // Input
   var row = document.createElement("div");
-  row.style.cssText = "display:flex;gap:7px;padding:8px 10px;background:#fff;border-top:1px solid #dbeafe;align-items:flex-end;flex-shrink:0;";
-
+  row.style.cssText = "display:flex;gap:8px;padding:10px 14px 14px;flex-shrink:0;align-items:flex-end;";
   var ta = document.createElement("textarea");
-  ta.id = "gInp";
+  ta.id = "iaInp";
   ta.placeholder = "Posez votre question...";
   ta.rows = 1;
-  ta.style.cssText = "flex:1;border:1.5px solid #bfdbfe;border-radius:11px;padding:9px 12px;font-size:14px;resize:none;min-height:40px;max-height:80px;font-family:inherit;background:#f8faff;outline:none;";
-  ta.onkeydown = function(e) {
-    if (e.keyCode === 13 && !e.shiftKey) { e.preventDefault(); gEnvoyerInput(); }
-  };
-
+  ta.style.cssText = "flex:1;border:1.5px solid #e0e0e0;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;min-height:40px;max-height:80px;font-family:inherit;background:#f8f8f8;outline:none;color:#1a1a1a;box-sizing:border-box;";
+  ta.oninput = function(){ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight,80)+"px"; };
+  ta.onkeydown = function(e){ if(e.keyCode===13&&!e.shiftKey){e.preventDefault();iaSendInput();} };
   var sb = document.createElement("button");
-  sb.style.cssText = "height:44px;padding:0 16px;border-radius:11px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;";
-  sb.textContent = "Envoyer";
-  sb.onclick = function() { gEnvoyerInput(); };
-
-  var cb = document.createElement("button");
-  cb.style.cssText = "height:44px;width:44px;border-radius:11px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;";
-  cb.textContent = "X";
-  cb.onclick = function() { S.gh = []; renderIA(sc); };
-
+  sb.style.cssText = "width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);border:none;color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;";
+  sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+  sb.onclick = function(){ iaSendInput(); };
   row.appendChild(ta);
   row.appendChild(sb);
-  row.appendChild(cb);
   wrap.appendChild(row);
 
-  sc.innerHTML = "";
-  sc.appendChild(wrap);
-
-  setTimeout(function() { var b = document.getElementById("gBox"); if (b) b.scrollTop = b.scrollHeight; }, 50);
-  var oldF = document.getElementById("fab"); if (oldF) oldF.remove();
+  document.body.appendChild(wrap);
+  iaRender();
+  setTimeout(function(){ var t=document.getElementById("iaInp"); if(t) t.focus(); }, 200);
 }
+
+function iaSendInput() {
+  var inp = document.getElementById("iaInp");
+  if (!inp || !inp.value.trim()) return;
+  var q = inp.value.trim();
+  inp.value = "";
+  inp.style.height = "auto";
+  iaEnvoyer(q);
+}
+
+// Bouton flottant
+function iaCreerBouton() {
+  if (document.getElementById("iaBtnFlottant")) return;
+  var btn = document.createElement("button");
+  btn.id = "iaBtnFlottant";
+  btn.innerHTML = "&#x1F916;";
+  btn.style.cssText = "position:fixed;bottom:80px;right:16px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);border:none;color:white;font-size:22px;cursor:pointer;z-index:800;box-shadow:0 4px 16px rgba(0,102,204,0.4);display:flex;align-items:center;justify-content:center;";
+  btn.onclick = function() {
+    var p = document.getElementById("iaPanelWrap");
+    if (p) p.remove(); else iaOuvrirPanel();
+  };
+  document.body.appendChild(btn);
+}
+
+// CSS
+(function(){
+  var st = document.createElement("style");
+  st.textContent = "@keyframes iaSlide{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes iaDot{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-5px);opacity:1}}";
+  document.head.appendChild(st);
+})();
+
+setTimeout(iaCreerBouton, 1000);
 
 </script>
 </body>
