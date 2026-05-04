@@ -5972,10 +5972,6 @@ setTimeout(function(){
 
 
 
-async 
-
-
-
 // === CLAUDE IA SALONI MANAGER ===
 
 // Contexte dynamique avec les vraies données
@@ -6036,7 +6032,7 @@ async function gEnvoyer(question) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 1024,
         system: gCtx(),
         messages: msgs
@@ -6264,7 +6260,7 @@ gEnvoyer = async function(question) {
       method: "POST",
       headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 1024,
         system: gCtx(),
         messages: msgs
@@ -6393,4 +6389,4 @@ function renderIA(sc) {
 
 </script>
 </body>
-</html>mm 
+</html>
