@@ -6019,27 +6019,27 @@ function gCtx() {
 // Historique conversation Claude
 if (!window._claudeHist) window._claudeHist = [];
 
+var GK = "AIzaSyAkRRS-b99r0_PcJ9zIm4z2qoYq0Kui_to";
+var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+
 async function gEnvoyer(question) {
   if (!question || !question.trim()) return;
   window._claudeHist.push({ role: "user", content: question.trim() });
   renderIAPanel();
   try {
-    var msgs = window._claudeHist.slice(-10);
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
+    var msgs = window._claudeHist.slice(-10).map(function(m) {
+      return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
+    });
+    var res = await fetch(GU + GK, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
-        system: gCtx(),
-        messages: msgs
+        system_instruction: { parts: [{ text: gCtx() }] },
+        contents: msgs
       })
     });
     var d = await res.json();
-    var rep = d.content && d.content[0] ? d.content[0].text : (d.error ? d.error.message : "Pas de réponse.");
+    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : "Pas de réponse.";
     window._claudeHist.push({ role: "assistant", content: rep });
   } catch(e) {
     window._claudeHist.push({ role: "assistant", content: "Erreur : " + (e.message || String(e)) });
@@ -6255,19 +6255,19 @@ gEnvoyer = async function(question) {
   window._claudeHist.push({ role: "user", content: question.trim() });
   renderIAPanel();
   try {
-    var msgs = window._claudeHist.slice(-10);
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
+    var msgs = window._claudeHist.slice(-10).map(function(m) {
+      return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
+    });
+    var res = await fetch(GU + GK, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
-        system: gCtx(),
-        messages: msgs
+        system_instruction: { parts: [{ text: gCtx() }] },
+        contents: msgs
       })
     });
     var d = await res.json();
-    var rep = d.content && d.content[0] ? d.content[0].text : (d.error ? "Erreur: "+d.error.message : "Pas de réponse.");
+    var rep = d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : "Pas de réponse.";
     window._claudeHist.push({ role: "assistant", content: rep });
   } catch(e) {
     window._claudeHist.push({ role: "assistant", content: "Erreur: " + (e.message||String(e)) });
