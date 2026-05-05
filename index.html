@@ -5983,7 +5983,7 @@ var GROQ_KEY = localStorage.getItem("sal_groq_key") || "";
 var GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 if (!window._iaHist) window._iaHist = [];
-window._iaLoading = false;
+window.window._iaLoading = false;
 
 function iaCtx() {
   var CH = S.data.chauffeurs || [];
@@ -6020,12 +6020,12 @@ async function iaEnvoyer(question) {
     iaAfficherSaisieKey();
     return;
   }
-  window._iaLoading = true;
-  window._iaHist.push({ role: "user", content: question.trim() });
+  window.window._iaLoading = true;
+  window.window._iaHist.push({ role: "user", content: question.trim() });
   iaRender();
   try {
     var msgs = [{ role: "system", content: iaCtx() }].concat(
-      window._iaHist.slice(-10).map(function(m) {
+      window.window._iaHist.slice(-10).map(function(m) {
         return { role: m.role === "user" ? "user" : "assistant", content: m.content };
       })
     );
@@ -6054,11 +6054,11 @@ async function iaEnvoyer(question) {
         rep = "Cle invalide ou revoquee. Cliquez sur Cle API pour en entrer une nouvelle.";
       }
     }
-    window._iaHist.push({ role: "assistant", content: rep });
+    window.window._iaHist.push({ role: "assistant", content: rep });
   } catch(e) {
-    window._iaHist.push({ role: "assistant", content: "Erreur: " + (e.message || String(e)) });
+    window.window._iaHist.push({ role: "assistant", content: "Erreur: " + (e.message || String(e)) });
   }
-  window._iaLoading = false;
+  window.window._iaLoading = false;
   iaRender();
   setTimeout(function(){ var b=document.getElementById("iaBox"); if(b) b.scrollTop=b.scrollHeight; }, 100);
 }
@@ -6078,11 +6078,11 @@ function iaRender() {
   if (!box) return;
 
   box.innerHTML = "";
-  if (window._iaHist.length === 0) {
+  if (window.window._iaHist.length === 0) {
     box.innerHTML = '<div style="text-align:center;padding:24px 10px;color:#64748b;font-size:13px;">👋 Bonjour JC !<br><br>Je connais vos donnees en temps reel.<br>Posez votre question.</div>';
   }
 
-  window._iaHist.forEach(function(m) {
+  window.window._iaHist.forEach(function(m) {
     var isUser = m.role === "user";
     var wrap = document.createElement("div");
     wrap.style.cssText = "display:flex;flex-direction:column;align-items:" + (isUser ? "flex-end" : "flex-start") + ";margin-bottom:10px;";
@@ -6148,7 +6148,7 @@ function iaSauvegarderKey() {
     GROQ_KEY = cle;
     var form = document.getElementById("iaKeyForm");
     if (form) form.remove();
-    window._iaHist.push({ role: "assistant", content: "Cle sauvegardee ! Posez votre question." });
+    window.window._iaHist.push({ role: "assistant", content: "Cle sauvegardee ! Posez votre question." });
     iaRender();
   } else {
     inp.style.borderColor = "#ef4444";
@@ -6228,15 +6228,24 @@ function iaOuvrirPanel() {
   chatZone.style.cssText = "flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;background:#f8faff;";
   
   // Message de bienvenue
-  chatZone.innerHTML = '<div style="text-align:center;padding:20px 10px;">' +
-    '<div style="font-size:44px;margin-bottom:10px;">🤖</div>' +
+  // Construire le welcome avec createElement pour éviter les problèmes d'échappement
+  var welcomeDiv = document.createElement("div");
+  welcomeDiv.style.cssText = "text-align:center;padding:20px 10px;";
+  welcomeDiv.innerHTML = '<div style="font-size:44px;margin-bottom:10px;">🤖</div>' +
     '<div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">Bonjour JC !</div>' +
-    '<div style="font-size:12px;color:#64748b;line-height:1.6;margin-bottom:16px;">Je lis vos données Firebase en temps réel.<br>Chauffeurs, versements, dépenses, bénéfices...</div>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;">' +
-    ["Qui n'a pas versé ?","Bénéfice du mois","Message WhatsApp retard","Conseils flotte","Analyse performances"].map(function(s){
-      return '<button onclick="iaEnvoyerMsg(\"'+s+'\")" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:5px 11px;font-size:11px;color:#1d4ed8;cursor:pointer;font-weight:600;">'+s+'</button>';
-    }).join("") +
-    '</div></div>';
+    '<div style="font-size:12px;color:#64748b;line-height:1.6;margin-bottom:16px;">Je lis vos données Firebase en temps réel.<br>Chauffeurs, versements, dépenses, bénéfices...</div>';
+  var suggDiv = document.createElement("div");
+  suggDiv.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;justify-content:center;";
+  var iaQuestions = ["Qui n a pas verse ?","Benefice du mois","Message WhatsApp retard","Conseils flotte","Analyse mes performances"];
+  iaQuestions.forEach(function(s){
+    var btn = document.createElement("button");
+    btn.style.cssText = "background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:5px 11px;font-size:11px;color:#1d4ed8;cursor:pointer;font-weight:600;font-family:inherit;";
+    btn.textContent = s;
+    btn.addEventListener("click", function(){ iaEnvoyerMsg(s); });
+    suggDiv.appendChild(btn);
+  });
+  welcomeDiv.appendChild(suggDiv);
+  chatZone.appendChild(welcomeDiv);
   wrap.appendChild(chatZone);
 
   // Suggestions rapides
@@ -6273,9 +6282,9 @@ function iaOuvrirPanel() {
 }
 
 // Variables IA
-var _iaHist = [];
-var _iaLoading = false;
-var _iaData = null;
+window._iaHist = window._iaHist || [];
+window._iaLoading = window._iaLoading || false;
+window._iaData = window._iaData || null;
 
 var FB_KEY = "AIzaSyD2V04148tPm3Yit-Gwj3aR6ybeLcciAI";
 var FB_PROJECT = "saloni-manager-1c0d3";
@@ -6317,8 +6326,8 @@ async function iaChargerFirebase() {
   
   try {
     var results = await Promise.all(FB_COLS.map(function(col){ return iaFetchCol(col); }));
-    _iaData = {};
-    FB_COLS.forEach(function(col, i){ _iaData[col] = results[i]; });
+    window._iaData = {};
+    FB_COLS.forEach(function(col, i){ window._iaData[col] = results[i]; });
     
     var loadMsg = document.getElementById("iaLoadingMsg");
     if (loadMsg) loadMsg.remove();
@@ -6362,7 +6371,7 @@ function iaAfficherStats() {
 }
 
 function iaBuildCtx() {
-  var data = _iaData || S.data || {};
+  var data = window._iaData || S.data || {};
   var t = td();
   var CH = data.chauffeurs || [];
   var VE = data.versements || [];
@@ -6389,12 +6398,12 @@ async function iaEnvoyerMsg(question) {
   var msg = (question || "").trim();
   if (!msg || _iaLoading) return;
   
-  _iaLoading = true;
-  _iaHist.push({ role: "user", content: msg });
+  window._iaLoading = true;
+  window._iaHist.push({ role: "user", content: msg });
   iaRenderMessages();
   
   try {
-    var msgs = _iaHist.slice(-10).map(function(m){
+    var msgs = window._iaHist.slice(-10).map(function(m){
       return { role: m.role==="user"?"user":"assistant", content: m.content };
     });
     // Injecter le contexte dans le premier message
@@ -6414,13 +6423,13 @@ async function iaEnvoyerMsg(question) {
     
     var d = await res.json();
     var rep = (d.content && d.content[0] && d.content[0].text) ? d.content[0].text : "Pas de reponse.";
-    _iaHist.push({ role: "assistant", content: rep });
+    window._iaHist.push({ role: "assistant", content: rep });
     
   } catch(e) {
-    _iaHist.push({ role: "assistant", content: "Erreur: " + (e.message||String(e)) });
+    window._iaHist.push({ role: "assistant", content: "Erreur: " + (e.message||String(e)) });
   }
   
-  _iaLoading = false;
+  window._iaLoading = false;
   iaRenderMessages();
   setTimeout(function(){ var b=document.getElementById("iaBox"); if(b) b.scrollTop=b.scrollHeight; }, 100);
 }
@@ -6442,7 +6451,7 @@ function iaRenderMessages() {
   var msgs = box.querySelectorAll(".ia-msg");
   msgs.forEach(function(m){ m.remove(); });
   
-  _iaHist.forEach(function(m) {
+  window._iaHist.forEach(function(m) {
     var isUser = m.role === "user";
     var wrap = document.createElement("div");
     wrap.className = "ia-msg";
@@ -6463,7 +6472,7 @@ function iaRenderMessages() {
     box.appendChild(wrap);
   });
   
-  if (_iaLoading) {
+  if (window._iaLoading) {
     var ld = document.createElement("div");
     ld.className = "ia-msg";
     ld.style.cssText = "display:flex;gap:5px;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-radius:16px;width:fit-content;margin-bottom:8px;";
