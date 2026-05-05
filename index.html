@@ -5972,18 +5972,17 @@ setTimeout(function(){
 
 
 
+async 
 
 
 
-// === ASSISTANT IA SALONI MANAGER ===
+// === ASSISTANT IA SALONI MANAGER — GROQ ===
 
-var GU = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+var GROQ_KEY = "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";
+var GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
 if (!window._iaHist) window._iaHist = [];
 window._iaLoading = false;
-
-function iaGetKey() {
-  return localStorage.getItem("sal_gemini_key") || "";
-}
 
 function iaCtx() {
   var CH = S.data.chauffeurs || [];
@@ -5997,54 +5996,69 @@ function iaCtx() {
   var ac = CH.filter(function(c){ return c.statut==="actif"; });
   var op = ac.filter(function(c){ return vj.some(function(v){ return String(v.chauffeurId)===String(c.id); }); });
   var np = ac.filter(function(c){ return !vj.some(function(v){ return String(v.chauffeurId)===String(c.id); }); });
-  return "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan. Tu travailles pour JC le gerant.\n" +
-    "Chauffeurs actifs: " + ac.map(function(c){return c.nom;}).join(", ") + "\n" +
-    "Ont verse aujourd hui: " + (op.length ? op.map(function(c){return c.nom;}).join(", ") : "Personne") + "\n" +
-    "N ont pas verse: " + (np.length ? np.map(function(c){return c.nom;}).join(", ") : "Tous ont verse") + "\n" +
-    "Total jour: " + tJ + " FCFA. Total global: " + tR + " FCFA. Depenses: " + tD + " FCFA. Benefice: " + (tR-tD) + " FCFA.\n" +
-    "Reponds en francais, de facon concise et pratique. Pour les messages WhatsApp fournis un texte pret a copier.";
+  var hier = new Date(); hier.setDate(hier.getDate()-1);
+  var fmt = function(d){ return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate(); };
+  var retard = ac.filter(function(c){
+    return !VE.some(function(v){ return String(v.chauffeurId)===String(c.id)&&(v.date===t||v.date===fmt(hier)); });
+  });
+  var ctx = "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan. Tu travailles pour JC le gerant. ";
+  ctx += "Date: " + t + ". ";
+  ctx += "Chauffeurs actifs: " + ac.map(function(c){return c.nom;}).join(", ") + ". ";
+  ctx += "Ont verse aujourd hui: " + (op.length ? op.map(function(c){return c.nom;}).join(", ") : "Personne") + " Total: " + tJ + " FCFA. ";
+  ctx += "N ont pas verse: " + (np.length ? np.map(function(c){return c.nom;}).join(", ") : "Tous ont verse") + ". ";
+  ctx += "En retard (2+ jours): " + (retard.length ? retard.map(function(c){return c.nom;}).join(", ") : "Aucun") + ". ";
+  ctx += "Total versements global: " + tR + " FCFA. Depenses: " + tD + " FCFA. Benefice: " + (tR-tD) + " FCFA. ";
+  ctx += "Reponds en francais, de facon concise et pratique. Pour les messages WhatsApp fournis un texte pret a copier.";
+  return ctx;
 }
 
 async function iaEnvoyer(question) {
   if (!question || !question.trim()) return;
-  var gk = iaGetKey();
-  if (!gk) {
-    window._iaHist.push({ role: "user", content: question.trim() });
-    window._iaHist.push({ role: "model", content: "Cliquez sur Configurer cle pour entrer votre cle Gemini." });
-    iaRender();
-    return;
-  }
   window._iaLoading = true;
   window._iaHist.push({ role: "user", content: question.trim() });
   iaRender();
   try {
-    var msgs = window._iaHist.slice(-10).map(function(m) {
-      return { role: m.role === "user" ? "user" : "model", parts: [{ text: m.content }] };
-    });
-    msgs = msgs.filter(function(m, i) { return i === 0 || m.role !== msgs[i-1].role; });
-    var res = await fetch(GU + gk, {
+    var msgs = [{ role: "system", content: iaCtx() }].concat(
+      window._iaHist.slice(-10).map(function(m) {
+        return { role: m.role === "user" ? "user" : "assistant", content: m.content };
+      })
+    );
+    var res = await fetch(GROQ_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ system_instruction: { parts: [{ text: iaCtx() }] }, contents: msgs })
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + GROQ_KEY
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192",
+        messages: msgs,
+        max_tokens: 1024,
+        temperature: 0.7
+      })
     });
     var d = await res.json();
     var rep = "Pas de reponse.";
-    if (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) {
-      rep = d.candidates[0].content.parts[0].text;
+    if (d.choices && d.choices[0] && d.choices[0].message) {
+      rep = d.choices[0].message.content;
     } else if (d.error) {
       rep = "Erreur: " + d.error.message;
-      if (d.error.message && d.error.message.indexOf("quota") >= 0) {
-        localStorage.removeItem("sal_gemini_key");
-        rep = "Quota depasse ou cle invalide. Cliquez Configurer cle pour en entrer une nouvelle.";
-      }
     }
-    window._iaHist.push({ role: "model", content: rep });
+    window._iaHist.push({ role: "assistant", content: rep });
   } catch(e) {
-    window._iaHist.push({ role: "model", content: "Erreur: " + (e.message || String(e)) });
+    window._iaHist.push({ role: "assistant", content: "Erreur: " + (e.message || String(e)) });
   }
   window._iaLoading = false;
   iaRender();
   setTimeout(function(){ var b=document.getElementById("iaBox"); if(b) b.scrollTop=b.scrollHeight; }, 100);
+}
+
+function iaEnvoyerInput() {
+  var inp = document.getElementById("iaInp");
+  if (!inp || !inp.value.trim()) return;
+  var q = inp.value.trim();
+  inp.value = "";
+  inp.style.height = "auto";
+  iaEnvoyer(q);
 }
 
 function iaRender() {
@@ -6054,19 +6068,20 @@ function iaRender() {
 
   box.innerHTML = "";
   if (window._iaHist.length === 0) {
-    box.innerHTML = '<div style="text-align:center;padding:24px 10px;color:#999;font-size:13px;">Bonjour JC !<br><br>Je connais vos donnees en temps reel.<br>Posez votre question.</div>';
+    box.innerHTML = '<div style="text-align:center;padding:24px 10px;color:#64748b;font-size:13px;">👋 Bonjour JC !<br><br>Je connais vos donnees en temps reel.<br>Posez votre question.</div>';
   }
+
   window._iaHist.forEach(function(m) {
     var isUser = m.role === "user";
     var wrap = document.createElement("div");
-    wrap.style.cssText = "display:flex;flex-direction:column;align-items:" + (isUser?"flex-end":"flex-start") + ";margin-bottom:10px;";
+    wrap.style.cssText = "display:flex;flex-direction:column;align-items:" + (isUser ? "flex-end" : "flex-start") + ";margin-bottom:10px;";
     var lbl = document.createElement("div");
-    lbl.style.cssText = "font-size:10px;color:#aaa;margin-bottom:3px;";
+    lbl.style.cssText = "font-size:10px;color:#94a3b8;margin-bottom:3px;";
     lbl.textContent = isUser ? "Vous" : "Assistant";
     var bub = document.createElement("div");
     bub.style.cssText = isUser
-      ? "background:#f0f0f0;border-radius:18px 18px 4px 18px;padding:9px 14px;max-width:85%;font-size:13.5px;line-height:1.65;color:#1a1a1a;white-space:pre-wrap;"
-      : "padding:0;max-width:95%;font-size:13.5px;line-height:1.65;color:#1a1a1a;white-space:pre-wrap;";
+      ? "background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:85%;font-size:13px;line-height:1.65;white-space:pre-wrap;"
+      : "background:#fff;border:1px solid #dbeafe;color:#0f172a;border-radius:16px 16px 16px 4px;padding:10px 14px;max-width:90%;font-size:13px;line-height:1.65;white-space:pre-wrap;";
     bub.textContent = m.content;
     wrap.appendChild(lbl);
     wrap.appendChild(bub);
@@ -6075,12 +6090,7 @@ function iaRender() {
 
   if (window._iaLoading) {
     var ld = document.createElement("div");
-    ld.style.cssText = "display:flex;gap:5px;align-items:center;padding:8px 0;";
-    for (var i=0;i<3;i++) {
-      var dot = document.createElement("div");
-      dot.style.cssText = "width:7px;height:7px;border-radius:50%;background:#ccc;animation:iaDot 1.2s " + (i*0.2) + "s ease-in-out infinite;";
-      ld.appendChild(dot);
-    }
+    ld.innerHTML = '<div style="display:flex;gap:5px;padding:10px 14px;background:#fff;border:1px solid #dbeafe;border-radius:16px;width:fit-content;"><div style="width:7px;height:7px;border-radius:50%;background:#1d4ed8;animation:iaDot 1.2s 0s ease-in-out infinite;"></div><div style="width:7px;height:7px;border-radius:50%;background:#1d4ed8;animation:iaDot 1.2s 0.2s ease-in-out infinite;"></div><div style="width:7px;height:7px;border-radius:50%;background:#1d4ed8;animation:iaDot 1.2s 0.4s ease-in-out infinite;"></div></div>';
     box.appendChild(ld);
   }
 
@@ -6088,49 +6098,13 @@ function iaRender() {
 
   if (sugg) {
     sugg.innerHTML = "";
-    ["Qui n a pas verse ?","Benefice du mois","Message retard WhatsApp","Conseils flotte"].forEach(function(s) {
+    ["Qui n a pas verse ?", "Benefice du mois", "Message retard WhatsApp", "Conseils flotte"].forEach(function(s) {
       var btn = document.createElement("button");
-      btn.style.cssText = "background:#f0f5ff;border:1px solid #dbeafe;border-radius:12px;padding:5px 11px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;white-space:nowrap;";
+      btn.style.cssText = "background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:5px 12px;font-size:11px;color:#1d4ed8;cursor:pointer;font-family:inherit;white-space:nowrap;font-weight:600;";
       btn.textContent = s;
       btn.onclick = function() { iaEnvoyer(s); };
       sugg.appendChild(btn);
     });
-  }
-}
-
-function iaAfficherSaisieKey() {
-  var box = document.getElementById("iaBox");
-  if (!box) return;
-  var old = document.getElementById("iaKeyForm");
-  if (old) old.remove();
-
-  var form = document.createElement("div");
-  form.id = "iaKeyForm";
-  form.style.cssText = "background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:14px;padding:14px;margin-top:8px;";
-  form.innerHTML = '<div style="font-size:12px;font-weight:600;color:#1d4ed8;margin-bottom:6px;">Configurer la cle Gemini API</div>' +
-    '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">Obtenez-la gratuitement sur aistudio.google.com</div>' +
-    '<input id="iaKeyInp" type="text" placeholder="AIzaSy..." style="width:100%;border:1.5px solid #bfdbfe;border-radius:9px;padding:9px 11px;font-size:13px;outline:none;margin-bottom:8px;box-sizing:border-box;" />' +
-    '<div style="display:flex;gap:6px;">' +
-    '<button onclick="iaSauvegarderKey()" style="flex:1;background:#1d4ed8;border:none;border-radius:9px;padding:9px;color:white;font-size:13px;font-weight:600;cursor:pointer;">Sauvegarder</button>' +
-    '<button onclick="document.getElementById("iaKeyForm").remove();" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:9px;padding:9px 14px;color:#64748b;font-size:13px;cursor:pointer;">Annuler</button>' +
-    '</div>';
-  box.appendChild(form);
-  box.scrollTop = box.scrollHeight;
-  setTimeout(function(){ var inp=document.getElementById("iaKeyInp"); if(inp) inp.focus(); }, 200);
-}
-
-function iaSauvegarderKey() {
-  var inp = document.getElementById("iaKeyInp");
-  if (!inp) return;
-  var cle = inp.value.trim();
-  if (cle.length > 10) {
-    localStorage.setItem("sal_gemini_key", cle);
-    var form = document.getElementById("iaKeyForm");
-    if (form) form.remove();
-    window._iaHist.push({ role: "model", content: "Cle sauvegardee ! Posez votre question." });
-    iaRender();
-  } else {
-    inp.style.borderColor = "#ef4444";
   }
 }
 
@@ -6139,46 +6113,40 @@ function iaOuvrirPanel() {
 
   var wrap = document.createElement("div");
   wrap.id = "iaPanelWrap";
-  wrap.style.cssText = "position:fixed;bottom:145px;right:16px;width:min(380px,calc(100vw - 32px));height:min(520px,calc(100vh - 160px));background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.18);border:1px solid #e5e5e5;display:flex;flex-direction:column;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;z-index:700;animation:iaSlide .25s ease;";
+  wrap.style.cssText = "position:fixed;bottom:145px;right:16px;width:min(380px,calc(100vw - 32px));height:min(520px,calc(100vh - 160px));background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.18);border:1px solid #e5e5e5;display:flex;flex-direction:column;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;z-index:700;";
 
-  // Header
   var hd = document.createElement("div");
-  hd.style.cssText = "display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid #e5e5e5;flex-shrink:0;";
-  hd.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:600;flex-shrink:0;">S</div>' +
-    '<div style="flex:1;"><div style="font-weight:600;font-size:14px;color:#1a1a1a;">Assistant Saloni</div><div style="font-size:11px;color:#4ade80;">En ligne</div></div>' +
-    '<button onclick="iaAfficherSaisieKey()" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 8px;font-size:11px;color:#0066cc;cursor:pointer;font-family:inherit;white-space:nowrap;">Cle API</button>' +
-    '<button onclick="window._iaHist=[];iaRender();" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 8px;font-size:11px;color:#666;cursor:pointer;font-family:inherit;margin-left:4px;">Effacer</button>' +
-    '<button onclick="document.getElementById(\"iaPanelWrap\").remove();" style="background:none;border:none;font-size:20px;color:#999;cursor:pointer;margin-left:4px;line-height:1;">x</button>';
+  hd.style.cssText = "display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid #e5e5e5;flex-shrink:0;background:#fff;";
+  hd.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:600;flex-shrink:0;">S</div>' +
+    '<div style="flex:1;"><div style="font-weight:700;font-size:14px;color:#0f172a;">Assistant Saloni</div><div style="font-size:11px;color:#4ade80;">🟢 En ligne · Groq IA</div></div>' +
+    '<button onclick="window._iaHist=[];iaRender();" style="background:none;border:1px solid #e0e0e0;border-radius:8px;padding:4px 8px;font-size:11px;color:#666;cursor:pointer;font-family:inherit;">Effacer</button>' +
+    '<button onclick="document.getElementById(\"iaPanelWrap\").remove();" style="background:none;border:none;font-size:20px;color:#999;cursor:pointer;margin-left:4px;line-height:1;padding:0 4px;">×</button>';
   wrap.appendChild(hd);
 
-  // Messages
   var box = document.createElement("div");
   box.id = "iaBox";
-  box.style.cssText = "flex:1;overflow-y:auto;padding:14px 14px;display:flex;flex-direction:column;";
+  box.style.cssText = "flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;";
   wrap.appendChild(box);
 
-  // Suggestions
   var sugg = document.createElement("div");
   sugg.id = "iaSugg";
   sugg.style.cssText = "padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #f0f0f0;flex-shrink:0;";
   wrap.appendChild(sugg);
 
-  // Input
   var row = document.createElement("div");
   row.style.cssText = "display:flex;gap:8px;padding:10px 14px 14px;flex-shrink:0;align-items:flex-end;";
   var ta = document.createElement("textarea");
   ta.id = "iaInp";
   ta.placeholder = "Posez votre question...";
   ta.rows = 1;
-  ta.style.cssText = "flex:1;border:1.5px solid #e0e0e0;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;min-height:40px;max-height:80px;font-family:inherit;background:#f8f8f8;outline:none;color:#1a1a1a;box-sizing:border-box;";
+  ta.style.cssText = "flex:1;border:1.5px solid #dbeafe;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;min-height:42px;max-height:80px;font-family:inherit;background:#f8faff;outline:none;color:#0f172a;";
   ta.oninput = function(){ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight,80)+"px"; };
-  ta.onkeydown = function(e){ if(e.keyCode===13&&!e.shiftKey){e.preventDefault();iaSendInput();} };
+  ta.onkeydown = function(e){ if(e.keyCode===13&&!e.shiftKey){e.preventDefault();iaEnvoyerInput();} };
   var sb = document.createElement("button");
-  sb.style.cssText = "width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);border:none;color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;";
-  sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
-  sb.onclick = function(){ iaSendInput(); };
-  row.appendChild(ta);
-  row.appendChild(sb);
+  sb.style.cssText = "width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;";
+  sb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+  sb.onclick = function(){ iaEnvoyerInput(); };
+  row.appendChild(ta); row.appendChild(sb);
   wrap.appendChild(row);
 
   document.body.appendChild(wrap);
@@ -6186,22 +6154,12 @@ function iaOuvrirPanel() {
   setTimeout(function(){ var t=document.getElementById("iaInp"); if(t) t.focus(); }, 200);
 }
 
-function iaSendInput() {
-  var inp = document.getElementById("iaInp");
-  if (!inp || !inp.value.trim()) return;
-  var q = inp.value.trim();
-  inp.value = "";
-  inp.style.height = "auto";
-  iaEnvoyer(q);
-}
-
-// Bouton flottant
 function iaCreerBouton() {
   if (document.getElementById("iaBtnFlottant")) return;
   var btn = document.createElement("button");
   btn.id = "iaBtnFlottant";
   btn.innerHTML = "&#x1F916;";
-  btn.style.cssText = "position:fixed;bottom:80px;right:16px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#0066cc,#0052a3);border:none;color:white;font-size:22px;cursor:pointer;z-index:800;box-shadow:0 4px 16px rgba(0,102,204,0.4);display:flex;align-items:center;justify-content:center;";
+  btn.style.cssText = "position:fixed;bottom:80px;right:16px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:white;font-size:22px;cursor:pointer;z-index:800;box-shadow:0 4px 16px rgba(29,78,216,0.4);display:flex;align-items:center;justify-content:center;";
   btn.onclick = function() {
     var p = document.getElementById("iaPanelWrap");
     if (p) p.remove(); else iaOuvrirPanel();
@@ -6209,15 +6167,18 @@ function iaCreerBouton() {
   document.body.appendChild(btn);
 }
 
-// CSS
 (function(){
   var st = document.createElement("style");
   st.textContent = "@keyframes iaSlide{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes iaDot{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-5px);opacity:1}}";
   document.head.appendChild(st);
 })();
 
-setTimeout(iaCreerBouton, 1000);
+function renderIA(sc) {
+  if (!sc) return;
+  if (!window._iaHist) window._iaHist = [];
+}
 
+setTimeout(iaCreerBouton, 1000);
 </script>
 </body>
 </html>
