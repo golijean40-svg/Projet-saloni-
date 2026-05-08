@@ -6411,18 +6411,17 @@ async function iaEnvoyerMsg(question) {
       msgs[0].content = iaBuildCtx() + " Question: " + msgs[0].content;
     }
     
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
+    var res = await fetch("https://saloni.golijean40.workers.dev", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        messages: msgs
+        messages: msgs,
+        context: iaBuildCtx()
       })
     });
     
     var d = await res.json();
-    var rep = (d.content && d.content[0] && d.content[0].text) ? d.content[0].text : "Pas de reponse.";
+    var rep = d.reply || d.error || "Pas de reponse.";
     window._iaHist.push({ role: "assistant", content: rep });
     
   } catch(e) {
