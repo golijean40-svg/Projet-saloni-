@@ -5980,33 +5980,40 @@ async
 // === AGENT IA SALONI ===
 
 var WORKER_URL = "https://saloni.golijean40.workers.dev";
-window._iaHist = [];
+if (!Array.isArray(window._iaHist)) window._iaHist = [];
 window._iaBusy = false;
 
 function td(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate();}
 
 function iaBuildCtx(){
-  var data = S.data || {};
-  var CH = data.chauffeurs || [];
-  var VE = data.versements || [];
-  var DE = data.depenses || [];
-  var t = td();
-  var ac = CH.filter(function(c){return c.statut==="actif";});
-  var vj = VE.filter(function(v){return v.date===t;});
-  var tJ = vj.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
-  var tR = VE.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
-  var tD = DE.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
-  var op = ac.filter(function(c){return vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});
-  var np = ac.filter(function(c){return !vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});
-  return "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan, pour JC le gerant. " +
-    "Date: "+t+". Chauffeurs actifs: "+ac.map(function(c){return c.nom;}).join(", ")+". " +
-    "Ont verse ("+fc(tJ)+"): "+(op.length?op.map(function(c){return c.nom;}).join(", "):"Personne")+". " +
-    "N ont pas verse: "+(np.length?np.map(function(c){return c.nom;}).join(", "):"Tous ont verse")+". " +
-    "Total: "+fc(tR)+". Depenses: "+fc(tD)+". Benefice: "+fc(tR-tD)+". " +
-    "Reponds en francais, concis. Pour WhatsApp donne le texte pret a copier.";
+  try {
+    var data = (typeof S !== "undefined" && S.data) ? S.data : {};
+    var CH = data.chauffeurs || [];
+    var VE = data.versements || [];
+    var DE = data.depenses || [];
+    var d = new Date();
+    var t = d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate();
+    var fmt = function(n){ return Number(n).toLocaleString()+" FCFA"; };
+    var ac = CH.filter(function(c){return c.statut==="actif";});
+    var vj = VE.filter(function(v){return v.date===t;});
+    var tJ = vj.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
+    var tR = VE.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
+    var tD = DE.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
+    var op = ac.filter(function(c){return vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});
+    var np = ac.filter(function(c){return !vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});
+    return "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan, pour JC le gerant. " +
+      "Date: "+t+". Chauffeurs actifs: "+ac.map(function(c){return c.nom;}).join(", ")+". " +
+      "Ont verse ("+fmt(tJ)+"): "+(op.length?op.map(function(c){return c.nom;}).join(", "):"Personne")+". " +
+      "N ont pas verse: "+(np.length?np.map(function(c){return c.nom;}).join(", "):"Tous ont verse")+". " +
+      "Total: "+fmt(tR)+". Depenses: "+fmt(tD)+". Benefice: "+fmt(tR-tD)+". " +
+      "Reponds en francais, concis. Pour WhatsApp donne le texte pret a copier.";
+  } catch(e) {
+    return "Tu es l assistant IA de Saloni Manager a Abidjan pour JC. Reponds en francais.";
+  }
 }
 
 async function iaSend(question){
+  if (!Array.isArray(window._iaHist)) window._iaHist = [];
   if(!question||!question.trim()||window._iaBusy) return;
   var msg = question.trim();
   window._iaBusy = true;
