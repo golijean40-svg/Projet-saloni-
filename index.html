@@ -4418,6 +4418,8 @@ function rModal(){
     +'<div id="objJ" class="mb">'+lbl("Objectif/jour (F)",'<input id="co" type="number" value="5000" inputmode="numeric"/>')+'</div>'
     +'<div id="objS" style="display:none;" class="mb">'+lbl("Objectif/semaine (F)",'<input id="cos" type="number" value="30000" inputmode="numeric"/>')+'</div>'
     +lbl("Statut",sl("cst",["actif","repos","suspendu"]))
+    +'<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:11px;padding:12px;margin-bottom:12px;"><div style="font-size:11px;font-weight:800;color:#ea580c;margin-bottom:10px;">👤 IDENTITÉ</div>'
+    +'<div class="row2">'+lbl("Date de naissance",'<input id="cDateNaiss" type="date"/>')+lbl("Lieu de naissance",'<input id="cLieuNaiss" type="text" placeholder="Ex: Abidjan"/>')+'</div></div>'
     +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:11px;padding:12px;margin-bottom:12px;"><div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-bottom:10px;">📋 DOCUMENTS & VALIDITÉS</div>'
     +'<div class="row2">'+lbl("Permis — Expiration",'<input id="cPermis" type="date"/>')+lbl("Carte grise — Début",'<input id="cCgDebut" type="date"/>')+'</div>'
     +'<div class="row2">'+lbl("Carte grise — Fin",'<input id="cCgFin" type="date"/>')+lbl("Vignette — Expiration",'<input id="cVignette" type="date"/>')+'</div></div>'
@@ -4633,6 +4635,8 @@ function saveEditCh(id){
   c.nom=nom;
   c.tel=gv("ct");
   c.saloniId=gv("cs");
+  c.dateNaissance=gv("cDateNaiss")||c.dateNaissance||"";
+  c.lieuNaissance=gv("cLieuNaiss")||c.lieuNaissance||"";
   c.zone=gv("cz")||"Abobo";
   c.freqPaiement=gv("cfp")||"Journalier";
   c.objectifJour=parseInt(gv("co"))||5000;
@@ -4648,7 +4652,7 @@ function saveEditCh(id){
   jLog("chauffeur_ajout","Modification chauffeur: "+nom);
   fM();
 }
-function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""},
+function saveCh(){var nom=gv("cn").trim();if(!nom)return;var freq=gv("cfp")||"Journalier";var item={id:Date.now(),nom:nom,tel:gv("ct"),saloniId:gv("cs"),objectifJour:parseInt(gv("co"))||5000,objectifSemaine:parseInt(gv("cos"))||30000,freqPaiement:freq,zone:gv("cz")||"Abobo",statut:gv("cst")||"actif",solde:0,dette:0,avance:0,photo:"",dateNaissance:gv("cDateNaiss")||"",lieuNaissance:gv("cLieuNaiss")||"",permisExp:gv("cPermis")||"",cgDebut:gv("cCgDebut")||"",cgFin:gv("cCgFin")||"",vignetteExp:gv("cVignette")||"",docs:{permis:"",contrat:"",identite:""},
   creePar:S.user?S.user.pseudo:"gerant",
   creeParRole:S.user?S.user.role:"Gerant",
   creeParNiveau:S.user?S.user.niveau:3,
@@ -5146,14 +5150,14 @@ function _genContratPDFInner(c,sal){
   doc.text("DIAKITE TRANSPORT",W/2,11,{align:'center'});
   setFont(8,'normal',200,220,255);
   doc.text("Adjame St Michel, Lot 611, Abidjan",W/2,17,{align:'center'});
-  doc.text("Gestion de Flotte — Saloni Manager",W/2,22,{align:'center'});
+  doc.text("Gestion de Flotte — Cargo Manager",W/2,22,{align:'center'});
   // Pastille bleue foncée
   fillRect(0,28,W,1,17,55,170);
   y=36;
 
   // ══ TITRE ══
   setFont(13,'bold',17,24,39);
-  doc.text("CONTRAT DE LOCATION DE TRICYCLE (SALONI)",W/2,y,{align:'center'});
+  doc.text("CONTRAT DE LOCATION DE TRICYCLE (CARGO)",W/2,y,{align:'center'});
   y+=6;
   setFont(9,'italic',107,114,128);
   doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:'center'});
@@ -5179,6 +5183,8 @@ function _genContratPDFInner(c,sal){
   setFont(8.5,'bold',255,255,255);doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4);y+=5.5;
   y=tableRow("Nom & Prenom :",nom,y,false);
   y=tableRow("Telephone :",c.tel||"N/A",y,true);
+  y=tableRow("Date de naissance :",c.dateNaissance||"N/A",y,false);
+  y=tableRow("Lieu de naissance :",c.lieuNaissance||"N/A",y,true);
   y=tableRow("N° Permis :",c.permisExp||"N/A",y,false);
   y=tableRow("Saloni attribue :",salInfo,y,true);
   y+=5;
