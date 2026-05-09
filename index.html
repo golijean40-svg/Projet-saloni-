@@ -21,33 +21,37 @@
 <style>
 /* ══ ERP SALONI — STYLE PROFESSIONNEL ══ */
 :root{
-  --bg:#f4f6f9;
+  --bg:#f4f6fb;
   --bg2:#ffffff;
-  --bg3:#f8f9fb;
+  --bg3:#f8f9fc;
   --bg4:#eef2f7;
-  --border:#dde3ec;
+  --border:#e8eaf0;
   --border2:#c8d4e8;
-  --txt:#1a2332;
-  --txt2:#5a6a80;
-  --txt3:#8a9bb0;
-  --accent:#0066cc;
-  --accent2:#0052a3;
-  --accent-light:#e8f0fb;
-  --success:#1a8a4a;
-  --success-light:#e6f4ec;
-  --danger:#cc2200;
-  --danger-light:#faeae8;
-  --warning:#b85c00;
-  --warning-light:#fef3e8;
-  --card-shadow:rgba(0,0,0,.06);
-  --nav-shadow:rgba(0,0,0,.08);
+  --txt:#0f172a;
+  --txt2:#475569;
+  --txt3:#94a3b8;
+  --accent:#4f46e5;
+  --accent2:#3730a3;
+  --accent-light:#eef2ff;
+  --success:#059669;
+  --success-light:#ecfdf5;
+  --danger:#dc2626;
+  --danger-light:#fef2f2;
+  --warning:#d97706;
+  --warning-light:#fffbeb;
+  --card-shadow:rgba(79,70,229,.07);
+  --nav-shadow:rgba(0,0,0,.15);
   --sheet-bg:#fff;
-  --sheet-hd:#f4f6f9;
+  --sheet-hd:#f4f6fb;
   --input-bg:#fff;
-  --overlay:rgba(26,35,50,.55);
+  --overlay:rgba(15,23,42,.6);
   --tog-bg:#dde3ec;
   --prow-border:#eef2f7;
-  --header-bg:linear-gradient(135deg,#003d7a,#0066cc);
+  --header-bg:linear-gradient(135deg,#0f0e2e,#1e1b4b);
+  --sidebar-bg:#0f0e2e;
+  --sidebar-txt:#c8d4e8;
+  --sidebar-active:rgba(79,70,229,1);
+  --sidebar-hover:rgba(79,70,229,.15);
 }
 body.dark{
   --bg:#0f1923;
@@ -80,11 +84,11 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:system-u
 /* ── SIDEBAR GAUCHE ── */
 #nav{
   position:fixed;top:0;left:-280px;bottom:0;width:280px;
-  background:var(--bg2);
-  border-right:1px solid var(--border);
+  background:var(--sidebar-bg, #0f0e2e);
+  border-right:none;
   display:flex;flex-direction:column;
   padding:0;z-index:500;
-  box-shadow:4px 0 20px rgba(0,0,0,.15);
+  box-shadow:4px 0 30px rgba(0,0,0,.4);
   transition:left .25s ease;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
@@ -97,7 +101,8 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:system-u
 #nav-overlay.open{display:block;}
 .nb{
   display:flex;flex-direction:row;align-items:center;gap:12px;
-  padding:13px 16px;border:none;background:transparent;
+  padding:12px 16px;border:none;background:transparent;
+  color:var(--sidebar-txt, #c8d4e8) !important;
   color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;
   border-left:3px solid transparent;text-align:left;width:100%;
   font-family:inherit;
@@ -295,31 +300,33 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
   .nb {
     flex-direction: row;
     justify-content: flex-start;
-    padding: 9px 16px;
+    padding: 10px 14px;
     font-size: 13px;
     font-weight: 500;
-    border-radius: 8px;
-    margin: 1px 8px;
+    border-radius: 10px;
+    margin: 1px 10px;
     border-top: none;
-    gap: 10px;
-    color: var(--txt2);
+    gap: 12px;
+    color: var(--nav-txt2, #94a3b8);
+    background: transparent;
   }
 
   .nb span:first-child {
-    font-size: 17px;
-    width: 22px;
+    font-size: 18px;
+    width: 24px;
     text-align: center;
   }
 
   .nb.on {
-    background: var(--accent-light, #ebf0ff);
-    color: var(--accent, #1a56db);
+    background: rgba(79,70,229,0.15);
+    color: #fff;
     font-weight: 700;
+    border-left: 3px solid var(--nav-active, #4f46e5);
   }
 
   .nb:not(.on):hover {
-    background: var(--bg4);
-    color: var(--txt);
+    background: rgba(255,255,255,0.06);
+    color: var(--nav-txt, #e2e8f0);
   }
 
   /* Header desktop style */
@@ -379,11 +386,91 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
   }
 }
 
+/* ── Sidebar sombre ── */
+#nav .nb { color: #c8d4e8 !important; font-weight:500; }
+#nav .nb:hover { background: rgba(79,70,229,.15) !important; border-radius:10px; color:#fff !important; }
+#nav .nb.on { background: #4f46e5 !important; border-radius:10px; color:#fff !important; font-weight:700; }
+#nav .nb span:first-child { font-size:18px; }
+.nav-section-title {
+  font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;
+  letter-spacing:0.1em; padding:14px 16px 6px; 
+}
+#nav .nav-logo {
+  padding:20px 16px 16px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  margin-bottom:8px;
+}
+#nav .nav-logo-title { font-size:18px; font-weight:900; color:#fff; }
+#nav .nav-logo-sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+#nav .nav-upgrade {
+  margin:12px; background:linear-gradient(135deg,#4f46e5,#7c3aed);
+  border-radius:14px; padding:14px; cursor:pointer;
+}
+#nav .nav-upgrade-title { font-size:13px; font-weight:800; color:#fff; }
+#nav .nav-upgrade-sub { font-size:10px; color:rgba(255,255,255,.7); margin-top:2px; }
+
+/* ── Header principal ── */
+#hd .hd-inner {
+  background: linear-gradient(135deg,#0f0e2e,#1e1b4b);
+  padding: 12px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+#hd .hd-greeting { font-size:15px; font-weight:800; color:#fff; }
+#hd .hd-role { font-size:11px; color:rgba(255,255,255,.6); margin-top:1px; }
+#hd .hd-actions { display:flex; align-items:center; gap:8px; }
+#hd .hd-btn {
+  width:36px; height:36px; border-radius:50%; border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+  background:rgba(255,255,255,.12); color:#fff;
+}
+
+/* ── Cards stats accueil ── */
+.stat-card-new {
+  background:#fff; border-radius:16px; padding:14px;
+  border:1px solid #e8eaf0; box-shadow:0 2px 10px rgba(79,70,229,.06);
+}
+
+/* ── Graphique semaine ── */
+.week-bar-wrap { background:#fff; border-radius:18px; border:1px solid #e8eaf0; padding:16px; margin-bottom:14px; box-shadow:0 2px 10px rgba(79,70,229,.06); }
+
+/* ── Actions rapides ── */
+.quick-actions { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; }
+.quick-action-btn { display:flex; flex-direction:column; align-items:center; gap:5px; flex-shrink:0; background:#fff; border:1px solid #e8eaf0; border-radius:16px; padding:12px 16px; cursor:pointer; min-width:70px; box-shadow:0 2px 8px rgba(79,70,229,.05); }
+.quick-action-icon { width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+.quick-action-label { font-size:10px; font-weight:700; color:#0f172a; }
+.quick-action-sub { font-size:9px; color:#94a3b8; }
+
+/* ── Bannière IA ── */
+.ia-banner {
+  background:linear-gradient(135deg,#4f46e5,#7c3aed);
+  border-radius:18px; padding:16px; display:flex; align-items:center;
+  gap:12px; margin-bottom:14px; cursor:pointer;
+  box-shadow:0 4px 20px rgba(79,70,229,.3);
+}
+
+/* ── Bottom Bar ── */
 /* ── Bottom Bar ── */
 #bottomBar.visible { display:flex !important; }
 .bb-active svg { stroke: #4f46e5 !important; }
 .bb-active span { color: #4f46e5 !important; font-weight:800 !important; }
 #app { padding-bottom: 72px !important; }
+
+/* ── Sidebar sombre ── */
+nav#nav {
+  background: #0f1117 !important;
+}
+nav#nav .nb {
+  color: #94a3b8;
+}
+nav#nav .nb.on {
+  background: rgba(79,70,229,0.15) !important;
+  color: #fff !important;
+  border-left: 3px solid #4f46e5;
+}
+nav#nav .nb:hover {
+  background: rgba(255,255,255,0.06) !important;
+  color: #e2e8f0 !important;
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -1783,8 +1870,11 @@ function rHD(){
   mLeft.appendChild(hamBtn);
   if(S.tab==="home"){
     var logoDiv=document.createElement("div");
-    logoDiv.innerHTML='<div style="font-size:16px;font-weight:900;color:#fff;">SALONI 🛺</div>'
-      +'<div style="font-size:10px;color:rgba(255,255,255,.7);">'+(isCh?"Chauffeur · "+S.user.pseudo:S.user.role+" · "+conx.length+" en ligne")+'</div>';
+    logoDiv.innerHTML='<div style="font-size:16px;font-weight:900;color:#fff;">Bonjour, '+(S.user.pseudo||"Saloni")+' 👋</div>'
+      +'<div style="font-size:11px;color:rgba(255,255,255,.75);display:flex;align-items:center;gap:5px;margin-top:2px;">'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;"></span>'
+      +(isCh?"Chauffeur · "+S.user.pseudo:S.user.role+" · "+conx.length+" en ligne")
+      +'</div>';
     mLeft.appendChild(logoDiv);
   }else{
     var titleEl=document.createElement("div");
@@ -1795,18 +1885,34 @@ function rHD(){
   // Droite: alertes + dark + logout
   var mRight=document.createElement("div");
   mRight.style.cssText="display:flex;gap:6px;align-items:center;";
-  if(!isCh&&al.vis.length>0){
-    var alertBtn=document.createElement("button");
-    alertBtn.textContent="🚨 "+al.vis.length;
-    alertBtn.style.cssText="background:rgba(220,38,38,.3);border:1px solid rgba(220,38,38,.5);border-radius:8px;padding:5px 9px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;";
-    alertBtn.onclick=function(){sT("alertes");};
-    mRight.appendChild(alertBtn);
+  if(!isCh){
+    var alertWrap=document.createElement("div");
+    alertWrap.style.cssText="position:relative;cursor:pointer;";
+    alertWrap.onclick=function(){sT("alertes");};
+    var bellBtn=document.createElement("div");
+    bellBtn.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:6px 9px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;";
+    bellBtn.textContent="🔔";
+    if(al.vis.length>0){
+      var badgeEl=document.createElement("div");
+      badgeEl.style.cssText="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid rgba(79,70,229,1);";
+      badgeEl.textContent=al.vis.length;
+      alertWrap.appendChild(badgeEl);
+    }
+    alertWrap.appendChild(bellBtn);
+    mRight.appendChild(alertWrap);
   }
   var darkBtn=document.createElement("button");
   darkBtn.textContent=S.darkMode?"☀️":"🌙";
   darkBtn.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:6px 9px;font-size:15px;cursor:pointer;";
   darkBtn.onclick=function(){toggleDark();};
   mRight.appendChild(darkBtn);
+  // Photo profil
+  var photoHd=getPhoto(S.user.chauffeurId||0)||"";
+  var profPic=document.createElement("div");
+  profPic.style.cssText="width:34px;height:34px;border-radius:50%;overflow:hidden;cursor:pointer;border:2px solid rgba(255,255,255,.3);flex-shrink:0;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;";
+  profPic.innerHTML=photoHd?'<img src="'+photoHd+'" style="width:100%;height:100%;object-fit:cover;"/>':S.user.pseudo.charAt(0).toUpperCase();
+  profPic.onclick=function(){openNav();};
+  mRight.appendChild(profPic);
   var logoutBtn=document.createElement("button");
   logoutBtn.textContent="🚪";
   logoutBtn.style.cssText="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:6px 9px;color:#fff;font-size:14px;cursor:pointer;";
@@ -1825,14 +1931,22 @@ function rNAV(){
 
   // ── En-tête sidebar ──
   var sideHd=document.createElement("div");
-  sideHd.style.cssText="background:var(--header-bg);padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;";
+  // Style sidebar sombre
+  nav.style.cssText="background:#0f1117;color:#e2e8f0;";
+  sideHd.style.cssText="background:#0f1117;padding:20px 16px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid #1e2433;";
   var closeBtn=document.createElement("button");
   closeBtn.innerHTML="✕";
-  closeBtn.style.cssText="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:5px 9px;font-size:16px;cursor:pointer;margin-left:auto;";
+  closeBtn.style.cssText="background:rgba(255,255,255,.08);border:1px solid #1e2433;color:#94a3b8;border-radius:8px;padding:5px 9px;font-size:16px;cursor:pointer;margin-left:auto;";
   closeBtn.onclick=function(){closeNav();};
   var sideTitle=document.createElement("div");
-  sideTitle.innerHTML='<div style="font-size:16px;font-weight:900;color:#fff;">🛺 SALONI</div>'
-    +'<div style="font-size:10px;color:rgba(255,255,255,.7);">'+(isCh?S.user.pseudo:S.user.role)+'</div>';
+  var photoUser = getPhoto(S.user.chauffeurId||0)||"";
+  sideTitle.innerHTML='<div style="display:flex;align-items:center;gap:10px;">'
+    +'<div style="width:42px;height:42px;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">'+(photoUser?'<img src="'+photoUser+'" style="width:100%;height:100%;object-fit:cover;"/>':'🛺')+'</div>'
+    +'<div>'
+    +'<div style="font-size:15px;font-weight:900;color:#fff;">SALONI</div>'
+    +'<div style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;"></span>'+(isCh?S.user.pseudo:S.user.role)+'</div>'
+    +'</div>'
+    +'</div>';
   sideHd.appendChild(sideTitle);sideHd.appendChild(closeBtn);
   nav.appendChild(sideHd);
 
@@ -1855,7 +1969,9 @@ function rNAV(){
 
   function addSep(title,ic,color){
     var sep=document.createElement("div");
-    sep.style.cssText="padding:12px 16px 6px;display:flex;align-items:center;gap:7px;border-top:1px solid var(--border,#dde3ec);margin-top:4px;";
+    sep.style.cssText="padding:14px 16px 6px;display:flex;align-items:center;gap:7px;border-top:1px solid #1e2433;margin-top:4px;";
+    sep.innerHTML='<span style="font-size:12px;">'+ic+'</span><span style="font-size:10px;font-weight:800;color:'+color+';text-transform:uppercase;letter-spacing:1px;">'+title+'</span>';
+    nav.appendChild(sep);return;
     sep.innerHTML='<span style="font-size:14px;">'+ic+'</span><span style="font-size:11px;font-weight:800;color:'+color+';text-transform:uppercase;letter-spacing:.5px;">'+title+'</span>';
     nav.appendChild(sep);
   }
@@ -1878,7 +1994,7 @@ function rNAV(){
     addItem("chat","💬","Chat",nbChat);
 
     // Finances
-    addSep("Finances","💰","#059669");
+    addSep("Finances","💰","#6ee7b7");
     addItem("finances","💸","Dépenses & amendes");
     addItem("rapports","📊","Rapports");
     addItem("rsi","📈","RSI");
@@ -1896,23 +2012,23 @@ function rNAV(){
     })();
 
     // Équipe
-    addSep("Gestion équipe","👥","#1d4ed8");
+    addSep("Gestion équipe","👥","#93c5fd");
     addItem("chauffeurs","👥","Mon équipe");
     addItem("versements","💵","Versements");
-    addItem("ia","🤖","Assistant IA");
+    (function(){var btn=document.createElement("button");btn.className="nb"+(S.tab==="ia"?" on":"");btn.style.position="relative";var icSpan=document.createElement("span");icSpan.textContent="🤖";var lbSpan=document.createElement("span");lbSpan.textContent="Assistant IA";var badge2=document.createElement("span");badge2.style.cssText="margin-left:auto;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:6px;min-width:52px;padding:2px 6px;font-size:9px;font-weight:800;text-align:center;";badge2.textContent="NOUVEAU";btn.appendChild(icSpan);btn.appendChild(lbSpan);btn.appendChild(badge2);btn.onclick=function(){closeNav();setTimeout(function(){sT("ia");},200);};nav.appendChild(btn);})();
     addItem("salonis","🛺","Ma flotte");
     addItem("primes","⭐","Primes",nbP);
     addItem("entretiens","🔧","Entretiens");
     addItem("sanctions","⚠️","Sanctions",getNbSanctionsActives());
 
     // Communication
-    addSep("Communication","📲","#7c3aed");
+    addSep("Communication","📲","#c4b5fd");
     addItem("messages","💬","Messages");
     addItem("alertes","🔔","Alertes",al2.vis.length);
     addItem("alertesAuto","🤖","Alertes automatiques");
 
     // Paramètres
-    addSep("Paramètres","⚙️","#64748b");
+    addSep("Paramètres","⚙️","#94a3b8");
     addItem("journal","📒","Journal");
     if(S.user.niveau>=3){
       addItem("comptes","👤","Sous-comptes");
@@ -1923,11 +2039,16 @@ function rNAV(){
     var sep2=document.createElement("div");sep2.style.cssText="margin-top:8px;border-top:1px solid var(--border,#dde3ec);padding:8px;";
     var logBtn=document.createElement("button");
     logBtn.className="nb";
-    logBtn.style.cssText="color:#dc2626 !important;width:100%;";
+    logBtn.style.cssText="color:#f87171 !important;width:100%;";
     logBtn.innerHTML='<span>🚪</span><span>Déconnexion</span>';
     logBtn.onclick=function(){closeNav();jLog("deconnexion","Déconnexion");setOffline();localStorage.removeItem("sal_session_token");S.user=null;R();};
     sep2.appendChild(logBtn);
     nav.appendChild(sep2);
+    // Bouton PRO en bas
+    var proBtn=document.createElement("div");
+    proBtn.style.cssText="margin:8px 10px 16px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:14px;padding:12px 14px;cursor:pointer;";
+    proBtn.innerHTML='<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:20px;">👑</span><div><div style="font-size:12px;font-weight:800;color:#fff;">Passer en PRO</div><div style="font-size:10px;color:rgba(255,255,255,.7);">Plus de puissance, plus de contrôle</div></div><span style="margin-left:auto;color:rgba(255,255,255,.7);">›</span></div>';
+    nav.appendChild(proBtn);
   }
 }
 
@@ -3154,15 +3275,71 @@ function rScreenGlobal(sc){
   if(S.tab==="home"){
     var chHtml=CH.length===0
     ?'<div class="card" style="text-align:center;padding:24px;color:#64748b;">Aucun chauffeur'+(hasPerm("chauffeur")?' — <span onclick="sT(\'chauffeurs\');oM(\'ch\')" style="color:#1d4ed8;cursor:pointer;font-weight:700;">+ Ajouter</span>':"")+'</div>'
-    :CH.map(function(c){var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c),p=pc(val,obj);var col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";return'<div onclick="'+(hasPerm("versement")?"oV("+c.id+")":"oD("+c.id+")")+'" style="background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:13px;margin-bottom:9px;cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div><div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div><div style="font-size:10px;color:#64748b;">'+(c.saloniId||"—")+' · '+c.zone+'</div></div><div style="text-align:right;"><div style="font-weight:800;font-size:15px;color:'+col+';">'+fc(val)+'</div><div style="font-size:10px;color:#64748b;">/ '+fc(obj)+(isH?" sem":"")+'</div></div></div>'+bar(p,col)+'</div>';}).join("");
+    :CH.map(function(c){
+      var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c),p=pc(val,obj);
+      var col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";
+      var photo=getPhoto(c.id);
+      return'<div onclick="'+(hasPerm("versement")?"oV("+c.id+")":"oD("+c.id+")")+'" style="background:#fff;border-radius:16px;padding:13px;margin-bottom:9px;cursor:pointer;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.05);">'
+      +'<div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">'
+      +'<div style="width:42px;height:42px;border-radius:14px;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;">'+(photo?'<img src="'+photo+'" style="width:100%;height:100%;object-fit:cover;"/>':c.nom.charAt(0))+'</div>'
+      +'<div style="flex:1;">'
+      +'<div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div>'
+      +'<div style="font-size:10px;color:#94a3b8;">'+(c.saloniId||"—")+' · '+c.zone+'</div>'
+      +'</div>'
+      +'<div style="text-align:right;">'
+      +'<div style="font-weight:900;font-size:15px;color:'+col+';">'+fc(val)+'</div>'
+      +'<div style="font-size:10px;color:#94a3b8;">/ '+fc(obj)+(isH?" sem":"")+'</div>'
+      +'</div>'
+      +'</div>'
+      +'<div style="height:5px;background:#f0f2f8;border-radius:5px;"><div style="height:100%;width:'+Math.min(p,100)+'%;background:'+col+';border-radius:5px;"></div></div>'
+      +'</div>';
+    }).join("");
     var alHtml=al.vis.length>0?'<div style="font-size:13px;font-weight:700;color:#0f172a;margin:12px 0 8px;">Alertes</div>'+al.vis.map(function(a){return'<div style="background:#fff;border-left:3px solid #dc2626;border-radius:0 12px 12px 0;padding:10px 13px;margin-bottom:7px;font-size:12px;">'+a.icon+' '+a.msg+'</div>';}).join(""):"";
     var retHtml="";if(S.retards&&S.retards.length>0){retHtml='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:14px;padding:13px;margin-bottom:12px;"><div style="font-size:12px;font-weight:800;color:#dc2626;margin-bottom:8px;">Retards ce dimanche</div>'+S.retards.map(function(r){return'<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;"><div><div style="font-size:12px;font-weight:700;">'+r.c.nom+'</div><div style="font-size:10px;color:#dc2626;">Manque: '+fc(r.manque)+'</div></div><button onclick="envRetard('+r.c.id+')" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none;border-radius:8px;padding:6px 10px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">WhatsApp</button></div>';}).join("")+'</div>';}
     var nbPrimesActives=getNbPrimesActives();
     var primesHtml=nbPrimesActives>0?'<div class="prime-badge" onclick="sT(\'primes\')">⭐ '+nbPrimesActives+' prime(s) à payer — '+fc(getPrimesData().filter(function(p){return p.statut==="active"&&!p.paye;}).reduce(function(s,p){return s+p.montant;},0))+'</div>':"";
-    html='<div class="sec">'
-    +'<div onclick="showWAModal()" style="background:linear-gradient(135deg,#25d366,#128c7e);border-radius:10px;padding:11px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"><div><div style="font-size:13px;font-weight:800;color:#fff;">📲 WhatsApp automatique</div><div style="font-size:10px;color:rgba(255,255,255,.7);">Rapports, alertes, messages groupés</div></div><span style="color:#fff;font-size:18px;">›</span></div>'
+    var nbChActifs=CH.filter(function(c){return c.statut==="actif";}).length;
+    var nbSalonis=SAL.length;
+    var nbAlertes=al.vis.length;
+    html='<div class="sec" style="background:#f8f9ff;">'
+    // 4 cards stats en haut style image
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">'
+    // Revenus aujourd'hui
+    +'<div style="background:#fff;border-radius:16px;padding:12px 8px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);text-align:center;">'
+    +'<div style="width:34px;height:34px;border-radius:10px;background:#f0f0ff;display:flex;align-items:center;justify-content:center;font-size:17px;margin:0 auto 6px;">💰</div>'
+    +'<div style="font-size:9px;color:#94a3b8;font-weight:600;margin-bottom:3px;">Revenus</div>'
+    +'<div style="font-size:14px;font-weight:900;color:#4f46e5;">'+fc(tJ)+'</div>'
+    +'<div style="font-size:8px;color:#94a3b8;margin-top:2px;">'+vj.length+' versement(s)</div>'
+    +'</div>'
+    // Chauffeurs actifs
+    +'<div style="background:#fff;border-radius:16px;padding:12px 8px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);text-align:center;">'
+    +'<div style="width:34px;height:34px;border-radius:10px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;font-size:17px;margin:0 auto 6px;">👥</div>'
+    +'<div style="font-size:9px;color:#94a3b8;font-weight:600;margin-bottom:3px;">Chauffeurs</div>'
+    +'<div style="font-size:14px;font-weight:900;color:#059669;">'+nbChActifs+'</div>'
+    +'<div style="font-size:8px;color:#22c55e;margin-top:2px;font-weight:600;">En ligne</div>'
+    +'</div>'
+    // Flotte
+    +'<div style="background:#fff;border-radius:16px;padding:12px 8px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);text-align:center;">'
+    +'<div style="width:34px;height:34px;border-radius:10px;background:#fdf4ff;display:flex;align-items:center;justify-content:center;font-size:17px;margin:0 auto 6px;">🛺</div>'
+    +'<div style="font-size:9px;color:#94a3b8;font-weight:600;margin-bottom:3px;">Flotte</div>'
+    +'<div style="font-size:14px;font-weight:900;color:#7c3aed;">'+nbSalonis+'</div>'
+    +'<div style="font-size:8px;color:#94a3b8;margin-top:2px;">Véhicules</div>'
+    +'</div>'
+    // Alertes
+    +'<div onclick="sT(\'alertes\')" style="background:#fff;border-radius:16px;padding:12px 8px;border:1px solid '+(nbAlertes>0?"#fecaca":"#e8eaf6")+';box-shadow:0 2px 8px rgba(79,70,229,.06);text-align:center;cursor:pointer;">'
+    +'<div style="width:34px;height:34px;border-radius:10px;background:'+(nbAlertes>0?"#fef2f2":"#f8f9ff")+';display:flex;align-items:center;justify-content:center;font-size:17px;margin:0 auto 6px;">🚨</div>'
+    +'<div style="font-size:9px;color:#94a3b8;font-weight:600;margin-bottom:3px;">Alertes</div>'
+    +'<div style="font-size:14px;font-weight:900;color:'+(nbAlertes>0?"#dc2626":"#94a3b8")+';">'+nbAlertes+'</div>'
+    +'<div style="font-size:8px;color:'+(nbAlertes>0?"#dc2626":"#94a3b8")+';margin-top:2px;font-weight:600;">À traiter</div>'
+    +'</div>'
+    +'</div>'
+    // WhatsApp banner
+    +'<div onclick="showWAModal()" style="background:linear-gradient(135deg,#025c4c,#128c7e);border-radius:16px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;cursor:pointer;position:relative;overflow:hidden;">'
+    +'<div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">📲</div>'
+    +'<div style="flex:1;"><div style="font-size:13px;font-weight:800;color:#fff;">WhatsApp automatique</div><div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:2px;">Rapports, alertes, messages groupés</div></div>'
+    +'<span style="color:rgba(255,255,255,.7);font-size:18px;">›</span>'
+    +'</div>'
     +primesHtml
-    +'<div style="background:var(--header-bg);border-radius:8px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.15);"><div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:700;text-transform:uppercase;margin-bottom:5px;">Recettes aujourd\'hui</div><div style="font-size:34px;font-weight:900;color:#fff;">'+fc(tJ)+'</div><div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:4px;">'+vj.length+' versement(s)</div></div>'
     +'<div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:14px;padding:13px;margin-bottom:12px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
     +'<div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.05em;">📅 Période du '+debutStr+' au '+finStr+'</div>'
@@ -3180,8 +3357,11 @@ function rScreenGlobal(sc){
     +'</div>'
     +'</div>'
     +'</div>'
-    +'<div style="font-size:13px;font-weight:700;color:var(--txt,#0f172a);margin-bottom:8px;">📊 Semaine en cours</div>'
-    +'<div class="card" style="margin-bottom:14px;padding:14px 10px 10px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:4px;">'
+    +'<div style="display:flex;align-items:center;gap:7px;"><span style="font-size:18px;">📊</span><span style="font-size:14px;font-weight:800;color:#0f172a;">Semaine en cours</span></div>'
+    +'<button onclick="sT(\'rapports\')" style="font-size:11px;font-weight:700;color:#4f46e5;background:#f0f0ff;border:none;border-radius:20px;padding:4px 12px;cursor:pointer;font-family:inherit;">Voir tout ›</button>'
+    +'</div>'
+    +'<div style="background:#fff;border-radius:18px;border:1px solid #e8eaf6;margin-bottom:14px;padding:16px 12px 12px;box-shadow:0 2px 10px rgba(79,70,229,.06);">'
     +'<div style="display:flex;align-items:flex-end;gap:5px;height:90px;margin-bottom:8px;">'
     +sem.map(function(d,i){var vD=VE.filter(function(v){return v.date===d;}).reduce(function(s,v){return s+v.montant;},0);var isT=d===t;var objT=CH.reduce(function(s,c){return s+(c.objectifJour||0);},0);var maxV=Math.max.apply(null,sem.map(function(sd){return VE.filter(function(v){return v.date===sd;}).reduce(function(s,v){return s+v.montant;},0);}));var maxBar=Math.max(maxV,objT,1);var hPct=Math.round(vD/maxBar*85);var hObjPct=objT>0?Math.round(objT/maxBar*85):0;var col=isT?"#1d4ed8":vD>=objT&&vD>0?"#059669":vD>0?"#d97706":"transparent";return'<div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative;cursor:pointer;" onclick="S.filtreDate=\''+d+'\';sT(\'versements\')"><div style="font-size:8px;font-weight:800;color:'+(isT?"#1d4ed8":vD>0?col:"var(--txt3,#94a3b8)")+';margin-bottom:3px;min-height:10px;">'+(vD>0?(vD/1000).toFixed(vD<10000?1:0)+"k":"")+'</div><div style="width:100%;position:relative;height:65px;background:var(--border,#dbeafe);border-radius:6px 6px 0 0;overflow:visible;">'+(hObjPct>0?'<div style="position:absolute;bottom:'+hObjPct+'%;left:0;right:0;height:1.5px;background:rgba(220,38,38,.4);z-index:2;"></div>':"")+'<div style="position:absolute;bottom:0;left:0;right:0;border-radius:6px 6px 0 0;transition:height .5s ease;height:'+Math.max(hPct,vD>0?5:0)+'%;background:'+(isT?"linear-gradient(180deg,#60a5fa,#1d4ed8)":vD>=objT&&vD>0?"linear-gradient(180deg,#34d399,#059669)":vD>0?"linear-gradient(180deg,#fbbf24,#d97706)":"transparent")+';"></div></div><div style="font-size:9px;margin-top:4px;font-weight:'+(isT?"800":"600")+';color:'+(isT?"#1d4ed8":"var(--txt2,#64748b)")+';background:'+(isT?"rgba(29,78,216,.1)":"transparent")+';border-radius:4px;padding:1px 3px;">'+JOURS[i]+'</div></div>';}).join("")
     +'</div>'
@@ -3190,9 +3370,35 @@ function rScreenGlobal(sc){
     +'<div style="font-size:10px;font-weight:700;color:var(--txt,#0f172a);">Sem: <span style="color:#059669;">'+fc(sem.reduce(function(s,d){return s+VE.filter(function(v){return v.date===d;}).reduce(function(s2,v){return s2+v.montant;},0);},0))+'</span></div>'
     +'</div></div>'
     +retHtml
-    +'<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">Versements du jour</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:14px;">'
+    +'<div style="font-size:14px;font-weight:800;color:#0f172a;">Versements du jour</div>'
+    +'<button onclick="sT(\'versements\')" style="font-size:11px;font-weight:700;color:#4f46e5;background:#f0f0ff;border:none;border-radius:20px;padding:4px 12px;cursor:pointer;font-family:inherit;">Voir tout</button>'
+    +'</div>'
     +chHtml
-
+    // Actions rapides
+    +'<div style="margin-top:14px;margin-bottom:14px;">'
+    +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">'
+    +[
+      {ic:"🔔",lb:"Rappel",sub:"Envoyer",bg:"#eff6ff",fn:"sT(\'alertes\')"},
+      {ic:"🛺",lb:"Flotte",sub:"Voir",bg:"#fdf4ff",fn:"sT(\'salonis\')"},
+      {ic:"🔒",lb:"Moteur",sub:"Bloquer",bg:"#fef2f2",fn:"sT(\'salonis\')"},
+      {ic:"📊",lb:"Rapport",sub:"Générer",bg:"#f0fdf4",fn:"sT(\'rapports\')"},
+      {ic:"🤖",lb:"Chat IA",sub:"Parler",bg:"#f0f0ff",fn:"iaOpen?iaOpen():sT(\'ia\')"}
+    ].map(function(a){
+      return'<div onclick="'+a.fn+'" style="background:#fff;border-radius:16px;padding:12px 6px;text-align:center;border:1px solid #e8eaf6;cursor:pointer;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+      +'<div style="width:44px;height:44px;border-radius:14px;background:'+a.bg+';display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 6px;">'+a.ic+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:#0f172a;">'+a.lb+'</div>'
+      +'<div style="font-size:9px;color:#94a3b8;">'+a.sub+'</div>'
+      +'</div>';
+    }).join("")
+    +'</div>'
+    +'</div>'
+    // Bannière IA
+    +'<div onclick="iaOpen?iaOpen():sT(\'ia\')" style="background:linear-gradient(135deg,#3730a3,#4f46e5);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:14px;">'
+    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:20px;">✨</div>'
+    +'<div style="flex:1;"><div style="font-size:13px;font-weight:800;color:#fff;">Assistant IA</div><div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:1px;">Posez-moi une question ou demandez un rapport intelligent</div></div>'
+    +'<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🤖</div>'
+    +'</div>'
     +alHtml+'</div>';
   }
 
@@ -3644,18 +3850,120 @@ function rScreenGlobal(sc){
     if(!hasPerm("rapport")){html='<div class="sec"><div class="card" style="text-align:center;padding:30px;color:#dc2626;">❌ Accès refusé</div></div>';}
     else{
     var rs=S.rapSeg||"semaine";
+    var t=td();
+    var vj=VE.filter(function(v){return v.date===t;});
+    var tJ=vj.reduce(function(s,v){return s+v.montant;},0);
     var tR3=VE.reduce(function(s,v){return s+v.montant;},0);
     var nbJours=VE.length>0?(function(){var u={};VE.forEach(function(v){u[v.date]=1;});return Object.keys(u).length;})():1;
     var moyJour=Math.round(tR3/(nbJours||1));
     var meilleurJ=null,meilleurJV=0;var joursMap={};VE.forEach(function(v){joursMap[v.date]=(joursMap[v.date]||0)+v.montant;});Object.keys(joursMap).forEach(function(d){if(joursMap[d]>meilleurJV){meilleurJV=joursMap[d];meilleurJ=d;}});
     var modeCounts={};VE.forEach(function(v){modeCounts[v.mode||"Especes"]=(modeCounts[v.mode||"Especes"]||0)+v.montant;});
     var modeTop=Object.keys(modeCounts).sort(function(a,b){return modeCounts[b]-modeCounts[a];})[0]||"—";
-    var statsGlobal='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;"><div class="card"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Moyenne/jour</div><div style="font-size:18px;font-weight:900;color:#1d4ed8;margin-top:4px;">'+fc(moyJour)+'</div><div style="font-size:10px;color:#64748b;">sur '+nbJours+' jour(s)</div></div><div class="card"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Meilleur jour</div><div style="font-size:15px;font-weight:900;color:#059669;margin-top:4px;">'+fc(meilleurJV)+'</div><div style="font-size:10px;color:#64748b;">'+(meilleurJ||"—")+'</div></div><div class="card"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Total recettes</div><div style="font-size:18px;font-weight:900;color:#059669;margin-top:4px;">'+fc(tR3)+'</div><div style="font-size:10px;color:#64748b;">'+VE.length+' versement(s)</div></div><div class="card"><div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">Mode favori</div><div style="font-size:15px;font-weight:900;color:#7c3aed;margin-top:4px;">'+modeTop+'</div></div></div>';
-    var classement=[].concat(CH).map(function(c){var tot=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);var obj=getObjJ(c)*30;return{c:c,tot:tot,p:pc(tot,obj)};}).sort(function(a,b){return b.tot-a.tot;});
-    var classHtml='<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:9px;">🏆 Classement chauffeurs</div><div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">'+classement.map(function(x,i){var medals=["🥇","🥈","🥉"];var col=x.p>=80?"#059669":x.p>=50?"#d97706":"#dc2626";return'<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #eff6ff;"><div style="font-size:18px;width:24px;text-align:center;">'+(i<3?medals[i]:"#"+(i+1))+'</div><div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">'+x.c.nom.charAt(0)+'</div><div style="flex:1;"><div style="font-weight:700;font-size:13px;color:#0f172a;">'+x.c.nom+'</div><div class="bw" style="margin-top:4px;"><div class="bf" style="width:'+x.p+'%;background:'+col+';"></div></div></div><div style="text-align:right;"><div style="font-weight:800;font-size:13px;color:'+col+';">'+fc(x.tot)+'</div><div style="font-size:10px;color:#64748b;">'+x.p+'%</div></div></div>';}).join("")+'</div>';
-    var rapCards=CH.length===0?'<div class="card" style="text-align:center;padding:30px;color:#64748b;">Aucun chauffeur</div>'
-    :CH.map(function(c){var jours=rs==="semaine"?getSem():getMois();var VEc=VE.filter(function(v){return String(v.chauffeurId)===String(c.id)&&jours.indexOf(v.date)>=0;});var total=VEc.reduce(function(s,v){return s+v.montant;},0);var obj=rs==="semaine"?getObjS(c):c.objectifJour*getMois().length;var p=pc(total,obj),col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";var tendance=total>=(obj*0.8)?"📈":"📉";return'<div class="card" style="margin-bottom:12px;border-top:3px solid '+col+';"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;"><div style="display:flex;align-items:center;gap:9px;"><div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;">'+c.nom.charAt(0)+'</div><div><div style="font-weight:800;font-size:14px;color:#0f172a;">'+c.nom+'</div><div style="font-size:10px;color:#64748b;">'+(rs==="semaine"?"Cette semaine":"Ce mois")+' '+tendance+'</div></div></div><div style="font-size:22px;font-weight:900;color:'+col+';">'+p+'%</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:9px;">'+[["Versé",fc(total),col],["Objectif",fc(obj),"#64748b"],["Jours",VEc.length+"/"+jours.length,"#1d4ed8"]].map(function(x){return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:8px;color:#64748b;">'+x[0]+'</div><div style="font-size:11px;font-weight:700;color:'+x[2]+';margin-top:2px;">'+x[1]+'</div></div>';}).join("")+'</div>'+bar(p,col)+'<div style="display:flex;gap:6px;margin-top:9px;"><button onclick="oRapWA('+c.id+',\''+rs+'\')" style="flex:1;padding:9px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;">WhatsApp</button><button onclick="savRap('+c.id+',\''+rs+'\')" style="flex:1;padding:9px;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;">Sauver</button></div></div>';}).join("");
-    html='<div class="sec">'+statsGlobal+classHtml+'<div style="display:flex;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:3px;margin-bottom:13px;"><button onclick="S.rapSeg=\'semaine\';rScreen();" style="flex:1;padding:8px;border-radius:9px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:'+(rs==="semaine"?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"transparent")+';color:'+(rs==="semaine"?"#fff":"#64748b")+';">Semaine</button><button onclick="S.rapSeg=\'mois\';rScreen();" style="flex:1;padding:8px;border-radius:9px;border:none;cursor:pointer;font-size:12px;font-weight:700;background:'+(rs==="mois"?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"transparent")+';color:'+(rs==="mois"?"#fff":"#64748b")+';">Mois</button></div>'+rapCards+'</div>';
+    var modeIcons={"Wave":"🌊","Orange Money":"🟠","MTN":"💛","Especes":"💵","Moov":"🔵"};
+    var modeIcon=modeIcons[modeTop]||"💳";
+
+    var statsGlobal=''
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'
+    +'<div style="background:#fff;border-radius:18px;padding:14px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+    +'<div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:6px;">Encaissements aujourd\'hui</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<div><div style="font-size:20px;font-weight:900;color:#4f46e5;">'+fc(tJ)+'</div><div style="font-size:10px;color:#64748b;margin-top:2px;">sur '+nbJours+' jour(s)</div></div>'
+    +'<div style="width:38px;height:38px;border-radius:12px;background:#f0f0ff;display:flex;align-items:center;justify-content:center;font-size:20px;">📈</div>'
+    +'</div></div>'
+    +'<div style="background:#fff;border-radius:18px;padding:14px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+    +'<div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:6px;">Encaissement du jour</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<div><div style="font-size:20px;font-weight:900;color:#059669;">'+fc(meilleurJV)+'</div><div style="font-size:10px;color:#64748b;margin-top:2px;">'+(meilleurJ||"—")+'</div></div>'
+    +'<div style="width:38px;height:38px;border-radius:12px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;font-size:20px;">🗓</div>'
+    +'</div></div>'
+    +'<div style="background:#fff;border-radius:18px;padding:14px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+    +'<div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:6px;">Total recettes</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<div><div style="font-size:20px;font-weight:900;color:#059669;">'+fc(tR3)+'</div><div style="font-size:10px;color:#64748b;margin-top:2px;">'+VE.length+' versement(s)</div></div>'
+    +'<div style="width:38px;height:38px;border-radius:12px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;font-size:20px;">💼</div>'
+    +'</div></div>'
+    +'<div style="background:#fff;border-radius:18px;padding:14px;border:1px solid #e8eaf6;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+    +'<div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:6px;">Mode favori</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<div style="font-size:17px;font-weight:900;color:#7c3aed;margin-top:4px;">'+modeTop+'</div>'
+    +'<div style="width:38px;height:38px;border-radius:12px;background:#f5f3ff;display:flex;align-items:center;justify-content:center;font-size:20px;">'+modeIcon+'</div>'
+    +'</div></div>'
+    +'</div>';
+
+    var classement=[].concat(CH).map(function(c){var tot=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);var p=pc(tot,getObjJ(c)*30);return{c:c,tot:tot,p:p};}).sort(function(a,b){return b.tot-a.tot;});
+
+    var classHtml=''
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+    +'<div style="display:flex;align-items:center;gap:7px;"><span style="font-size:18px;">🏆</span><span style="font-size:14px;font-weight:800;color:#0f172a;">Classement chauffeurs</span></div>'
+    +'<button onclick="sT(\'chauffeurs\')" style="font-size:11px;font-weight:700;color:#4f46e5;background:#f0f0ff;border:none;border-radius:20px;padding:4px 12px;cursor:pointer;font-family:inherit;">Voir tout ›</button>'
+    +'</div>'
+    +'<div style="background:#fff;border-radius:18px;border:1px solid #e8eaf6;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+    +classement.map(function(x,i){
+      var col=x.p>=80?"#059669":x.p>=50?"#d97706":"#dc2626";
+      var mCol=i===0?"#f59e0b":i===1?"#94a3b8":"#b45309";
+      var rankBg=i===0?"#fff8e1":i===1?"#f8faff":"#fdf6ee";
+      return'<div style="display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid #f4f4ff;">'
+      +'<div style="width:26px;height:26px;border-radius:50%;background:'+rankBg+';border:2px solid '+mCol+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:'+mCol+';flex-shrink:0;">'+(i+1)+'</div>'
+      +'<div style="width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;">'+x.c.nom.charAt(0)+'</div>'
+      +'<div style="flex:1;">'
+      +'<div style="font-weight:700;font-size:13px;color:#0f172a;">'+x.c.nom+'</div>'
+      +'<div style="height:5px;background:#f0f2f8;border-radius:5px;margin-top:5px;"><div style="height:100%;width:'+Math.min(x.p,100)+'%;background:'+col+';border-radius:5px;"></div></div>'
+      +'</div>'
+      +'<div style="text-align:right;">'
+      +'<div style="font-weight:800;font-size:13px;color:'+col+';">'+fc(x.tot)+'</div>'
+      +'<span style="font-size:10px;background:'+(x.p>=80?"#ecfdf5":"#fffbeb")+';color:'+col+';border-radius:10px;padding:1px 7px;font-weight:700;">'+x.p+'%</span>'
+      +'</div>'
+      +'<span style="color:#94a3b8;font-size:16px;">›</span>'
+      +'</div>';
+    }).join("")
+    +'</div>';
+
+    var rapCards=CH.length===0?'<div style="background:#fff;border-radius:18px;padding:30px;text-align:center;color:#64748b;border:1px solid #e8eaf6;">Aucun chauffeur</div>'
+    :CH.map(function(c){
+      var jours=rs==="semaine"?getSem():getMois();
+      var VEc=VE.filter(function(v){return String(v.chauffeurId)===String(c.id)&&jours.indexOf(v.date)>=0;});
+      var total=VEc.reduce(function(s,v){return s+v.montant;},0);
+      var obj=rs==="semaine"?getObjS(c):c.objectifJour*getMois().length;
+      var p=pc(total,obj),col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";
+      var isFirst=classement.length>0&&String(classement[0].c.id)===String(c.id);
+      return'<div style="background:#fff;border-radius:18px;border:1px solid #e8eaf6;margin-bottom:12px;overflow:hidden;box-shadow:0 2px 10px rgba(79,70,229,.06);">'
+      +'<div style="padding:14px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">'
+      +'<div style="display:flex;align-items:center;gap:10px;">'
+      +'<div style="width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;">'+c.nom.charAt(0)+'</div>'
+      +'<div>'
+      +'<div style="font-weight:800;font-size:14px;color:#0f172a;">'+c.nom+' 📈</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-top:3px;">'
+      +'<span style="font-size:10px;color:#64748b;">'+(rs==="semaine"?"Cette semaine":"Ce mois")+'</span>'
+      +(isFirst?'<span style="font-size:10px;font-weight:700;background:#fff8e1;color:#f59e0b;border-radius:10px;padding:1px 8px;border:1px solid #fde68a;">🥇 1er</span>':"")
+      +'</div>'
+      +'</div>'
+      +'</div>'
+      +'<div style="text-align:right;">'
+      +'<div style="font-size:22px;font-weight:900;color:'+col+';">'+p+'%</div>'
+      +(p>=100?'<div style="font-size:10px;color:#059669;font-weight:700;">Objectif atteint ✅</div>':"")
+      +'</div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
+      +[["Versé",fc(total),col],["Objectif",fc(obj),"#0f172a"],["Jours",VEc.length+"/"+jours.length,"#4f46e5"]].map(function(x){
+        return'<div style="text-align:center;"><div style="font-size:9px;color:#94a3b8;font-weight:600;text-transform:uppercase;margin-bottom:3px;">'+x[0]+'</div><div style="font-size:14px;font-weight:800;color:'+x[2]+';">'+x[1]+'</div></div>';
+      }).join("")
+      +'</div>'
+      +'</div>'
+      +'<div style="height:5px;background:#f0f2f8;"><div style="height:100%;width:'+Math.min(p,100)+'%;background:'+col+';"></div></div>'
+      +'<div style="display:flex;">'
+      +'<button onclick="oRapWA('+c.id+',\''+rs+'\')" style="flex:1;padding:12px;border:none;border-top:1px solid #f4f4ff;background:#f0fdf4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;border-right:1px solid #f4f4ff;">🟢 WhatsApp</button>'
+      +'<button onclick="savRap('+c.id+',\''+rs+'\')" style="flex:1;padding:12px;border:none;border-top:1px solid #f4f4ff;background:#f8f9ff;color:#4f46e5;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;">🔖 Sauver</button>'
+      +'</div>'
+      +'</div>';
+    }).join("");
+
+    html='<div class="sec" style="background:#f8f9ff;">'+statsGlobal+classHtml
+    +'<div style="display:flex;background:#fff;border:1px solid #e8eaf6;border-radius:14px;padding:4px;margin-bottom:14px;box-shadow:0 2px 8px rgba(79,70,229,.06);">'
+    +'<button onclick="S.rapSeg=\'semaine\';rScreen();" style="flex:1;padding:10px;border-radius:11px;border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;background:'+(rs==="semaine"?"linear-gradient(135deg,#4f46e5,#7c3aed)":"transparent")+';color:'+(rs==="semaine"?"#fff":"#64748b")+';">Semaine</button>'
+    +'<button onclick="S.rapSeg=\'mois\';rScreen();" style="flex:1;padding:10px;border-radius:11px;border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;background:'+(rs==="mois"?"linear-gradient(135deg,#4f46e5,#7c3aed)":"transparent")+';color:'+(rs==="mois"?"#fff":"#64748b")+';">Mois</button>'
+    +'</div>'
+    +rapCards+'</div>';
     }
   }
 
