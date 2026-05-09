@@ -378,6 +378,12 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
     grid-template-columns: 260px 1fr;
   }
 }
+
+/* ── Bottom Bar ── */
+#bottomBar.visible { display:flex !important; }
+.bb-active svg { stroke: #4f46e5 !important; }
+.bb-active span { color: #4f46e5 !important; font-weight:800 !important; }
+#app { padding-bottom: 72px !important; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -390,6 +396,28 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
   <div id="screen"></div>
 </div>
 <nav id="nav"></nav>
+<div id="bottomBar" style="display:none !important;position:fixed;bottom:0;left:0;right:0;height:72px;background:#fff;border-top:1px solid #e8eaf6;box-shadow:0 -4px 20px rgba(79,70,229,.08);z-index:400;display:flex;align-items:center;justify-content:space-around;padding:0 8px 8px;">
+  <button id="bbHome" onclick="sT('home')" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:8px 12px;border-radius:12px;flex:1;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span style="font-size:10px;font-weight:600;color:#94a3b8;">Accueil</span>
+  </button>
+  <button id="bbEquipe" onclick="sT('chauffeurs')" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:8px 12px;border-radius:12px;flex:1;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span style="font-size:10px;font-weight:600;color:#94a3b8;">Équipe</span>
+  </button>
+  <button onclick="oV(0)" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;cursor:pointer;width:56px;height:56px;border-radius:50%;box-shadow:0 4px 14px rgba(79,70,229,.4);justify-content:center;margin-bottom:12px;flex-shrink:0;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 5v14M5 12h14"/></svg>
+    <span style="font-size:8px;font-weight:700;color:white;margin-top:-2px;">Versement</span>
+  </button>
+  <button id="bbRapports" onclick="sT('rapports')" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:8px 12px;border-radius:12px;flex:1;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span style="font-size:10px;font-weight:600;color:#94a3b8;">Rapports</span>
+  </button>
+  <button id="bbParams" onclick="sT('parametres')" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:8px 12px;border-radius:12px;flex:1;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span style="font-size:10px;font-weight:600;color:#94a3b8;">Paramètres</span>
+  </button>
+</div>
 <script>
 // Gestionnaire d'erreur global pour Safari
 window.onerror = function(msg, src, line, col, err) {
@@ -1681,6 +1709,7 @@ function _R(){
   try{rHD();}catch(e){console.log('rHD err:',e.message);}
   try{rNAV();}catch(e){console.log('rNAV err:',e.message);}
   try{rScreen();}catch(e){console.log('rScreen err:',e.message);}
+  try{updateBottomBar();}catch(e){}
   try{ if(S.user) setTimeout(iaCreerBouton, 800); }catch(e){}
   try{
   if(S.modal)rModal();
@@ -2186,6 +2215,32 @@ function renderCarte(sc){
   sc.appendChild(wrapper);
 }
 // ══ ÉCRANS CHAUFFEURS ══
+function updateBottomBar(){
+  var tab = S.tab || "home";
+  var map = {home:"bbHome",chauffeurs:"bbEquipe",rapports:"bbRapports",parametres:"bbParams"};
+  ["bbHome","bbEquipe","bbRapports","bbParams"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ el.classList.remove("bb-active"); el.querySelector("svg").setAttribute("stroke","#94a3b8"); el.querySelector("span").style.color="#94a3b8"; }
+  });
+  var activeId = map[tab];
+  if(activeId){
+    var el = document.getElementById(activeId);
+    if(el){ el.classList.add("bb-active"); el.querySelector("svg").setAttribute("stroke","#4f46e5"); el.querySelector("span").style.color="#4f46e5"; el.querySelector("span").style.fontWeight="800"; }
+  }
+  // Afficher/masquer la bottom bar
+  var bb = document.getElementById("bottomBar");
+  if(bb){
+    if(S.user && !estCompteChauf()){
+      bb.style.cssText = bb.style.cssText.replace('display:none !important','');
+      bb.style.display = "flex";
+      bb.classList.add("visible");
+    } else {
+      bb.style.display = "none";
+      bb.classList.remove("visible");
+    }
+  }
+}
+
 function rScreen(){
   var sc=document.getElementById("screen");
   var isCh=estCompteChauf();
@@ -3158,10 +3213,45 @@ function rScreenGlobal(sc){
 
   else if(S.tab==="chauffeurs"){
     var chCards=CH.length===0?'<div class="card" style="text-align:center;padding:30px;color:#64748b;">Aucun chauffeur</div>'
-    :CH.map(function(c){var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c);var tC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);var p=pc(val,obj),col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";var stats=[["Saloni",c.saloniId||"—","#64748b"],[isH?"Sem.":"Auj.",fc(val),col],["Total",fc(tC),"#059669"],["Dette",c.dette>0?fc(c.dette):"—",c.dette>0?"#dc2626":"#64748b"]];var docAlerts=getDocAlerts(c);return'<div class="card" style="margin-bottom:10px;border-left:3px solid '+(CHC[c.statut]||"#64748b")+'"><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><div style="display:flex;align-items:center;gap:10px;"><div onclick="pickPhoto('+c.id+')" style="width:46px;height:46px;border-radius:13px;overflow:hidden;flex-shrink:0;cursor:pointer;border:2px solid #dbeafe;position:relative;">'+(getPhoto(c.id)?'<img src="'+getPhoto(c.id)+'" style="width:100%;height:100%;object-fit:cover;"/>':"<div style=\"width:100%;height:100%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;\">"+c.nom.charAt(0)+"</div>")+'<div style="position:absolute;bottom:0;right:0;width:16px;height:16px;background:#1d4ed8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;">📷</div></div><div><div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div><div style="font-size:10px;color:#64748b;">'+(c.tel||"—")+' · '+c.zone+'</div><div style="margin-top:2px;">'+pill(isH?"Hebdo":"Jour",isH?"#7c3aed":"#1d4ed8")+'</div></div></div>'+pill(c.statut,CHC[c.statut]||"#64748b")+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px;">'+stats.map(function(x){return'<div style="background:#f8faff;border:1px solid #dbeafe;border-radius:8px;padding:5px 6px;text-align:center;"><div style="font-size:8px;color:#64748b;">'+x[0]+'</div><div style="font-size:10px;font-weight:700;color:'+x[2]+';margin-top:1px;">'+x[1]+'</div></div>';}).join("")+'</div>'+(docAlerts.length>0?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">'+docAlerts.map(function(d){var col=d.sev==="expire"?"#dc2626":"#d97706";return'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+(d.sev==="expire"?"#fef2f2":"#fffbeb")+';color:'+col+';border:1px solid '+(d.sev==="expire"?"#fecaca":"#fde68a")+';font-weight:700;">'+(d.sev==="expire"?"🚨":"⚠️")+" "+d.msg+"</span>";}).join("")+'</div>':"")+bar(p,col)+'<div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;">'
-+'<button onclick="oD('+c.id+')" class="bgr" style="flex:1;font-size:11px;padding:8px;min-width:60px;">Détails</button>'
-+(hasPerm("rapport")?'<button onclick="oRp('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.08);color:#25d366;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">Rapport</button>':"")
-+'<button onclick="modalEntretien('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔧</button>'+'<button onclick="showHistoriqueChauffeur('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">📋</button>'+(c.simTracker?(function(){
+    :CH.map(function(c){var isH=c.freqPaiement==="Hebdomadaire",val=isH?getVS(c,VE):getVJ(c,vj),obj=isH?getObjS(c):getObjJ(c);var tC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).reduce(function(s,v){return s+v.montant;},0);var p=pc(val,obj),col=p>=100?"#059669":p>=60?"#d97706":"#dc2626";var stats=[["Saloni",c.saloniId||"—","#64748b"],[isH?"Sem.":"Auj.",fc(val),col],["Total",fc(tC),"#059669"],["Dette",c.dette>0?fc(c.dette):"—",c.dette>0?"#dc2626":"#64748b"]];var docAlerts=getDocAlerts(c);var sCol=c.statut==="actif"?"#059669":c.statut==="repos"?"#d97706":"#dc2626";
+    return'<div style="background:#fff;border-radius:20px;margin-bottom:14px;box-shadow:0 2px 14px rgba(79,70,229,.07);border:1px solid #eeefff;overflow:hidden;">'
+    // Barre progress colorée en haut
+    +'<div style="height:4px;background:#f0f0f0;"><div style="height:100%;width:'+Math.min(p,100)+'%;background:'+(p>=100?"linear-gradient(90deg,#059669,#34d399)":p>=60?"linear-gradient(90deg,#d97706,#fbbf24)":"linear-gradient(90deg,#dc2626,#f87171)")+';transition:width .5s;"></div></div>'
+    +'<div style="padding:14px;">'
+    // Photo + infos + statut
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">'
+    +'<div style="display:flex;align-items:center;gap:12px;">'
+    +'<div onclick="pickPhoto('+c.id+')" style="width:56px;height:56px;border-radius:18px;overflow:hidden;flex-shrink:0;cursor:pointer;position:relative;box-shadow:0 3px 10px rgba(79,70,229,.2);">'
+    +(getPhoto(c.id)?'<img src="'+getPhoto(c.id)+'" style="width:100%;height:100%;object-fit:cover;"/>':'<div style="width:100%;height:100%;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;">'+c.nom.charAt(0)+'</div>')
+    +'<div style="position:absolute;bottom:0;right:0;width:18px;height:18px;background:#4f46e5;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:8px;">📷</div>'
+    +'</div>'
+    +'<div>'
+    +'<div style="font-weight:800;font-size:15px;color:#0f172a;">'+c.nom+'</div>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:1px;">'+(c.tel||"—")+' · '+c.zone+'</div>'
+    +'<span style="display:inline-block;margin-top:5px;font-size:10px;font-weight:700;padding:3px 11px;border-radius:20px;background:'+(isH?"#f5f3ff":"#eff6ff")+';color:'+(isH?"#7c3aed":"#4f46e5")+';border:1px solid '+(isH?"#ddd6fe":"#c7d2fe")+'">'+(isH?"Hebdo":"Jour")+'</span>'
+    +'</div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;">'
+    +'<span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:'+sCol+';">'
+    +'<span style="width:7px;height:7px;border-radius:50%;background:'+sCol+';display:inline-block;"></span>'
+    +c.statut.charAt(0).toUpperCase()+c.statut.slice(1)
+    +'</span>'
+    +'</div>'
+    +'</div>'
+    // Stats grid avec icônes
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">'
+    +[["🗓",stats[0][0],stats[0][1],stats[0][2]],["💼",stats[1][0],stats[1][1],stats[1][2]],["💰",stats[2][0],stats[2][1],stats[2][2]],["💳",stats[3][0],stats[3][1],stats[3][2]]].map(function(x){return'<div style="background:#f8f9ff;border:1px solid #e8eaf6;border-radius:12px;padding:8px 4px;text-align:center;"><div style="font-size:14px;margin-bottom:2px;">'+x[0]+'</div><div style="font-size:8px;color:#94a3b8;font-weight:600;text-transform:uppercase;">'+x[1]+'</div><div style="font-size:11px;font-weight:800;color:'+x[3]+';margin-top:1px;">'+x[2]+'</div></div>';}).join("")
+    +'</div>'
+    // Barre progression
+    +bar(p,col)
+    // Alertes docs
+    +(docAlerts.length>0?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0;">'+docAlerts.map(function(d){return'<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:'+(d.sev==="expire"?"#fef2f2":"#fffbeb")+';color:'+(d.sev==="expire"?"#dc2626":"#d97706")+';border:1px solid '+(d.sev==="expire"?"#fecaca":"#fde68a")+';font-weight:700;">'+(d.sev==="expire"?"🚨":"⚠️")+" "+d.msg+'</span>';}).join("")+'</div>':"")
+    // Boutons action ligne 1
+    +'<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
++'<button onclick="oD('+c.id+')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:700;padding:9px;border-radius:11px;border:1px solid #e8eaf6;background:#f8f9ff;color:#4f46e5;cursor:pointer;min-width:55px;">≡ Détails</button>'
++(hasPerm("rapport")?'<button onclick="oRp('+c.id+')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px;border-radius:11px;border:1px solid #d1fae5;background:#f0fdf4;color:#059669;font-size:11px;font-weight:700;cursor:pointer;min-width:55px;">📊 Rapport</button>':"")
++'<button onclick="modalEntretien('+c.id+')" style="padding:9px 12px;border-radius:11px;border:1px solid #fde68a;background:#fffbeb;color:#d97706;font-size:13px;font-weight:700;cursor:pointer;">🔧</button>'
++'<button onclick="showHistoriqueChauffeur('+c.id+')" style="padding:9px 12px;border-radius:11px;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;font-size:13px;cursor:pointer;">📋</button>'+(c.simTracker?(function(){
   var rawTel=c.simTracker.replace(/[^0-9]/g,'');
   // Forcer indicatif Côte d'Ivoire +225
   if(rawTel.startsWith('225')){rawTel=rawTel;}
@@ -3179,11 +3269,39 @@ function rScreenGlobal(sc){
   return '<a href="sms://+'+tel+'?body='+encodeURIComponent(cmd)+'" onclick="markCoupeCircuit('+c.id+','+(!c.moteurCoupe)+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid '+border+';background:'+bg+';color:'+color+';font-size:11px;font-weight:700;cursor:pointer;min-width:60px;text-align:center;text-decoration:none;display:inline-block;">'+label+'</a>';
 })():"")
 +(hasPerm('chauffeur')?'<button onclick="oEditCh('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">✏️</button>':"")+'<button onclick="genContratPDF('+c.id+')" style="flex:1;padding:8px;border-radius:10px;border:1px solid #d1fae5;background:#f0fdf4;color:#059669;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">📄</button>'
-+(hasPerm("versement")?'<button onclick="oV('+c.id+')" class="bor" style="flex:1;font-size:11px;padding:8px;min-width:60px;">+Vers.</button>':"")
 +'</div>'
-+(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";}).length>0?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:7px 10px;margin-top:7px;font-size:10px;color:#dc2626;font-weight:700;">⚠️ Sanction active — '+(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";})[0]||{}).description+'</div>':"")
-+'</div>';}).join("");
-    html='<div class="sec"><div style="display:flex;gap:7px;margin-bottom:13px;">'+(hasPerm("versement")?'<button onclick="oM(\'av\')" class="bgr" style="flex:1;font-size:12px;padding:10px;">Avance</button>':"")+(hasPerm("chauffeur")?'<button onclick="oM(\'ch\')" class="bor" style="flex:1.5;font-size:13px;padding:10px;">+ Ajouter</button>':"")+'<button onclick="exportPDF(\'chauffeurs\')" style="padding:10px 12px;border-radius:11px;background:#eff6ff;border:1.5px solid #bfdbfe;color:#1d4ed8;font-size:12px;font-weight:700;cursor:pointer;">📄 PDF</button></div>'+chCards+'</div>';
+    // Ligne documents + versement
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:1px solid #f0f2f8;">'
+    +'<button onclick="oDoc('+c.id+')" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid #e8eaf6;background:transparent;color:#64748b;font-size:11px;font-weight:600;cursor:pointer;">📄 Documents</button>'
+    +(hasPerm("versement")?'<button onclick="oV('+c.id+')" style="display:flex;align-items:center;gap:7px;padding:11px 22px;border-radius:13px;background:linear-gradient(135deg,#059669,#34d399);color:#fff;font-size:13px;font-weight:800;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(5,150,105,.3);">+ Versement ›</button>':"")
+    +'</div>'
+    +(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";}).length>0?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:7px 10px;margin-top:8px;font-size:10px;color:#dc2626;font-weight:700;">⚠️ Sanction active — '+(getSanctionsChauffeur(c.id).filter(function(s){return s.statut==="active";})[0]||{}).description+'</div>':"")
+    +'</div>'
+    +'</div>';}).join("");
+    html='<div class="sec">'
+    // Header actions style image
+    +'<div style="display:flex;gap:8px;margin-bottom:14px;align-items:stretch;">'
+    // Avance
+    +(hasPerm("versement")?'<div onclick="oM(\'av\')" style="display:flex;flex-direction:column;justify-content:center;background:#fff;border:1px solid #e8eaf6;border-radius:14px;padding:10px 12px;cursor:pointer;min-width:80px;flex:1;">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="font-size:16px;">📈</span><span style="font-size:12px;font-weight:700;color:#0f172a;">Avance</span><span style="color:#94a3b8;font-size:14px;">›</span></div>'
+    +'<div style="font-size:10px;color:#94a3b8;">Suivi des avances</div>'
+    +'</div>':"")
+    // Ajouter un membre - bouton principal violet
+    +(hasPerm("chauffeur")?'<div onclick="oM(\'ch\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:14px;padding:12px 16px;cursor:pointer;flex:1.5;box-shadow:0 4px 14px rgba(79,70,229,.3);">'
+    +'<div style="width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;margin-bottom:4px;">+</div>'
+    +'<div style="font-size:13px;font-weight:800;color:#fff;">Ajouter un membre</div>'
+    +'<div style="font-size:10px;color:rgba(255,255,255,.75);">Nouveau chauffeur</div>'
+    +'</div>':"")
+    // Exporter PDF
+    +'<div onclick="exportPDF(\'chauffeurs\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border:1px solid #e8eaf6;border-radius:14px;padding:10px 12px;cursor:pointer;min-width:80px;flex:1;">'
+    +'<div style="width:32px;height:38px;background:#dc2626;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;margin-bottom:4px;position:relative;">'
+    +'<span style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;background:#fff;clip-path:polygon(100% 0,0 0,100% 100%);"></span>'
+    +'📄</div>'
+    +'<div style="font-size:11px;font-weight:700;color:#0f172a;">Exporter PDF</div>'
+    +'<div style="font-size:9px;color:#94a3b8;">Rapport complet</div>'
+    +'</div>'
+    +'</div>'
+    +chCards+'</div>';
   }
 
   else if(S.tab==="chat"){
