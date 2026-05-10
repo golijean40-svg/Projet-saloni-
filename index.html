@@ -3375,6 +3375,49 @@ function rScreenGlobal(sc){
     +'<button onclick="sT(\'versements\')" style="font-size:11px;font-weight:700;color:#4f46e5;background:#f0f0ff;border:none;border-radius:20px;padding:4px 12px;cursor:pointer;font-family:inherit;">Voir tout</button>'
     +'</div>'
     +chHtml
+    // Widget planning semaine
+    +(function(){
+      if(CH.length===0) return "";
+      var planHtml='<div style="margin-top:16px;margin-bottom:14px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+        +'<div style="display:flex;align-items:center;gap:7px;"><span style="font-size:16px;">📅</span><span style="font-size:14px;font-weight:800;color:#0f172a;">Planning semaine</span></div>'
+        +'</div>';
+      CH.forEach(function(c){
+        var statuts = getStatutVersementSemaine(c, VE);
+        var nbVerse = statuts.filter(function(s){return s.verse;}).length;
+        planHtml+='<div style="background:#fff;border-radius:16px;border:1px solid #e8eaf6;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(79,70,229,.05);">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+          +'<div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div>'
+          +'<div style="font-size:11px;font-weight:700;background:#eff6ff;color:#4f46e5;padding:3px 10px;border-radius:20px;">'+nbVerse+"/"+statuts.length+' versés</div>'
+          +'</div>'
+          +'<div style="display:grid;grid-template-columns:repeat('+statuts.length+',1fr);gap:4px;">';
+        statuts.forEach(function(s){
+          var bg=s.verse?"#ecfdf5":s.retard?"#fef2f2":"#f8f9ff";
+          var border=s.verse?"#bbf7d0":s.retard?"#fecaca":"#e8eaf6";
+          var icon=s.verse?"✅":s.retard?"⚠️":"⏳";
+          var col=s.verse?"#059669":s.retard?"#dc2626":"#94a3b8";
+          planHtml+='<div style="background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:7px 4px;text-align:center;">'
+            +'<div style="font-size:14px;">'+icon+'</div>'
+            +'<div style="font-size:9px;font-weight:700;color:'+col+';margin-top:2px;">'+s.jour.substring(0,3)+'</div>'
+            +(s.verse?'<div style="font-size:8px;color:#059669;font-weight:600;">'+Math.round(s.montant/1000)+'k</div>':"")
+            +(s.decalage?'<div style="font-size:7px;color:#d97706;">Décalé</div>':"")
+            +(hasPerm("versement")&&!s.verse?'<div onclick="modalDecalage('+c.id+',\''+s.date+'\')" style="font-size:7px;color:#4f46e5;cursor:pointer;margin-top:2px;">↕ Décaler</div>':"")
+            +'</div>';
+        });
+        planHtml+='</div>';
+        var decalages=statuts.filter(function(s){return s.decalage;});
+        if(decalages.length>0){
+          planHtml+='<div style="margin-top:8px;padding:8px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;">';
+          decalages.forEach(function(s){
+            planHtml+='<div style="font-size:10px;color:#92400e;">📌 '+s.jour+' : '+s.decalage.raison+'</div>';
+          });
+          planHtml+='</div>';
+        }
+        planHtml+='</div>';
+      });
+      planHtml+='</div>';
+      return planHtml;
+    })()
     // Actions rapides
     +'<div style="margin-top:14px;margin-bottom:14px;">'
     +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">'
@@ -6747,6 +6790,193 @@ function iaOpen(){
   iaRefresh();
   setTimeout(function(){ta.focus();},200);
 }
+
+
+// ===== PLANNING VERSEMENTS =====
+
+var JOURS_SEMAINE = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+var RAISONS_DECALAGE = ["Retard chauffeur","Panne du saloni","Problème personnel","Décision du gérant","Autre"];
+
+function getDatesSemaineCourante() {
+  var today = new Date();
+  var day = today.getDay(); // 0=dim, 1=lun...
+  var lundi = new Date(today);
+  lundi.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+  var dates = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(lundi);
+    d.setDate(lundi.getDate() + i);
+    var y = d.getFullYear();
+    var m = (d.getMonth()+1)<10?"0"+(d.getMonth()+1):(d.getMonth()+1);
+    var j = d.getDate()<10?"0"+d.getDate():d.getDate();
+    dates.push(y+"-"+m+"-"+j);
+  }
+  return dates; // [lun, mar, mer, jeu, ven, sam, dim]
+}
+
+function getPlanningChauffeur(c) {
+  // Retourne le planning de la semaine courante pour un chauffeur
+  var dates = getDatesSemaineCourante();
+  var plan = JSON.parse(localStorage.getItem("sal_planning_"+c.id) || "null");
+  
+  if (c.freqPaiement === "Hebdomadaire") {
+    // 1 versement/semaine, limite dimanche 23h
+    return {
+      type: "hebdo",
+      joursAutorises: [dates[6]], // dimanche
+      limite: dates[6] + " 23:00",
+      joursEffectifs: plan ? plan.joursEffectifs : [dates[6]]
+    };
+  } else {
+    // Quotidien: lun-ven par défaut, 5 jours/semaine
+    var joursDefaut = [dates[0], dates[1], dates[2], dates[3], dates[4]]; // lun-ven
+    return {
+      type: "quotidien",
+      joursAutorises: plan ? plan.joursEffectifs : joursDefaut,
+      limite: "23:00",
+      joursEffectifs: plan ? plan.joursEffectifs : joursDefaut,
+      decalages: plan ? plan.decalages : {}
+    };
+  }
+}
+
+function getStatutVersementSemaine(c, VE) {
+  var dates = getDatesSemaineCourante();
+  var plan = getPlanningChauffeur(c);
+  var VEchauffeur = VE.filter(function(v){ return String(v.chauffeurId)===String(c.id); });
+  
+  var result = [];
+  
+  if (plan.type === "hebdo") {
+    // Chercher versement cette semaine (lun-dim)
+    var aVerse = VEchauffeur.some(function(v){
+      return dates.indexOf(v.date) >= 0;
+    });
+    var now = new Date();
+    var dim = new Date(dates[6] + "T23:00:00");
+    var enRetard = !aVerse && now > dim;
+    result.push({
+      date: dates[6],
+      jour: "Dimanche",
+      attendu: true,
+      verse: aVerse,
+      retard: enRetard,
+      montant: aVerse ? VEchauffeur.filter(function(v){ return dates.indexOf(v.date)>=0; }).reduce(function(s,v){return s+v.montant;},0) : 0
+    });
+  } else {
+    // Quotidien: 5 jours
+    plan.joursEffectifs.forEach(function(date, idx) {
+      var nomJour = JOURS_SEMAINE[new Date(date + "T12:00:00").getDay()];
+      var versements = VEchauffeur.filter(function(v){ return v.date === date; });
+      var aVerse = versements.length > 0;
+      var montant = versements.reduce(function(s,v){return s+v.montant;},0);
+      var now = new Date();
+      var limite = new Date(date + "T23:00:00");
+      var enRetard = !aVerse && now > limite;
+      var decalage = plan.decalages ? plan.decalages[date] : null;
+      result.push({
+        date: date,
+        jour: nomJour,
+        attendu: true,
+        verse: aVerse,
+        retard: enRetard,
+        montant: montant,
+        decalage: decalage
+      });
+    });
+  }
+  return result;
+}
+
+function decalerJourVersement(chauffeurId, dateOriginale, dateNouvelle, raison) {
+  var planKey = "sal_planning_" + chauffeurId;
+  var plan = JSON.parse(localStorage.getItem(planKey) || "{}");
+  if (!plan.joursEffectifs) {
+    var dates = getDatesSemaineCourante();
+    plan.joursEffectifs = [dates[0], dates[1], dates[2], dates[3], dates[4]];
+  }
+  if (!plan.decalages) plan.decalages = {};
+  
+  // Remplacer la date originale par la nouvelle
+  var idx = plan.joursEffectifs.indexOf(dateOriginale);
+  if (idx >= 0) plan.joursEffectifs[idx] = dateNouvelle;
+  
+  // Enregistrer la raison du décalage
+  plan.decalages[dateNouvelle] = {
+    dateOriginale: dateOriginale,
+    raison: raison,
+    par: S.user ? S.user.pseudo : "Gérant",
+    le: td()
+  };
+  
+  localStorage.setItem(planKey, JSON.stringify(plan));
+  R();
+}
+
+function modalDecalage(chauffeurId, dateOriginale) {
+  var old = document.getElementById("_decalageModal");
+  if (old) old.remove();
+  
+  var modal = document.createElement("div");
+  modal.id = "_decalageModal";
+  modal.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;";
+  
+  var box = document.createElement("div");
+  box.style.cssText = "background:#fff;border-radius:20px 20px 0 0;width:100%;padding:20px 16px 32px;";
+  
+  var dates = getDatesSemaineCourante();
+  var opts = dates.map(function(d,i){
+    return '<option value="'+d+'">'+JOURS_SEMAINE[i===6?0:i+1]+" "+d+'</option>';
+  }).join("");
+  
+  // Construire le contenu avec innerHTML safe
+  var bar = document.createElement("div"); bar.style.cssText="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"; box.appendChild(bar);
+  var titre = document.createElement("div"); titre.style.cssText="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:4px;"; titre.textContent="Décaler un versement"; box.appendChild(titre);
+  var sous = document.createElement("div"); sous.style.cssText="font-size:12px;color:#64748b;margin-bottom:16px;"; sous.textContent="Date originale : "+dateOriginale; box.appendChild(sous);
+  var lbl1 = document.createElement("label"); lbl1.style.cssText="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;"; lbl1.textContent="Nouveau jour"; box.appendChild(lbl1);
+  var sel = document.createElement("select"); sel.id="decalDateNew"; sel.style.cssText="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px;margin:6px 0 14px;font-family:inherit;box-sizing:border-box;"; sel.innerHTML=opts; box.appendChild(sel);
+  var lbl2 = document.createElement("label"); lbl2.style.cssText="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;"; lbl2.textContent="Raison"; box.appendChild(lbl2);
+  var wrap = document.createElement("div"); wrap.id="decalRaisonsWrap"; wrap.style.cssText="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 6px;"; box.appendChild(wrap);
+  var inp = document.createElement("input"); inp.id="decalRaisonTexte"; inp.type="text"; inp.placeholder="Choisir une raison..."; inp.readOnly=true; inp.style.cssText="width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px;margin-bottom:14px;box-sizing:border-box;font-family:inherit;"; box.appendChild(inp);
+  var btnOk = document.createElement("button"); btnOk.textContent="Confirmer le décalage"; btnOk.style.cssText="width:100%;padding:14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;"; btnOk.addEventListener("click",function(){ validerDecalage(chauffeurId, dateOriginale); }); box.appendChild(btnOk);
+  var btnAnn = document.createElement("button"); btnAnn.textContent="Annuler"; btnAnn.style.cssText="width:100%;padding:12px;background:none;border:none;color:#64748b;font-size:14px;cursor:pointer;margin-top:6px;font-family:inherit;"; btnAnn.addEventListener("click",function(){ document.getElementById("_decalageModal").remove(); }); box.appendChild(btnAnn);
+
+  // Boutons raisons
+  RAISONS_DECALAGE.forEach(function(r){
+    var btn = document.createElement("button");
+    btn.textContent = r;
+    btn.style.cssText = "background:#f0f0f0;border:1px solid #ddd;border-radius:20px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit;margin:3px;";
+    btn.addEventListener("click", function(){
+      wrap.querySelectorAll("button").forEach(function(b){ b.style.background="#f0f0f0"; b.style.color="#333"; });
+      btn.style.background="#4f46e5"; btn.style.color="#fff";
+      inp.value = r;
+    });
+    wrap.appendChild(btn);
+  });
+
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+function selectRaison(btn, raison) {
+  document.querySelectorAll("#decalRaisonsWrap button").forEach(function(b){
+    b.style.background = "#f0f0f0";
+    b.style.color = "#333";
+  });
+  btn.style.background = "#4f46e5";
+  btn.style.color = "#fff";
+  document.getElementById("decalRaisonTexte").value = raison;
+}
+
+function validerDecalage(chauffeurId, dateOriginale) {
+  var dateNouvelle = document.getElementById("decalDateNew").value;
+  var raison = document.getElementById("decalRaisonTexte").value;
+  if (!raison) { alert("Choisissez une raison"); return; }
+  document.getElementById("_decalageModal").remove();
+  decalerJourVersement(chauffeurId, dateOriginale, dateNouvelle, raison);
+}
+
+// ===== FIN PLANNING VERSEMENTS =====
 
 function iaCreerBouton(){
   if(document.getElementById("ia-fab")) return;
