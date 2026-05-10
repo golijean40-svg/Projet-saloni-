@@ -6494,11 +6494,25 @@ async function iaSend(question){
   iaShowLoading(true);
 
   try {
+    // Construire les messages en alternance stricte user/assistant
+    var allMsgs = window._iaHist.slice();
+    var cleanMsgs = [];
+    var lastRole = null;
+    for (var i = 0; i < allMsgs.length; i++) {
+      var r = allMsgs[i].role === "assistant" ? "assistant" : "user";
+      if (r !== lastRole) {
+        cleanMsgs.push({role: r, content: allMsgs[i].content});
+        lastRole = r;
+      }
+    }
+    // S'assurer que le premier message est "user"
+    if (cleanMsgs.length > 0 && cleanMsgs[0].role !== "user") {
+      cleanMsgs.shift();
+    }
+    
     var payload = {
       context: iaBuildCtx(),
-      messages: window._iaHist.map(function(m){
-        return {role:m.role,content:m.content};
-      })
+      messages: cleanMsgs
     };
     var res = await fetch(WORKER_URL, {
       method:"POST",
@@ -6506,7 +6520,7 @@ async function iaSend(question){
       body:JSON.stringify(payload)
     });
     var data = await res.json();
-    var rep = data.reply || data.error || "Pas de reponse.";
+    var rep = data.reply || (data.error ? "Erreur API: " + JSON.stringify(data.error) : "Pas de reponse.");
     window._iaHist.push({role:"assistant",content:rep});
   } catch(e) {
     window._iaHist.push({role:"assistant",content:"Erreur: "+e.message});
