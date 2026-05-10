@@ -6695,17 +6695,21 @@ function iaOpen(){
   ta.placeholder = "Posez votre question...";
   ta.rows = 1;
   ta.style.cssText = "flex:1;border:1.5px solid #dbeafe;border-radius:12px;padding:10px 12px;font-size:14px;resize:none;min-height:42px;max-height:90px;font-family:inherit;background:white;outline:none;color:#0f172a;line-height:1.5;";
-  ta.addEventListener("input",function(){
+  ta.addEventListener("input",function(e){
+    e.stopPropagation();
     ta.style.height="auto";
     ta.style.height=Math.min(ta.scrollHeight,90)+"px";
   });
   ta.addEventListener("keydown",function(e){
+    e.stopPropagation();
     if(e.keyCode===13&&!e.shiftKey){
       e.preventDefault();
       var val=ta.value.trim();
       if(val){ta.value="";ta.style.height="auto";iaSend(val);}
     }
   });
+  ta.addEventListener("click",function(e){e.stopPropagation();});
+  ta.addEventListener("focus",function(e){e.stopPropagation();});
 
   var sendBtn = document.createElement("button");
   sendBtn.style.cssText = "width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;";
@@ -6719,6 +6723,11 @@ function iaOpen(){
   inputZone.appendChild(sendBtn);
   panel.appendChild(inputZone);
 
+  // Stopper propagation sur tout le panel
+  panel.addEventListener("click", function(e){e.stopPropagation();});
+  panel.addEventListener("touchstart", function(e){e.stopPropagation();});
+  panel.addEventListener("touchend", function(e){e.stopPropagation();});
+  
   document.body.appendChild(panel);
   iaRefresh();
   setTimeout(function(){ta.focus();},200);
