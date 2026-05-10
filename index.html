@@ -6465,7 +6465,6 @@ function iaBuildCtx(){
     var DE = data.depenses || [];
     var d = new Date();
     var t = d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate();
-    var fmt = function(n){ return Number(n).toLocaleString()+" FCFA"; };
     var ac = CH.filter(function(c){return c.statut==="actif";});
     var vj = VE.filter(function(v){return v.date===t;});
     var tJ = vj.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
@@ -6473,12 +6472,14 @@ function iaBuildCtx(){
     var tD = DE.reduce(function(s,v){return s+(Number(v.montant)||0);},0);
     var op = ac.filter(function(c){return vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});
     var np = ac.filter(function(c){return !vj.some(function(v){return String(v.chauffeurId)===String(c.id);});});
-    return "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan, pour JC le gerant. " +
-      "Date: "+t+". Chauffeurs actifs: "+ac.map(function(c){return c.nom;}).join(", ")+". " +
-      "Ont verse ("+fmt(tJ)+"): "+(op.length?op.map(function(c){return c.nom;}).join(", "):"Personne")+". " +
-      "N ont pas verse: "+(np.length?np.map(function(c){return c.nom;}).join(", "):"Tous ont verse")+". " +
-      "Total: "+fmt(tR)+". Depenses: "+fmt(tD)+". Benefice: "+fmt(tR-tD)+". " +
-      "Reponds en francais, concis. Pour WhatsApp donne le texte pret a copier.";
+    var ctx = "Tu es l assistant IA de Saloni Manager, flotte de tricycles-taxis a Abidjan, pour JC le gerant. ";
+    ctx += "Date: " + t + ". ";
+    ctx += "Chauffeurs actifs (" + ac.length + "): " + ac.map(function(c){return c.nom;}).join(", ") + ". ";
+    ctx += "Ont verse aujourd hui (" + tJ + " FCFA): " + (op.length ? op.map(function(c){return c.nom;}).join(", ") : "Personne") + ". ";
+    ctx += "N ont pas verse: " + (np.length ? np.map(function(c){return c.nom;}).join(", ") : "Tous ont verse") + ". ";
+    ctx += "Total versements: " + tR + " FCFA. Depenses: " + tD + " FCFA. Benefice: " + (tR-tD) + " FCFA. ";
+    ctx += "Reponds en francais, de facon concise et pratique.";
+    return ctx;
   } catch(e) {
     return "Tu es l assistant IA de Saloni Manager a Abidjan pour JC. Reponds en francais.";
   }
