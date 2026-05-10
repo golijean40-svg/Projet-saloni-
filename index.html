@@ -174,11 +174,11 @@ select{
 
 /* ── MODALS / SHEETS ── */
 .overlay{position:fixed;inset:0;background:var(--overlay);z-index:100;display:flex;align-items:flex-end;}
-.sheet{background:var(--sheet-bg);border-radius:12px 12px 0 0;width:100%;max-height:90vh;display:flex;flex-direction:column;animation:up .2s ease;box-shadow:0 -4px 20px rgba(0,0,0,.15);}
+.sheet{background:var(--sheet-bg);border-radius:20px 20px 0 0;width:100%;max-height:93vh;display:flex;flex-direction:column;animation:up .2s ease;box-shadow:0 -4px 30px rgba(0,0,0,.2);}
 @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .sh-bar{width:32px;height:3px;background:var(--border2);border-radius:2px;margin:8px auto;}
 .sh-hd{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--sheet-hd);}
-.sh-bd{padding:16px 16px 32px;overflow-y:auto;}
+.sh-bd{padding:16px 16px 100px;overflow-y:auto;}
 
 /* ── FAB ── */
 .fab{
