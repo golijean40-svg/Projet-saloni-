@@ -451,6 +451,7 @@ body.dark [style*="border-bottom:1px solid #eff6ff"]{border-color:var(--border) 
 /* ── Bottom Bar ── */
 /* ── Bottom Bar ── */
 #bottomBar.visible { display:flex !important; }
+#bottomBar { display:none; }
 .bb-active svg { stroke: #4f46e5 !important; }
 .bb-active span { color: #4f46e5 !important; font-weight:800 !important; }
 #app { padding-bottom: 72px !important; }
@@ -483,7 +484,7 @@ nav#nav .nb:hover {
   <div id="screen"></div>
 </div>
 <nav id="nav"></nav>
-<div id="bottomBar" style="display:none !important;position:fixed;bottom:0;left:0;right:0;height:72px;background:#fff;border-top:1px solid #e8eaf6;box-shadow:0 -4px 20px rgba(79,70,229,.08);z-index:400;display:flex;align-items:center;justify-content:space-around;padding:0 8px 8px;">
+<div id="bottomBar" style="display:none;position:fixed;bottom:0;left:0;right:0;height:72px;background:#fff;border-top:1px solid #e8eaf6;box-shadow:0 -4px 20px rgba(79,70,229,.08);z-index:400;display:flex;align-items:center;justify-content:space-around;padding:0 8px 8px;">
   <button id="bbHome" onclick="sT('home')" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:8px 12px;border-radius:12px;flex:1;">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span style="font-size:10px;font-weight:600;color:#94a3b8;">Accueil</span>
@@ -536,6 +537,7 @@ var MODES=["Especes","Wave","Orange Money","MTN Money","Virement"];
 var CATS=["Carburant","Reparation","Assurance","Pieces","Lavage","Autre"];
 var CHC={actif:"#059669",repos:"#d97706",suspendu:"#dc2626"};
 var JOURS=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+var JOURS_SEMAINE=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
 var PRIME_MONTANT=15000;
 
 // ══ SONS MESSAGES ══
@@ -1792,6 +1794,11 @@ function R(){
 }
 function _R(){
   if(!S.user){try{rLogin();}catch(e){}return;}
+  // Connecté : s'assurer que l'écran login est effacé
+  var sc = document.getElementById("screen");
+  if(sc && sc.innerHTML && sc.innerHTML.indexOf('id="lp"') >= 0){
+    sc.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Chargement...</div>';
+  }
   try{pingSession();}catch(e){}
   try{rHD();}catch(e){console.log('rHD err:',e.message);}
   try{rNAV();}catch(e){console.log('rNAV err:',e.message);}
@@ -1815,6 +1822,11 @@ function _R(){
 }
 
 function rLogin(){
+  // Cacher bottom bar sur login
+  var bb = document.getElementById("bottomBar");
+  var app = document.getElementById("app");
+  if(bb){ bb.style.display = "none"; bb.classList.remove("visible"); }
+  if(app){ app.style.paddingBottom = "0"; }
   document.getElementById("hd").innerHTML="";document.getElementById("nav").innerHTML="";
   document.getElementById("screen").innerHTML=
   '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#1e3a8a,#2563eb,#3b82f6);">'
@@ -2337,27 +2349,42 @@ function renderCarte(sc){
 }
 // ══ ÉCRANS CHAUFFEURS ══
 function updateBottomBar(){
+  var bb = document.getElementById("bottomBar");
+  var app = document.getElementById("app");
+  
+  if(!S.user || estCompteChauf()){
+    // Pas connecté ou chauffeur : cacher la bar
+    if(bb){ bb.style.display = "none"; bb.classList.remove("visible"); }
+    if(app){ app.style.paddingBottom = "0"; }
+    return;
+  }
+  
+  // Gérant/Admin connecté : afficher la bar
+  if(bb){ bb.style.display = "flex"; bb.classList.add("visible"); }
+  if(app){ app.style.paddingBottom = "72px"; }
+  
+  // Onglet actif
   var tab = S.tab || "home";
   var map = {home:"bbHome",chauffeurs:"bbEquipe",rapports:"bbRapports",parametres:"bbParams"};
   ["bbHome","bbEquipe","bbRapports","bbParams"].forEach(function(id){
     var el = document.getElementById(id);
-    if(el){ el.classList.remove("bb-active"); el.querySelector("svg").setAttribute("stroke","#94a3b8"); el.querySelector("span").style.color="#94a3b8"; }
+    if(el){
+      el.classList.remove("bb-active");
+      var svg = el.querySelector("svg");
+      var span = el.querySelector("span");
+      if(svg) svg.setAttribute("stroke","#94a3b8");
+      if(span){ span.style.color="#94a3b8"; span.style.fontWeight="600"; }
+    }
   });
   var activeId = map[tab];
   if(activeId){
     var el = document.getElementById(activeId);
-    if(el){ el.classList.add("bb-active"); el.querySelector("svg").setAttribute("stroke","#4f46e5"); el.querySelector("span").style.color="#4f46e5"; el.querySelector("span").style.fontWeight="800"; }
-  }
-  // Afficher/masquer la bottom bar
-  var bb = document.getElementById("bottomBar");
-  if(bb){
-    if(S.user && !estCompteChauf()){
-      bb.style.cssText = bb.style.cssText.replace('display:none !important','');
-      bb.style.display = "flex";
-      bb.classList.add("visible");
-    } else {
-      bb.style.display = "none";
-      bb.classList.remove("visible");
+    if(el){
+      el.classList.add("bb-active");
+      var svg = el.querySelector("svg");
+      var span = el.querySelector("span");
+      if(svg) svg.setAttribute("stroke","#4f46e5");
+      if(span){ span.style.color="#4f46e5"; span.style.fontWeight="800"; }
     }
   }
 }
@@ -3377,7 +3404,7 @@ function rScreenGlobal(sc){
     +chHtml
     // Widget planning semaine
     +(function(){
-      if(CH.length===0) return "";
+      if(!CH || CH.length===0) return '<div style="background:#fff;border-radius:16px;border:1px solid #e8eaf6;padding:14px;margin-top:16px;text-align:center;color:#94a3b8;font-size:13px;">📅 Chargement du planning...</div>';
       var planHtml='<div style="margin-top:16px;margin-bottom:14px;">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
         +'<div style="display:flex;align-items:center;gap:7px;"><span style="font-size:16px;">📅</span><span style="font-size:14px;font-weight:800;color:#0f172a;">Planning semaine</span></div>'
@@ -6844,6 +6871,15 @@ function getStatutVersementSemaine(c, VE) {
   var dates = getDatesSemaineCourante();
   var plan = getPlanningChauffeur(c);
   var VEchauffeur = VE.filter(function(v){ return String(v.chauffeurId)===String(c.id); });
+  // Normaliser les dates (Firebase: "04/05/2026" → "2026-05-04")
+  VEchauffeur = VEchauffeur.map(function(v){
+    var d = v.date || "";
+    if(d.indexOf("/") > -1){
+      var parts = d.split("/");
+      if(parts.length === 3) d = parts[2]+"-"+parts[1]+"-"+parts[0];
+    }
+    return Object.assign({}, v, {date: d});
+  });
   
   var result = [];
   
