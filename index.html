@@ -1752,24 +1752,58 @@ function envoyerChat(cid){var inp=document.getElementById("chatInput");if(!inp||
 function msgBubble(m,moiDe){
   var moi=m.de===moiDe;
   var expediteurNom="";
-  var bulleColor="linear-gradient(135deg,#1d4ed8,#3b82f6)";
   var allC=tousComptes();
   var cc=allC.filter(function(x){return x.pseudo===m.auteur;})[0];
-  if(moi){
-    if(S.user&&S.user.pseudo==="gerant"){bulleColor="linear-gradient(135deg,#1d4ed8,#3b82f6)";}
-    else if(S.user&&S.user.typeCompte==="chauffeur"){bulleColor="linear-gradient(135deg,#059669,#10b981)";}
-    else{bulleColor="linear-gradient(135deg,#7c3aed,#a855f7)";}
-  }else{
-    if(m.auteur==="gerant"){expediteurNom="Gerant";}
+  if(!moi){
+    if(m.auteur==="gerant"){expediteurNom="Gérant";}
     else if(cc){expediteurNom=cc.role||cc.pseudo;}
     else{expediteurNom=m.auteur||"";}
   }
-  var bulleRecuColor=m.de==="chauffeur"?"#fff":m.auteur==="gerant"?"#e8f0fb":"#f3e8ff";
-  var borderRecuColor=m.de==="chauffeur"?"1px solid #dbeafe":m.auteur==="gerant"?"1px solid #bfdbfe":"1px solid #ddd6fe";
-  return'<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:8px;">'  +'<div style="max-width:78%;">'  +(!moi&&expediteurNom?'<div style="font-size:10px;font-weight:800;color:'+(m.auteur==="gerant"?"#1d4ed8":"#7c3aed")+';margin-bottom:3px;padding-left:4px;">'+expediteurNom+'</div>':"")  +'<div style="background:'+(moi?bulleColor:bulleRecuColor)+';color:'+(moi?"#fff":"#0f172a")+';border-radius:'+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+';padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:'+(moi?"none":borderRecuColor)+';">'  +m.texte.replace(/</g,"&lt;")  +'<div style="font-size:9px;opacity:.6;margin-top:3px;text-align:right;">'+m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"")+"</div>"  +"</div></div></div>";}
+  // Style WhatsApp
+  var moiBg="#dcf8c6"; // vert clair comme WhatsApp
+  var recuBg="#ffffff";
+  var moiTxt="#0f172a";
+  var recuTxt="#0f172a";
+  var tickCol=m.lu?"#34b7f1":"#94a3b8"; // bleu si lu, gris si envoyé
+  
+  return '<div style="display:flex;justify-content:'+(moi?"flex-end":"flex-start")+';margin-bottom:3px;padding:0 10px;">'
+    +'<div style="max-width:75%;position:relative;">'
+    +(!moi&&expediteurNom?'<div style="font-size:11px;font-weight:700;color:#075e54;margin-bottom:2px;padding-left:2px;">'+expediteurNom+'</div>':"")
+    +'<div style="background:'+(moi?moiBg:recuBg)+';color:'+(moi?moiTxt:recuTxt)+';border-radius:'+(moi?"12px 12px 2px 12px":"12px 12px 12px 2px")+';padding:7px 12px 5px;font-size:14px;line-height:1.5;box-shadow:0 1px 3px rgba(0,0,0,.12);position:relative;">'
+    // Triangle style WhatsApp
+    +'<div style="position:absolute;'+(moi?"right:-6px;":"left:-6px;")+';top:0;width:0;height:0;border-style:solid;border-width:'+(moi?"0 0 8px 7px":"0 7px 8px 0")+';border-color:'+(moi?"transparent transparent transparent "+moiBg:"transparent "+recuBg+" transparent transparent")+'"></div>'
+    +m.texte.replace(/</g,"&lt;").replace(/\n/g,"<br>")
+    +'<div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;margin-top:2px;">'
+    +'<span style="font-size:10px;color:#94a3b8;">'+m.heure+'</span>'
+    +(moi?'<span style="font-size:11px;color:'+tickCol+';">'+(m.lu?"✓✓":"✓")+'</span>':"")
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+}
 
-function chatBox(cid,moiDe){var msgs=getChatMsgs(cid);marquerChatLu(cid);return'<div style="flex:1;overflow-y:auto;padding:12px 14px;" id="chatBox">'+(msgs.length===0?'<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">💬 Aucun message pour l\'instant</div>':msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))+"</div>";}
-function chatInput(cid){return'<div style="padding:10px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:8px;align-items:flex-end;"><textarea id="chatInput" placeholder="Votre message..." rows="1" style="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea><button onclick="envoyerChat('+cid+')" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;">↑</button></div>';}
+function chatBox(cid,moiDe){
+  var msgs=getChatMsgs(cid);
+  marquerChatLu(cid);
+  // Fond style WhatsApp avec motif
+  return '<div style="flex:1;overflow-y:auto;padding:8px 0 12px;background:#e5ddd5;background-image:url(\'data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23c8b8a2\' fill-opacity=\'0.3\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\');" id="chatBox">'
+    +(msgs.length===0
+      ?'<div style="text-align:center;padding:40px 20px;">'
+        +'<div style="background:rgba(255,255,255,.8);border-radius:12px;padding:14px 20px;display:inline-block;font-size:13px;color:#667781;">💬 Aucun message pour l\'instant</div>'
+        +'</div>'
+      :msgs.map(function(m){return msgBubble(m,moiDe);}).join(""))
+    +"</div>";
+}
+function chatInput(cid){
+  return '<div style="padding:6px 8px;background:#f0f0f0;display:flex;gap:8px;align-items:flex-end;">'
+    +'<div style="flex:1;background:#fff;border-radius:24px;padding:6px 14px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,.1);">'
+    +'<span style="font-size:20px;cursor:pointer;padding-bottom:4px;">😊</span>'
+    +'<textarea id="chatInput" placeholder="Message..." rows="1" style="flex:1;min-height:28px;max-height:90px;resize:none;border:none;outline:none;font-size:15px;line-height:1.5;background:transparent;font-family:inherit;padding:4px 0;" onkeydown="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();envoyerChat('+cid+');}"></textarea>'
+    +'<span style="font-size:20px;cursor:pointer;padding-bottom:4px;">📎</span>'
+    +'</div>'
+    +'<button onclick="envoyerChat('+cid+')" style="width:48px;height:48px;border-radius:50%;background:#25d366;border:none;color:#fff;font-size:22px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,211,102,.4);">➤</button>'
+    +'</div>';
+}
 function joursRestants(dateStr){if(!dateStr)return null;var exp=new Date(dateStr);var now=new Date();now.setHours(0,0,0,0);exp.setHours(0,0,0,0);return Math.round((exp-now)/(1000*60*60*24));}
 function getDocAlerts(c){var alerts=[];[{key:"permisExp",label:"Permis"},{key:"cgFin",label:"Carte grise"},{key:"vignetteExp",label:"Vignette"}].forEach(function(d){var j=joursRestants(c[d.key]);if(j===null)return;if(j<0)alerts.push({sev:"expire",label:d.label,jours:j,msg:d.label+" expiré depuis "+Math.abs(j)+" jour(s)"});else if(j<=30)alerts.push({sev:"bientot",label:d.label,jours:j,msg:d.label+" expire dans "+j+" jour(s)"});});return alerts;}
 function getAl(){var a=[];(S.data.chauffeurs||[]).forEach(function(c){if(c.dette>0)a.push({id:"dt-"+c.id,icon:"💸",msg:"Dette: "+c.nom+" — "+fc(c.dette)});var docAl=getDocAlerts(c);docAl.forEach(function(d){a.push({id:"doc-"+c.id+"-"+d.label,icon:d.sev==="expire"?"🚨":"⚠️",msg:c.nom+" — "+d.msg});});});return{all:a,vis:a.filter(function(x){return S.ign.indexOf(x.id)<0;})};}
@@ -2490,105 +2524,193 @@ function renderVersementsChauf(sc,c){
 function renderChatChauf(sc,c){
   if(!c){sc.innerHTML="";return;}
   var cid=c.id;
-  var wrapper=document.createElement("div");
-  wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
 
-  // Header
-  var hd=document.createElement("div");
-  hd.style.cssText="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;";
-  var ico=document.createElement("div");
-  ico.style.cssText="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;";
-  ico.textContent="🛺";
-  var hInfo=document.createElement("div");
-  hInfo.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>Gérant / Équipe</div>"
-    +"<div style='font-size:10px;color:#059669;'>💬 Message instantané</div>";
-  hd.appendChild(ico);hd.appendChild(hInfo);
-  wrapper.appendChild(hd);
+  // Fonction pour afficher une conversation
+  function showConv(destNom, destInit, destBg){
+    var wrapper=document.createElement("div");
+    wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 60px);background:#e5ddd5;";
 
-  // Messages avec séparateurs de dates
-  var chatBoxDiv=document.createElement("div");
-  chatBoxDiv.id="chatBox";
-  chatBoxDiv.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
-  var msgs=getChatMsgs(cid);
-  marquerChatLu(cid);
-  if(msgs.length===0){
-    chatBoxDiv.innerHTML="<div style='text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;'>💬 Aucun message pour l&#39;instant</div>";
-  }else{
-    var lastDate="";
-    msgs.forEach(function(m){
-      // Séparateur de date
-      var msgDate=m.date||"";
-      if(msgDate&&msgDate!==lastDate){
-        chatBoxDiv.appendChild(dateSepDiv(formatMsgDate(msgDate)));
-        lastDate=msgDate;
-      }
-      var moi=m.de==="chauffeur";
-      var expediteur="";
-      var bulleRecuBg="#fff";
-      var bulleRecuBorder="1px solid #dbeafe";
-      var expediteurColor="#1d4ed8";
-      if(!moi){
-        var allC=tousComptes();
-        var cc=allC.filter(function(x){return x.pseudo===m.auteur;})[0];
-        if(m.auto){
-          expediteur="🤖 Saloni Manager";bulleRecuBg="#fef3c7";bulleRecuBorder="1px solid #fde68a";expediteurColor="#d97706";
-        }else if(m.auteur==="gerant"||(!cc&&m.de==="admin")){
-          expediteur="Gérant";bulleRecuBg="#e8f0fb";bulleRecuBorder="1px solid #bfdbfe";expediteurColor="#1d4ed8";
-        }else if(cc){
-          expediteur=cc.role||cc.pseudo;bulleRecuBg="#f3e8ff";bulleRecuBorder="1px solid #ddd6fe";expediteurColor="#7c3aed";
-        }else{expediteur=m.auteur||"Admin";}
-      }
-      var bbl=document.createElement("div");
-      bbl.style.cssText="display:flex;justify-content:"+(moi?"flex-end":"flex-start")+";margin-bottom:8px;";
-      var inner=document.createElement("div");inner.style.cssText="max-width:78%;";
-      if(!moi&&expediteur){
-        var expDiv=document.createElement("div");
-        expDiv.style.cssText="font-size:10px;font-weight:800;color:"+expediteurColor+";margin-bottom:3px;padding-left:4px;";
-        expDiv.textContent=expediteur;inner.appendChild(expDiv);
-      }
-      // Photo ou texte
-      var bulle=document.createElement("div");
-      if(m.photo){
-        bulle.style.cssText="background:"+(moi?"linear-gradient(135deg,#059669,#10b981)":bulleRecuBg)+";border-radius:"+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:5px;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi?"none":bulleRecuBorder)+";overflow:hidden;";
-        var img=document.createElement("img");
-        img.src=m.photo;img.style.cssText="max-width:180px;max-height:200px;border-radius:10px;display:block;";
-        bulle.appendChild(img);
-      }else{
-        bulle.style.cssText="background:"+(moi?"linear-gradient(135deg,#059669,#10b981)":bulleRecuBg)+";color:"+(moi?"#fff":"#0f172a")+";border-radius:"+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi?"none":bulleRecuBorder)+";";
-        bulle.textContent=m.texte;
-      }
-      var meta=document.createElement("div");
-      meta.style.cssText="font-size:9px;opacity:.6;margin-top:3px;text-align:right;";
-      meta.textContent=m.heure+(moi&&m.lu?" ✓✓":moi?" ✓":"");
-      bulle.appendChild(meta);
-      inner.appendChild(bulle);bbl.appendChild(inner);chatBoxDiv.appendChild(bbl);
+    // Header WhatsApp
+    var hd=document.createElement("div");
+    hd.style.cssText="padding:8px 12px;background:#008069;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.2);";
+    var backBtn=document.createElement("button");
+    backBtn.innerHTML="&#8592;";
+    backBtn.style.cssText="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:0 4px;";
+    backBtn.onclick=function(){S.chatConvChaufOuverte=null;renderChatChauf(sc,c);};
+    var av=document.createElement("div");
+    av.style.cssText="width:40px;height:40px;border-radius:50%;background:"+destBg+";display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;";
+    av.textContent=destInit;
+    var hInfo=document.createElement("div");
+    hInfo.style.flex="1";
+    hInfo.innerHTML="<div style='font-weight:700;font-size:15px;color:#fff;'>"+destNom+"</div>"
+      +"<div style='font-size:11px;color:rgba(255,255,255,.8);'>Saloni Manager</div>";
+    var icos=document.createElement("div");
+    icos.style.cssText="display:flex;gap:16px;";
+    icos.innerHTML="<span style='font-size:20px;color:#fff;'>📞</span><span style='font-size:20px;color:#fff;'>&#8942;</span>";
+    hd.appendChild(backBtn);hd.appendChild(av);hd.appendChild(hInfo);hd.appendChild(icos);
+    wrapper.appendChild(hd);
+
+    // Messages
+    var chatBoxDiv=document.createElement("div");
+    chatBoxDiv.id="chatBox";
+    chatBoxDiv.style.cssText="flex:1;overflow-y:auto;padding:8px 4px 12px;background:#e5ddd5;";
+    var msgs=getChatMsgs(cid);
+    marquerChatLu(cid);
+    if(msgs.length===0){
+      var emptyDiv=document.createElement("div");
+      emptyDiv.style.cssText="text-align:center;padding:40px 20px;";
+      emptyDiv.innerHTML="<div style='background:rgba(255,255,255,.85);border-radius:12px;padding:12px 20px;display:inline-block;font-size:13px;color:#667781;'>Aucun message. Écrivez pour commencer !</div>";
+      chatBoxDiv.appendChild(emptyDiv);
+    } else {
+      var lastDate="";
+      msgs.forEach(function(m){
+        if(m.date&&m.date!==lastDate){
+          var sep=document.createElement("div");
+          sep.style.cssText="text-align:center;margin:8px 0;";
+          sep.innerHTML="<span style='background:rgba(255,255,255,.88);color:#667781;font-size:12px;font-weight:600;padding:4px 14px;border-radius:10px;'>"+formatMsgDate(m.date)+"</span>";
+          chatBoxDiv.appendChild(sep);
+          lastDate=m.date;
+        }
+        var moi=m.de==="chauffeur";
+        var row=document.createElement("div");
+        row.style.cssText="display:flex;justify-content:"+(moi?"flex-end":"flex-start")+";margin-bottom:2px;padding:0 8px;";
+        var bulle=document.createElement("div");
+        bulle.style.cssText="max-width:75%;background:"+(moi?"#dcf8c6":"#ffffff")+";border-radius:"+(moi?"12px 2px 12px 12px":"2px 12px 12px 12px")+";padding:6px 10px 4px;box-shadow:0 1px 2px rgba(0,0,0,.15);";
+        // Nom expéditeur côté reçu
+        if(!moi){
+          var expEl=document.createElement("div");
+          expEl.style.cssText="font-size:11px;font-weight:700;color:#128c7e;margin-bottom:2px;";
+          expEl.textContent=m.auto?"🤖 Saloni Manager":"Gérant";
+          bulle.appendChild(expEl);
+        }
+        if(m.photo){
+          var img=document.createElement("img");
+          img.src=m.photo;img.style.cssText="max-width:200px;max-height:220px;border-radius:8px;display:block;";
+          bulle.appendChild(img);
+        } else {
+          var txtEl=document.createElement("div");
+          txtEl.style.cssText="font-size:15px;color:#111;line-height:1.5;word-break:break-word;";
+          txtEl.textContent=m.texte;
+          bulle.appendChild(txtEl);
+        }
+        var meta=document.createElement("div");
+        meta.style.cssText="display:flex;align-items:center;justify-content:flex-end;gap:3px;margin-top:1px;";
+        var heureEl=document.createElement("span");
+        heureEl.style.cssText="font-size:11px;color:#667781;";
+        heureEl.textContent=m.heure||"";
+        meta.appendChild(heureEl);
+        if(moi){
+          var tick=document.createElement("span");
+          tick.style.cssText="font-size:13px;color:"+(m.lu?"#34b7f1":"#94a3b8")+";";
+          tick.textContent=m.lu?"✓✓":"✓";
+          meta.appendChild(tick);
+        }
+        bulle.appendChild(meta);
+        row.appendChild(bulle);
+        chatBoxDiv.appendChild(row);
+      });
+    }
+    wrapper.appendChild(chatBoxDiv);
+
+    // Input WhatsApp
+    var inputDiv=document.createElement("div");
+    inputDiv.style.cssText="padding:6px 8px;background:#f0f0f0;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;";
+    var inputWrap=document.createElement("div");
+    inputWrap.style.cssText="flex:1;background:#fff;border-radius:24px;padding:4px 12px;display:flex;align-items:flex-end;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,.1);min-height:44px;";
+    var emoji=document.createElement("span");
+    emoji.textContent="😊";emoji.style.cssText="font-size:22px;cursor:pointer;padding:7px 0;flex-shrink:0;";
+    var ta=document.createElement("textarea");
+    ta.id="chatInput";ta.placeholder="Message";ta.rows=1;
+    ta.style.cssText="flex:1;border:none;outline:none;background:transparent;font-size:15px;font-family:inherit;resize:none;min-height:30px;max-height:100px;padding:7px 0;line-height:1.4;color:#111;";
+    ta.oninput=function(){this.style.height="auto";this.style.height=Math.min(this.scrollHeight,100)+"px";};
+    ta.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChat(cid);}};
+    var photoB=document.createElement("span");
+    photoB.textContent="📎";photoB.style.cssText="font-size:22px;cursor:pointer;padding:7px 0;flex-shrink:0;";
+    photoB.onclick=function(){envoyerPhotoChat(cid,false);};
+    inputWrap.appendChild(emoji);inputWrap.appendChild(ta);inputWrap.appendChild(photoB);
+    var sendBtn=document.createElement("button");
+    sendBtn.innerHTML="&#10148;";
+    sendBtn.style.cssText="width:48px;height:48px;border-radius:50%;background:#008069;border:none;color:#fff;font-size:22px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2);";
+    sendBtn.onclick=function(){envoyerChat(cid);};
+    inputDiv.appendChild(inputWrap);inputDiv.appendChild(sendBtn);
+    wrapper.appendChild(inputDiv);
+    sc.innerHTML="";sc.appendChild(wrapper);
+    setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
+  }
+
+  // Si conversation déjà sélectionnée
+  if(S.chatConvChaufOuverte){
+    showConv("Gérant","G","linear-gradient(135deg,#128c7e,#25d366)");
+    return;
+  }
+
+  // ── LISTE DES CONTACTS style WhatsApp ──
+  var listWrapper=document.createElement("div");
+  listWrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 60px);background:#fff;";
+
+  // Header liste
+  var hdList=document.createElement("div");
+  hdList.style.cssText="padding:10px 16px 6px;background:#008069;flex-shrink:0;";
+  hdList.innerHTML="<div style='display:flex;justify-content:space-between;align-items:center;'>"
+    +"<div style='font-size:20px;font-weight:700;color:#fff;'>Chat</div>"
+    +"<span style='font-size:22px;color:#fff;cursor:pointer;'>&#8942;</span>"
+    +"</div>";
+
+  var convList2=document.createElement("div");
+  convList2.style.cssText="flex:1;overflow-y:auto;background:#fff;";
+
+  // Contact Gérant
+  var msgs_gerant=getChatMsgs(cid);
+  var dernMsg_g=msgs_gerant.length>0?msgs_gerant[msgs_gerant.length-1]:null;
+  var nonLus_g=(S.data.chats||[]).filter(function(m){
+    return m.convId===getChatConvId(cid)&&!m.lu&&m.de==="admin";
+  }).length;
+
+  var rowG=document.createElement("div");
+  rowG.style.cssText="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer;";
+  rowG.innerHTML="<div style='position:relative;flex-shrink:0;'>"
+    +"<div style='width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#128c7e,#25d366);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;'>G</div>"
+    +"<div style='position:absolute;bottom:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#25d366;border:2px solid #fff;'></div>"
+    +"</div>"
+    +"<div style='flex:1;min-width:0;'>"
+    +"<div style='display:flex;justify-content:space-between;margin-bottom:3px;'>"
+    +"<div style='font-weight:600;font-size:16px;color:#111;'>Gérant</div>"
+    +"<div style='font-size:12px;color:"+(nonLus_g>0?"#25d366":"#667781")+";'>"+(dernMsg_g?dernMsg_g.heure:"")+"</div>"
+    +"</div>"
+    +"<div style='display:flex;justify-content:space-between;align-items:center;'>"
+    +"<div style='font-size:14px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80%;'>"+(dernMsg_g?(dernMsg_g.de==="chauffeur"?"Vous : ":"")+dernMsg_g.texte.substring(0,40):"Appuyez pour écrire")+"</div>"
+    +(nonLus_g>0?"<div style='background:#25d366;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;'>"+nonLus_g+"</div>":"")
+    +"</div></div>";
+  rowG.onclick=function(){S.chatConvChaufOuverte="gerant";showConv("Gérant","G","linear-gradient(135deg,#128c7e,#25d366)");};
+  convList2.appendChild(rowG);
+
+  // Collaborateurs
+  var collabs2=(S.data.sousComptes||[]).filter(function(s){return s.typeCompte!=="chauffeur";});
+  if(collabs2.length>0){
+    var sepC=document.createElement("div");
+    sepC.style.cssText="padding:6px 16px;background:#f9f9f9;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #f0f0f0;";
+    sepC.textContent="Administrateurs";
+    convList2.appendChild(sepC);
+    collabs2.forEach(function(s){
+      var rowC2=document.createElement("div");
+      rowC2.style.cssText="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer;";
+      var enLc2=isUserOnline(s.pseudo);
+      rowC2.innerHTML="<div style='position:relative;flex-shrink:0;'>"
+        +"<div style='width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;'>"+(s.pseudo||"?").charAt(0).toUpperCase()+"</div>"
+        +(enLc2?"<div style='position:absolute;bottom:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#25d366;border:2px solid #fff;'></div>":"")
+        +"</div>"
+        +"<div style='flex:1;'>"
+        +"<div style='font-weight:600;font-size:16px;color:#111;'>"+s.pseudo+"</div>"
+        +"<div style='font-size:14px;color:#667781;'>"+(s.role||"Administrateur")+"</div>"
+        +"</div>";
+      rowC2.onclick=function(){S.chatConvChaufOuverte=s.pseudo;showConv(s.pseudo,s.pseudo.charAt(0).toUpperCase(),"linear-gradient(135deg,#7c3aed,#a855f7)");};
+      convList2.appendChild(rowC2);
     });
   }
-  wrapper.appendChild(chatBoxDiv);
 
-  // Input avec bouton photo
-  var inputDiv=document.createElement("div");
-  inputDiv.style.cssText="padding:8px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:6px;align-items:flex-end;";
-
-  // Bouton photo
-  var photoBtn=document.createElement("button");
-  photoBtn.textContent="📷";
-  photoBtn.style.cssText="width:44px;height:44px;border-radius:12px;background:#eff6ff;border:1.5px solid #bfdbfe;font-size:20px;cursor:pointer;flex-shrink:0;";
-  photoBtn.onclick=function(){envoyerPhotoChat(cid,false);};
-
-  var ta=document.createElement("textarea");
-  ta.id="chatInput";ta.placeholder="Votre message...";ta.rows=1;
-  ta.style.cssText="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;";
-  ta.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChat(cid);}};
-  var sendBtn=document.createElement("button");
-  sendBtn.textContent="↑";
-  sendBtn.style.cssText="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
-  sendBtn.onclick=function(){envoyerChat(cid);};
-  inputDiv.appendChild(photoBtn);inputDiv.appendChild(ta);inputDiv.appendChild(sendBtn);
-  wrapper.appendChild(inputDiv);
-
-  sc.innerHTML="";sc.appendChild(wrapper);
-  setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
+  listWrapper.appendChild(hdList);
+  listWrapper.appendChild(convList2);
+  sc.innerHTML="";sc.appendChild(listWrapper);
 }
 
 function renderPrimesChauf(sc,c){
@@ -3581,302 +3703,322 @@ function rScreenGlobal(sc){
   }
 
   else if(S.tab==="chat"){
+    // ══ CHAT STYLE WHATSAPP ══
+    var wrapper_wa = document.createElement("div");
+    wrapper_wa.style.cssText = "display:flex;flex-direction:column;height:calc(100vh - 60px);background:#e5ddd5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+
     if(S.chatConvOuverte){
-      // ── Conversation interne (gérant ↔ collaborateur) ──
-      if(String(S.chatConvOuverte).indexOf("internal_")===0){
-        var convIdInt=String(S.chatConvOuverte).replace("internal_","");
-        var destPseudo=S.chatConvDest||"";
-        var allC2=tousComptes();
-        var destCompte=allC2.filter(function(x){return x.pseudo===destPseudo;})[0];
-        var destNom=destCompte?(destCompte.role||destCompte.pseudo):destPseudo;
-        var enLigneInt=isUserOnline(destPseudo);
-        var wrapInt=document.createElement("div");
-        wrapInt.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
-        var hdInt=document.createElement("div");
-        hdInt.style.cssText="padding:10px 14px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;display:flex;align-items:center;gap:10px;";
-        var backInt=document.createElement("button");backInt.textContent="←";backInt.style.cssText="background:#fff;border:1px solid #bbf7d0;border-radius:9px;padding:6px 10px;font-size:13px;cursor:pointer;";
-        backInt.onclick=function(){S.chatConvOuverte=null;S.chatConvDest=null;rScreen();};
-        var avInt=document.createElement("div");
-        avInt.style.cssText="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
-        avInt.textContent=destNom.charAt(0).toUpperCase();
-        var dotInt=document.createElement("div");dotInt.style.cssText="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:"+(enLigneInt?"#10b981":"#94a3b8")+";border:2px solid #f0fdf4;";
-        avInt.appendChild(dotInt);
-        var infoInt=document.createElement("div");infoInt.style.flex="1";
-        infoInt.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>"+destNom+"</div><div style='font-size:10px;color:"+(enLigneInt?"#059669":"#94a3b8")+";font-weight:600;'>"+(enLigneInt?"🟢 En ligne":"⚫ "+getLastSeen(destPseudo).label)+"</div>";
-        hdInt.appendChild(backInt);hdInt.appendChild(avInt);hdInt.appendChild(infoInt);
-        wrapInt.appendChild(hdInt);
-        // Messages
-        marquerChatInterneOuvert(convIdInt);
-        var msgsInt=getInternalMsgs(convIdInt);
-        var boxInt=document.createElement("div");boxInt.id="chatBox";boxInt.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
-        if(msgsInt.length===0){boxInt.innerHTML="<div style='text-align:center;padding:40px;color:#94a3b8;font-size:13px;'>💬 Début de la conversation</div>";}
-        else{var lastDateInt="";msgsInt.forEach(function(m){
-          if(m.date&&m.date!==lastDateInt){boxInt.appendChild(dateSepDiv(formatMsgDate(m.date)));lastDateInt=m.date;}
-          var moi2=m.de===S.user.pseudo;
-          var bbl=document.createElement("div");bbl.style.cssText="display:flex;justify-content:"+(moi2?"flex-end":"flex-start")+";margin-bottom:6px;";
-          var inner=document.createElement("div");inner.style.cssText="max-width:78%;";
-          if(!moi2){var sn=document.createElement("div");sn.style.cssText="font-size:10px;font-weight:700;color:#059669;margin-bottom:3px;padding-left:4px;";sn.textContent=m.de==="gerant"?"Gérant":(destNom);inner.appendChild(sn);}
-          var bubble=document.createElement("div");
-          bubble.style.cssText="background:"+(moi2?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+";color:"+(moi2?"#fff":"#0f172a")+";border-radius:"+(moi2?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi2?"none":"1px solid #bbf7d0")+";";
-          bubble.textContent=m.texte;
-          var meta=document.createElement("div");meta.style.cssText="font-size:9px;opacity:.55;margin-top:3px;text-align:right;";meta.textContent=m.heure+(moi2&&m.lu?" ✓✓":moi2?" ✓":"");
-          bubble.appendChild(meta);inner.appendChild(bubble);bbl.appendChild(inner);boxInt.appendChild(bbl);
-        });}
-        wrapInt.appendChild(boxInt);
-        var inputInt=document.createElement("div");inputInt.style.cssText="padding:10px 12px;background:#fff;border-top:1px solid #bbf7d0;display:flex;gap:8px;align-items:flex-end;";
-        var taInt=document.createElement("textarea");taInt.id="chatInput";taInt.placeholder="Message à "+destNom+"...";taInt.rows=1;
-        taInt.style.cssText="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bbf7d0;background:#f0fdf4;font-family:inherit;";
-        taInt.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChatInterne(convIdInt,destPseudo);}};
-        var sendInt=document.createElement("button");sendInt.textContent="↑";sendInt.style.cssText="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
-        sendInt.onclick=function(){envoyerChatInterne(convIdInt,destPseudo);};
-        inputInt.appendChild(taInt);inputInt.appendChild(sendInt);wrapInt.appendChild(inputInt);
-        sc.innerHTML="";sc.appendChild(wrapInt);
-        setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
-        html=null;
+      // ── CONVERSATION OUVERTE ──
+      var cid_wa = S.chatConvOuverte;
+      var isInternal = String(cid_wa).indexOf("internal_")===0;
+      var isCollab = String(cid_wa).indexOf("conv_collab_")===0;
+      var convTitle_wa = "";
+      var convSub_wa = "en ligne";
+      var convInit_wa = "?";
+
+      if(isInternal){
+        var destP = S.chatConvDest||"";
+        var allC_wa = tousComptes();
+        var destC = allC_wa.filter(function(x){return x.pseudo===destP;})[0];
+        convTitle_wa = destC?(destC.role||destC.pseudo):destP;
+        convInit_wa = convTitle_wa.charAt(0).toUpperCase();
+        var enL_wa = isUserOnline(destP);
+        convSub_wa = enL_wa ? "en ligne" : getLastSeen(destP).label;
       } else {
-      // ── Conversation chauffeur ──
-      var cid2=S.chatConvOuverte;
-      var isCollabConv=typeof cid2==="string"&&cid2.indexOf("conv_collab_")===0;
-      var chC=null;var enLigne=false;var convTitle="";var convSub="";
-      if(isCollabConv){
-        // Conv entre collaborateurs
-        var scId2=cid2.replace("conv_collab_","");
-        var scC2=(S.data.sousComptes||[]).filter(function(sc){return sc.id===scId2;})[0];
-        convTitle=scC2?scC2.role||scC2.pseudo:"Collaborateur";
-        enLigne=scC2?isUserOnline(scC2.pseudo):false;
-        convSub=enLigne?"En ligne":scC2?getLastSeen(scC2.pseudo).label:"";
-      }else{
-        chC=CH.filter(function(x){return String(x.id)===String(cid2);})[0];
-        var scC=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===String(cid2);})[0];
-        enLigne=scC?isUserOnline(scC.pseudo):false;
-        convTitle=chC?chC.nom:"Chauffeur";
-        convSub=chC?chC.zone:"";
+        var chId_wa = isCollab ? cid_wa.replace("conv_collab_","") : cid_wa;
+        var ch_wa = (S.data.chauffeurs||[]).filter(function(c){return String(c.id)===String(chId_wa);})[0];
+        var sc_wa = (S.data.sousComptes||[]).filter(function(s){return String(s.chauffeurId)===String(chId_wa);})[0];
+        convTitle_wa = ch_wa ? ch_wa.nom : (sc_wa ? sc_wa.pseudo : "Conversation");
+        convInit_wa = convTitle_wa.charAt(0).toUpperCase();
+        convSub_wa = sc_wa && isUserOnline(sc_wa.pseudo) ? "en ligne" : "chauffeur";
       }
-      var wrapper=document.createElement("div");
-      wrapper.style.cssText="display:flex;flex-direction:column;height:calc(100vh - 130px);";
-      // Header conversation
-      var convHd=document.createElement("div");
-      convHd.style.cssText="padding:10px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;";
-      var backBtn=document.createElement("button");
-      backBtn.textContent="←";
-      backBtn.style.cssText="background:#fff;border:1px solid #dbeafe;border-radius:9px;padding:6px 10px;font-size:13px;cursor:pointer;";
-      backBtn.onclick=function(){S.chatConvOuverte=null;rScreen();};
-      var avatar=document.createElement("div");
-      avatar.style.cssText="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
-      avatar.textContent=chC?chC.nom.charAt(0):"?";
-      // Point de présence
-      var dot=document.createElement("div");
-      dot.style.cssText="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:"+(enLigne?"#10b981":"#94a3b8")+";border:2px solid #eff6ff;";
-      avatar.appendChild(dot);
-      var convInfo=document.createElement("div");
-      convInfo.style.flex="1";
-      convInfo.innerHTML="<div style='font-weight:700;font-size:13px;color:#0f172a;'>"+convTitle+"</div>"
-        +"<div style='font-size:10px;color:"+(enLigne?"#10b981":"#94a3b8")+";font-weight:600;'>"+(enLigne?"🟢 En ligne":"⚫ "+convSub)+"</div>";
-      convHd.appendChild(backBtn);convHd.appendChild(avatar);convHd.appendChild(convInfo);
-      wrapper.appendChild(convHd);
-      // Messages
-      var chatBoxDiv=document.createElement("div");
-      chatBoxDiv.id="chatBox";
-      chatBoxDiv.style.cssText="flex:1;overflow-y:auto;padding:12px 14px;background:#f8faff;";
-      var msgs=isCollabConv
-        ?(S.data.chats||[]).filter(function(m){return m.convId===cid2;}).sort(function(a,b){return a.ts-b.ts;})
-        :getChatMsgs(cid2);
-      // Marquer lus
-      msgs.forEach(function(m){if(!m.lu&&m.auteur!==S.user.pseudo){m.lu=true;fbSave("chats",m);}});
-      if(msgs.length===0){
-        chatBoxDiv.innerHTML="<div style='text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;'>💬 Aucun message</div>";
-      }else{
-        var lastDateG="";
-        msgs.forEach(function(m){
-          // Séparateur de date
-          if(m.date&&m.date!==lastDateG){
-            chatBoxDiv.appendChild(dateSepDiv(formatMsgDate(m.date)));
-            lastDateG=m.date;
+
+      // Header style WhatsApp
+      var hd_wa = document.createElement("div");
+      hd_wa.style.cssText = "padding:8px 12px;background:#008069;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.25);";
+      
+      var backB = document.createElement("button");
+      backB.innerHTML = "&#8592;";
+      backB.style.cssText = "background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:0 2px;flex-shrink:0;";
+      backB.onclick = function(){ S.chatConvOuverte=null; S.chatConvDest=null; rScreen(); };
+      
+      var av_wa = document.createElement("div");
+      av_wa.style.cssText = "width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#128c7e,#25d366);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;";
+      av_wa.textContent = convInit_wa;
+      
+      var info_wa = document.createElement("div");
+      info_wa.style.cssText = "flex:1;cursor:pointer;";
+      info_wa.innerHTML = "<div style='font-weight:600;font-size:16px;color:#fff;'>"+convTitle_wa+"</div>"
+        +"<div style='font-size:12px;color:rgba(255,255,255,.85);'>"+convSub_wa+"</div>";
+      
+      var ics_wa = document.createElement("div");
+      ics_wa.style.cssText = "display:flex;gap:18px;";
+      ics_wa.innerHTML = "<span style='font-size:20px;color:#fff;cursor:pointer;'>📞</span>"
+        +"<span style='font-size:20px;color:#fff;cursor:pointer;'>📹</span>"
+        +"<span style='font-size:22px;color:#fff;cursor:pointer;'>&#8942;</span>";
+      
+      hd_wa.appendChild(backB); hd_wa.appendChild(av_wa); hd_wa.appendChild(info_wa); hd_wa.appendChild(ics_wa);
+      wrapper_wa.appendChild(hd_wa);
+
+      // Zone messages
+      var box_wa = document.createElement("div");
+      box_wa.id = "chatBox";
+      box_wa.style.cssText = "flex:1;overflow-y:auto;padding:8px 4px 12px;background:#e5ddd5;";
+
+      // Récupérer messages
+      var msgs_wa = [];
+      var moiDe_wa = "admin";
+      if(isInternal){
+        var convIdInt2 = String(cid_wa).replace("internal_","");
+        msgs_wa = getInternalMsgs(convIdInt2);
+        marquerChatInterneOuvert(convIdInt2);
+        moiDe_wa = S.user.pseudo;
+      } else if(isCollab){
+        msgs_wa = (S.data.chats||[]).filter(function(m){return m.convId===cid_wa;}).sort(function(a,b){return a.ts-b.ts;});
+        msgs_wa.forEach(function(m){if(!m.lu&&m.auteur!==S.user.pseudo){m.lu=true;fbSave("chats",m);}});
+      } else {
+        msgs_wa = getChatMsgs(cid_wa);
+        marquerChatLu(cid_wa);
+      }
+
+      if(msgs_wa.length===0){
+        var emptyWa = document.createElement("div");
+        emptyWa.style.cssText = "text-align:center;padding:40px 20px;";
+        emptyWa.innerHTML = "<div style='background:rgba(255,255,255,.85);border-radius:12px;padding:12px 20px;display:inline-block;font-size:13px;color:#667781;'>Aucun message pour l'instant</div>";
+        box_wa.appendChild(emptyWa);
+      } else {
+        var lastDate_wa = "";
+        msgs_wa.forEach(function(m){
+          // Séparateur date
+          if(m.date && m.date !== lastDate_wa){
+            var sep = document.createElement("div");
+            sep.style.cssText = "text-align:center;margin:8px 0 10px;";
+            sep.innerHTML = "<span style='background:rgba(255,255,255,.88);color:#667781;font-size:12px;font-weight:600;padding:4px 14px;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.1);'>"+formatMsgDate(m.date)+"</span>";
+            box_wa.appendChild(sep);
+            lastDate_wa = m.date;
           }
-          var moi=m.de==="admin";
-          var bbl=document.createElement("div");
-          bbl.style.cssText="display:flex;justify-content:"+(moi?"flex-end":"flex-start")+";margin-bottom:6px;";
-          var inner=document.createElement("div");
-          // Afficher photo si présent
+          
+          var moi_wa = isInternal ? (m.de===S.user.pseudo) : (m.de==="admin");
+          
+          var row_wa = document.createElement("div");
+          row_wa.style.cssText = "display:flex;justify-content:"+(moi_wa?"flex-end":"flex-start")+";margin-bottom:2px;padding:0 8px;";
+          
+          var bulle_wa = document.createElement("div");
+          bulle_wa.style.cssText = "max-width:75%;background:"+(moi_wa?"#dcf8c6":"#ffffff")+";border-radius:"+(moi_wa?"12px 2px 12px 12px":"2px 12px 12px 12px")+";padding:6px 10px 4px;box-shadow:0 1px 2px rgba(0,0,0,.15);";
+          
+          // Photo ou texte
           if(m.photo){
-            inner.style.cssText="max-width:78%;";
-            var imgW=document.createElement("div");
-            imgW.style.cssText="background:"+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+";border-radius:"+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:5px;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi?"none":"1px solid #dbeafe")+";overflow:hidden;";
-            var imgEl=document.createElement("img");imgEl.src=m.photo;imgEl.style.cssText="max-width:180px;max-height:200px;border-radius:10px;display:block;";
-            imgW.appendChild(imgEl);inner.appendChild(imgW);
-          }else{
-          inner.style.cssText="max-width:78%;background:"+(moi?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#fff")+";color:"+(moi?"#fff":"#0f172a")+";border-radius:"+(moi?"16px 16px 4px 16px":"16px 16px 16px 4px")+";padding:10px 13px;font-size:13px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.07);border:"+(moi?"none":"1px solid #dbeafe")+";";
-          inner.textContent=m.texte;
-          // Heure + statut lu
-          var meta=document.createElement("div");
-          meta.style.cssText="font-size:9px;opacity:.6;margin-top:3px;text-align:right;display:flex;justify-content:flex-end;align-items:center;gap:3px;";
-          meta.textContent=m.heure;
-          if(moi){
-            var tick=document.createElement("span");
-            tick.style.cssText="font-size:11px;color:"+(m.lu?"#60a5fa":"rgba(255,255,255,0.6)")+";";
-            tick.textContent=m.lu?" ✓✓":" ✓";
-            meta.appendChild(tick);
+            var img_wa = document.createElement("img");
+            img_wa.src = m.photo;
+            img_wa.style.cssText = "max-width:200px;max-height:220px;border-radius:8px;display:block;";
+            bulle_wa.appendChild(img_wa);
+          } else {
+            // Nom expéditeur si groupe
+            if(!moi_wa){
+              var allC3 = tousComptes();
+              var cc3 = allC3.filter(function(x){return x.pseudo===m.auteur;})[0];
+              var expNom = m.auto?"🤖 Saloni Manager":(m.auteur==="gerant"||m.de==="admin")?"Gérant":(cc3?cc3.role||cc3.pseudo:m.auteur||"");
+              var expCol = m.auto?"#d97706":"#128c7e";
+              if(expNom){
+                var expEl = document.createElement("div");
+                expEl.style.cssText = "font-size:12px;font-weight:700;color:"+expCol+";margin-bottom:2px;";
+                expEl.textContent = expNom;
+                bulle_wa.appendChild(expEl);
+              }
+            }
+            var txt_wa = document.createElement("div");
+            txt_wa.style.cssText = "font-size:15px;color:#111;line-height:1.5;word-break:break-word;";
+            txt_wa.textContent = m.texte || "";
+            bulle_wa.appendChild(txt_wa);
           }
-          inner.appendChild(meta);
-          }// fin else photo
-          bbl.appendChild(inner);
-          chatBoxDiv.appendChild(bbl);
+          
+          // Heure + ticks
+          var meta_wa = document.createElement("div");
+          meta_wa.style.cssText = "display:flex;align-items:center;justify-content:flex-end;gap:3px;margin-top:1px;";
+          var h_wa = document.createElement("span");
+          h_wa.style.cssText = "font-size:11px;color:#667781;";
+          h_wa.textContent = m.heure||"";
+          meta_wa.appendChild(h_wa);
+          if(moi_wa){
+            var tick_wa = document.createElement("span");
+            tick_wa.style.cssText = "font-size:13px;color:"+(m.lu?"#34b7f1":"#94a3b8")+";";
+            tick_wa.textContent = m.lu?"✓✓":"✓";
+            meta_wa.appendChild(tick_wa);
+          }
+          bulle_wa.appendChild(meta_wa);
+          row_wa.appendChild(bulle_wa);
+          box_wa.appendChild(row_wa);
         });
       }
-      wrapper.appendChild(chatBoxDiv);
-      // Input avec bouton photo
-      var inputDiv=document.createElement("div");
-      inputDiv.style.cssText="padding:8px 12px;background:#fff;border-top:1px solid #dbeafe;display:flex;gap:6px;align-items:flex-end;";
-      var photoBtn2=document.createElement("button");
-      photoBtn2.textContent="📷";
-      photoBtn2.style.cssText="width:44px;height:44px;border-radius:12px;background:#eff6ff;border:1.5px solid #bfdbfe;font-size:20px;cursor:pointer;flex-shrink:0;";
-      (function(convId){photoBtn2.onclick=function(){envoyerPhotoChat(convId,!isCollabConv);};})(cid2);
-      var ta=document.createElement("textarea");
-      ta.id="chatInput";ta.placeholder="Votre message...";ta.rows=1;
-      ta.style.cssText="flex:1;min-height:42px;max-height:90px;resize:none;border-radius:12px;padding:10px 12px;font-size:14px;border:1.5px solid #bfdbfe;background:#f8faff;font-family:inherit;";
-      ta.onkeydown=function(e){if(e.keyCode===13&&!e.shiftKey){e.preventDefault();envoyerChat(cid2);}};
-      var sendBtn=document.createElement("button");
-      sendBtn.textContent="↑";
-      sendBtn.style.cssText="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
-      sendBtn.onclick=function(){envoyerChat(cid2);};
-      inputDiv.appendChild(photoBtn2);inputDiv.appendChild(ta);inputDiv.appendChild(sendBtn);
-      wrapper.appendChild(inputDiv);
-      sc.innerHTML="";sc.appendChild(wrapper);
-      setTimeout(function(){var b=document.getElementById("chatBox");if(b)b.scrollTop=b.scrollHeight;},100);
-      html=null;
-      } // fin else conv chauffeur
+      wrapper_wa.appendChild(box_wa);
 
-    }else{
-      // ── Liste conversations avec présence ──
-      var wrapper2=document.createElement("div");
-      wrapper2.style.cssText="background:#f8faff;min-height:100%;";
+      // Input style WhatsApp
+      var inp_wa = document.createElement("div");
+      inp_wa.style.cssText = "padding:6px 8px;background:#f0f0f0;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;";
+      
+      var inpWrap = document.createElement("div");
+      inpWrap.style.cssText = "flex:1;background:#fff;border-radius:24px;padding:4px 12px;display:flex;align-items:flex-end;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,.1);min-height:44px;";
+      
+      var emoji_wa = document.createElement("span");
+      emoji_wa.textContent = "😊";
+      emoji_wa.style.cssText = "font-size:22px;cursor:pointer;padding:7px 0;flex-shrink:0;";
+      
+      var ta_wa = document.createElement("textarea");
+      ta_wa.id = "chatInput"; ta_wa.placeholder = "Message"; ta_wa.rows = 1;
+      ta_wa.style.cssText = "flex:1;border:none;outline:none;background:transparent;font-size:15px;font-family:inherit;resize:none;min-height:30px;max-height:100px;padding:7px 0;line-height:1.4;color:#111;";
+      ta_wa.oninput = function(){ this.style.height="auto"; this.style.height=Math.min(this.scrollHeight,100)+"px"; };
+      ta_wa.onkeydown = function(e){ if(e.keyCode===13&&!e.shiftKey){e.preventDefault(); envoyerChat(cid_wa);} };
+      
+      var photo_wa = document.createElement("span");
+      photo_wa.textContent = "📎";
+      photo_wa.style.cssText = "font-size:22px;cursor:pointer;padding:7px 0;flex-shrink:0;";
+      photo_wa.onclick = function(){ envoyerPhotoChat(cid_wa, !isCollab && !isInternal); };
+      
+      inpWrap.appendChild(emoji_wa); inpWrap.appendChild(ta_wa); inpWrap.appendChild(photo_wa);
+      
+      var send_wa = document.createElement("button");
+      send_wa.innerHTML = "&#10148;";
+      send_wa.style.cssText = "width:48px;height:48px;border-radius:50%;background:#008069;border:none;color:#fff;font-size:22px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2);";
+      send_wa.onclick = function(){ envoyerChat(cid_wa); };
+      
+      inp_wa.appendChild(inpWrap); inp_wa.appendChild(send_wa);
+      wrapper_wa.appendChild(inp_wa);
 
-      // Barre personnes en ligne
-      var online=getOnlineUsers();
-      if(online.length>0){
-        var onlineBar=document.createElement("div");
-        onlineBar.style.cssText="background:#fff;border-bottom:1px solid #dbeafe;padding:10px 14px;";
-        var onlineTitle=document.createElement("div");
-        onlineTitle.style.cssText="font-size:11px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;";
-        onlineTitle.textContent="🟢 En ligne ("+online.length+")";
-        onlineBar.appendChild(onlineTitle);
-        var onlineRow=document.createElement("div");
-        onlineRow.style.cssText="display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;";
-        online.forEach(function(u){
-          var item=document.createElement("div");
-          item.style.cssText="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;";
-          var av=document.createElement("div");
-          av.style.cssText="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;position:relative;border:2px solid #10b981;";
-          av.textContent=u.pseudo.charAt(0).toUpperCase();
-          var dot2=document.createElement("div");
-          dot2.style.cssText="position:absolute;bottom:0;right:0;width:13px;height:13px;border-radius:50%;background:#10b981;border:2px solid #fff;";
-          av.appendChild(dot2);
-          var name=document.createElement("div");
-          name.style.cssText="font-size:10px;font-weight:700;color:#0f172a;text-align:center;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-          name.textContent=u.pseudo;
-          item.appendChild(av);item.appendChild(name);
-          // Cliquer sur un utilisateur en ligne → ouvrir sa conversation si chauffeur
-          var scMatch=(S.data.sousComptes||[]).filter(function(sc){return sc.pseudo===u.pseudo&&sc.chauffeurId;});
-          if(scMatch.length>0){
-            (function(chId){item.onclick=function(){S.chatConvOuverte=chId;rScreen();};})(scMatch[0].chauffeurId);
-          }
-          onlineRow.appendChild(item);
-        });
-        onlineBar.appendChild(onlineRow);
-        wrapper2.appendChild(onlineBar);
-      }
+      sc.innerHTML=""; sc.appendChild(wrapper_wa);
+      setTimeout(function(){ var b=document.getElementById("chatBox"); if(b) b.scrollTop=b.scrollHeight; },100);
+      html = null;
+
+    } else {
+      // ── LISTE DES CONVERSATIONS style WhatsApp ──
+      var list_wa = document.createElement("div");
+      list_wa.style.cssText = "display:flex;flex-direction:column;height:calc(100vh - 60px);background:#fff;";
+
+      // Header liste
+      var hd_list = document.createElement("div");
+      hd_list.style.cssText = "padding:10px 16px 6px;background:#008069;flex-shrink:0;";
+      hd_list.innerHTML = "<div style='display:flex;justify-content:space-between;align-items:center;'>"
+        +"<div style='font-size:20px;font-weight:700;color:#fff;'>Saloni Chat</div>"
+        +"<div style='display:flex;gap:20px;'>"
+        +"<span style='font-size:20px;color:#fff;cursor:pointer;'>🔍</span>"
+        +"<span style='font-size:22px;color:#fff;cursor:pointer;'>&#8942;</span>"
+        +"</div></div>";
+
+      // Onglets style WhatsApp
+      var tabs_wa = document.createElement("div");
+      tabs_wa.style.cssText = "background:#008069;display:flex;border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;";
+      ["TOUS","NON LUS"].forEach(function(t,i){
+        var tab = document.createElement("div");
+        tab.style.cssText = "flex:1;text-align:center;padding:10px 0;font-size:12px;font-weight:700;color:"+(i===0?"#fff":"rgba(255,255,255,.6)")+";border-bottom:"+(i===0?"2px solid #fff":"none")+";cursor:pointer;";
+        tab.textContent = t;
+        tabs_wa.appendChild(tab);
+      });
+
+      list_wa.appendChild(hd_list);
+      list_wa.appendChild(tabs_wa);
 
       // Liste conversations
-      // ── Section équipe interne (gérant ↔ collaborateurs) ──
-      // Pour les collaborateurs, ajouter aussi le gérant dans la liste
-      var collaborateursBase=(S.data.sousComptes||[]).filter(function(sc){return sc.typeCompte!=="chauffeur"&&sc.pseudo!==S.user.pseudo;});
-      var gerantVirtuel=S.user.pseudo!=="gerant"?[{id:"gerant_v",pseudo:"gerant",role:"Gérant",typeCompte:"normal",niveau:3}]:[];
-      var collaborateurs=gerantVirtuel.concat(collaborateursBase);
-      if(collaborateurs.length>0){
-        var equipeTitle=document.createElement("div");
-        equipeTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
-        equipeTitle.textContent="Équipe interne";
-        wrapper2.appendChild(equipeTitle);
-        collaborateurs.forEach(function(collab){
-          var convId=getInternalConvId(S.user.pseudo, collab.pseudo);
-          var msgsCollab=getInternalMsgs(convId);
-          var dernierMsgC=msgsCollab.length>0?msgsCollab[msgsCollab.length-1]:null;
-          var nonLusC=(S.data.chats||[]).filter(function(m){return m.convId===convId&&!m.lu&&m.pour===S.user.pseudo;}).length;
-          var enLigneC=isUserOnline(collab.pseudo);
-          var rowC=document.createElement("div");
-          rowC.style.cssText="background:#fff;border-bottom:1px solid #f0f2f5;padding:13px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;"+(nonLusC>0?"background:#eff6ff;":"");
-          var avC=document.createElement("div");
-          avC.style.cssText="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
-          avC.textContent=collab.pseudo.charAt(0).toUpperCase();
-          var dotC=document.createElement("div");
-          dotC.style.cssText="position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:"+(enLigneC?"#10b981":"#94a3b8")+";border:2px solid #fff;";
-          avC.appendChild(dotC);
-          var infoC=document.createElement("div");infoC.style.cssText="flex:1;min-width:0;";
-          var nomC=document.createElement("div");
-          nomC.style.cssText="font-weight:"+(nonLusC>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
-          nomC.textContent=(collab.role&&collab.role!=="Admin")?collab.role:collab.pseudo;
-          if(enLigneC){var onPillC=document.createElement("span");onPillC.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";onPillC.textContent="en ligne";nomC.appendChild(onPillC);}
-          var lastMsgC=document.createElement("div");
-          lastMsgC.style.cssText="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;";
-          var lsC=getLastSeen(collab.pseudo);
-          lastMsgC.innerHTML=(!enLigneC?'<span style="font-size:10px;color:#64748b;">'+lsC.label+'</span>'+"  ":"")+(dernierMsgC?dernierMsgC.texte.substring(0,30)+(dernierMsgC.texte.length>30?"...":""):"");
-          infoC.appendChild(nomC);infoC.appendChild(lastMsgC);
-          var rightC=document.createElement("div");rightC.style.cssText="display:flex;flex-direction:column;align-items:flex-end;gap:4px;";
-          if(nonLusC>0){var badgeC=document.createElement("span");badgeC.style.cssText="background:#dc2626;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";badgeC.textContent=nonLusC;rightC.appendChild(badgeC);}
-          else{var chevC=document.createElement("span");chevC.style.cssText="color:#bfdbfe;font-size:18px;";chevC.textContent="›";rightC.appendChild(chevC);}
-          rowC.appendChild(avC);rowC.appendChild(infoC);rowC.appendChild(rightC);
-          (function(cId,cPseudo){rowC.onclick=function(){S.chatConvOuverte="internal_"+cId;S.chatConvDest=cPseudo;rScreen();};})(convId, collab.pseudo);
-          wrapper2.appendChild(rowC);
+      var convList = document.createElement("div");
+      convList.style.cssText = "flex:1;overflow-y:auto;background:#fff;";
+
+      var CH_wa = S.data.chauffeurs||[];
+      var actifs_wa = CH_wa.filter(function(c){ return c.statut==="actif"; });
+
+      if(actifs_wa.length===0){
+        convList.innerHTML = "<div style='text-align:center;padding:60px 20px;color:#94a3b8;font-size:14px;'>Aucun chauffeur actif</div>";
+      } else {
+        actifs_wa.forEach(function(c){
+          var sc2_wa = (S.data.sousComptes||[]).filter(function(s){return String(s.chauffeurId)===String(c.id);})[0];
+          var enL2 = sc2_wa ? isUserOnline(sc2_wa.pseudo) : false;
+          var msgs2_wa = getChatMsgs(c.id);
+          var dernMsg = msgs2_wa.length>0 ? msgs2_wa[msgs2_wa.length-1] : null;
+          var nonLus2 = getNbChatNonLus ? 0 : 0;
+          // Compter non lus
+          nonLus2 = (S.data.chats||[]).filter(function(m){
+            return m.convId===getChatConvId(c.id) && !m.lu && m.de==="chauffeur";
+          }).length;
+
+          var row_wa2 = document.createElement("div");
+          row_wa2.style.cssText = "display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer;background:#fff;";
+          row_wa2.onmouseover = function(){ this.style.background="#f5f5f5"; };
+          row_wa2.onmouseout = function(){ this.style.background="#fff"; };
+
+          // Avatar rond
+          var av_wa2 = document.createElement("div");
+          av_wa2.style.cssText = "position:relative;flex-shrink:0;";
+          var avInner = document.createElement("div");
+          avInner.style.cssText = "width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#128c7e,#25d366);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;";
+          avInner.textContent = c.nom.charAt(0);
+          av_wa2.appendChild(avInner);
+          if(enL2){
+            var dot2 = document.createElement("div");
+            dot2.style.cssText = "position:absolute;bottom:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#25d366;border:2px solid #fff;";
+            av_wa2.appendChild(dot2);
+          }
+
+          // Info conversation
+          var info2 = document.createElement("div");
+          info2.style.cssText = "flex:1;min-width:0;";
+          var top2 = document.createElement("div");
+          top2.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;";
+          var nom2 = document.createElement("div");
+          nom2.style.cssText = "font-weight:600;font-size:16px;color:#111;";
+          nom2.textContent = c.nom;
+          var heure2 = document.createElement("div");
+          heure2.style.cssText = "font-size:12px;color:"+(nonLus2>0?"#25d366":"#667781")+";flex-shrink:0;";
+          heure2.textContent = dernMsg ? dernMsg.heure : "";
+          top2.appendChild(nom2); top2.appendChild(heure2);
+          
+          var sub2 = document.createElement("div");
+          sub2.style.cssText = "display:flex;justify-content:space-between;align-items:center;";
+          var lastTxt = document.createElement("div");
+          lastTxt.style.cssText = "font-size:14px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80%;";
+          lastTxt.textContent = dernMsg ? (dernMsg.de==="admin"?"✓ ":"")+dernMsg.texte.substring(0,40) : (enL2?"En ligne":"Appuyez pour envoyer un message");
+          sub2.appendChild(lastTxt);
+          if(nonLus2>0){
+            var badge2 = document.createElement("div");
+            badge2.style.cssText = "background:#25d366;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;";
+            badge2.textContent = nonLus2;
+            sub2.appendChild(badge2);
+          }
+          
+          info2.appendChild(top2); info2.appendChild(sub2);
+          row_wa2.appendChild(av_wa2); row_wa2.appendChild(info2);
+          (function(cid3){ row_wa2.onclick=function(){ S.chatConvOuverte=cid3; rScreen(); }; })(c.id);
+          convList.appendChild(row_wa2);
         });
+
+        // Collaborateurs
+        var collabs = (S.data.sousComptes||[]).filter(function(s){ return s.typeCompte!=="chauffeur"; });
+        if(collabs.length>0){
+          var sepCollab = document.createElement("div");
+          sepCollab.style.cssText = "padding:8px 16px;background:#f9f9f9;border-bottom:1px solid #f0f0f0;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;";
+          sepCollab.textContent = "Collaborateurs";
+          convList.appendChild(sepCollab);
+          collabs.forEach(function(s){
+            var enLc = isUserOnline(s.pseudo);
+            var row_c = document.createElement("div");
+            row_c.style.cssText = "display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer;background:#fff;";
+            var av_c = document.createElement("div");
+            av_c.style.cssText = "position:relative;flex-shrink:0;";
+            var avIc = document.createElement("div");
+            avIc.style.cssText = "width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;";
+            avIc.textContent = (s.pseudo||"?").charAt(0).toUpperCase();
+            av_c.appendChild(avIc);
+            if(enLc){var dotc=document.createElement("div");dotc.style.cssText="position:absolute;bottom:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#25d366;border:2px solid #fff;";av_c.appendChild(dotc);}
+            var infc=document.createElement("div");infc.style.cssText="flex:1;";
+            infc.innerHTML="<div style='font-weight:600;font-size:16px;color:#111;'>"+s.pseudo+"</div>"
+              +"<div style='font-size:14px;color:#667781;'>"+(enLc?"En ligne":s.role||"Collaborateur")+"</div>";
+            row_c.appendChild(av_c); row_c.appendChild(infc);
+            var convIdCollab="conv_collab_"+s.chauffeurId;
+            (function(cId){ row_c.onclick=function(){ S.chatConvOuverte=cId; rScreen(); }; })(convIdCollab);
+            convList.appendChild(row_c);
+          });
+        }
       }
 
-      var listTitle=document.createElement("div");
-      listTitle.style.cssText="padding:12px 14px 6px;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;";
-      listTitle.textContent="Chauffeurs";
-      wrapper2.appendChild(listTitle);
-
-      if(CH.length===0){
-        var empty=document.createElement("div");
-        empty.className="card";
-        empty.style.cssText="text-align:center;padding:30px;color:#64748b;margin:0 14px;";
-        empty.textContent="Aucun chauffeur";
-        wrapper2.appendChild(empty);
-      }else{
-        CH.forEach(function(c){
-          var msgs2=getChatMsgs(c.id);
-          var dernierMsg=msgs2.length>0?msgs2[msgs2.length-1]:null;
-          var nonLus=(S.data.chats||[]).filter(function(m){return m.convId===getChatConvId(c.id)&&!m.lu&&m.de==="chauffeur";}).length;
-          var scC2=(S.data.sousComptes||[]).filter(function(sc){return String(sc.chauffeurId)===String(c.id);})[0];
-          var enLigne2=scC2?isUserOnline(scC2.pseudo):false;
-          var row=document.createElement("div");
-          row.style.cssText="background:#fff;border-bottom:1px solid #f0f2f5;padding:13px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;"+(nonLus>0?"background:#eff6ff;":"");
-          var av2=document.createElement("div");
-          av2.style.cssText="width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative;";
-          av2.textContent=c.nom.charAt(0);
-          var dot3=document.createElement("div");
-          dot3.style.cssText="position:absolute;bottom:-2px;right:-2px;width:13px;height:13px;border-radius:50%;background:"+(enLigne2?"#10b981":"#94a3b8")+";border:2px solid #fff;";
-          av2.appendChild(dot3);
-          var info=document.createElement("div");info.style.cssText="flex:1;min-width:0;";
-          var nomDiv=document.createElement("div");
-          nomDiv.style.cssText="font-weight:"+(nonLus>0?"800":"700")+";font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;";
-          nomDiv.textContent=c.nom;
-          if(enLigne2){var onPill=document.createElement("span");onPill.style.cssText="font-size:9px;background:#dcfce7;color:#059669;border-radius:10px;padding:1px 6px;font-weight:700;";onPill.textContent="en ligne";nomDiv.appendChild(onPill);}
-          var lastMsg=document.createElement("div");
-          lastMsg.style.cssText="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;";
-          // Afficher "vu il y a..." si hors ligne, dernier message sinon
-          var lastSeenInfo=scC2?getLastSeen(scC2.pseudo):{online:false,label:"Jamais connecté"};
-          var lastMsgTxt=dernierMsg?dernierMsg.texte.substring(0,35)+(dernierMsg.texte.length>35?"...":""):"";
-          lastMsg.innerHTML=(enLigne2?"":('<span style="color:'+(lastSeenInfo.label==="Jamais connecté"?"#dc2626":"#64748b")+';font-size:10px;">'+lastSeenInfo.label+'</span>'))+(lastMsgTxt&&!enLigne2?' · '+lastMsgTxt:lastMsgTxt||"");
-          info.appendChild(nomDiv);info.appendChild(lastMsg);
-          var right2=document.createElement("div");right2.style.cssText="display:flex;flex-direction:column;align-items:flex-end;gap:4px;";
-          if(nonLus>0){var badge=document.createElement("span");badge.style.cssText="background:#dc2626;color:#fff;border-radius:10px;min-width:20px;padding:2px 6px;font-size:10px;font-weight:800;text-align:center;";badge.textContent=nonLus;right2.appendChild(badge);}
-          else{var chev2=document.createElement("span");chev2.style.cssText="color:#bfdbfe;font-size:18px;";chev2.textContent="›";right2.appendChild(chev2);}
-          row.appendChild(av2);row.appendChild(info);row.appendChild(right2);
-          (function(cid){row.onclick=function(){S.chatConvOuverte=cid;rScreen();};})(c.id);
-          wrapper2.appendChild(row);
-        });
-      }
-      sc.innerHTML="";sc.appendChild(wrapper2);html=null;
+      list_wa.appendChild(convList);
+      sc.innerHTML=""; sc.appendChild(list_wa);
+      html=null;
     }
   }
   else if(S.tab==="primes"){
@@ -4123,6 +4265,15 @@ function rScreenGlobal(sc){
       groups[3].items.push({ic:"🔐",lb:"Sécurité",sb:"Logs & 2FA",act:function(){sT("securite");}});
       groups[3].items.push({ic:"👤",lb:"Sous-comptes",sb:(S.data.sousComptes||[]).length+" compte(s)",act:function(){sT("comptes");}});
     }
+    // Corbeille pour tous les gérants et admins
+    var archives = (S.data.chauffeurs||[]).filter(function(c){return c.statut==="archive";});
+    groups[3].items.push({
+      ic:"🗑️",
+      lb:"Corbeille",
+      sb:archives.length > 0 ? archives.length+" chauffeur(s) archivé(s)" : "Vide",
+      badge: archives.length,
+      act:function(){ showCorbeille(); }
+    });
 
     // Rendre les groupes
     groups.forEach(function(grp){
@@ -5159,7 +5310,78 @@ function saveDep(){var m=parseFloat(gv("dm"))||0;if(!m)return;var item={id:Date.
 function saveAm(){var m=parseFloat(gv("amo"))||0;if(!m)return;var item={id:Date.now(),chauffeurId:parseInt(gv("ac"))||0,montant:m,date:td(),motif:gv("am2"),statut:"impayee"};S.data.amendes.push(item);var ch=(S.data.chauffeurs||[]).filter(function(x){return x.id===item.chauffeurId;})[0];jLog("amende_ajout","Amende "+gv("am2")+" : "+fc(m)+(ch?" — "+ch.nom:""));fbSave("amendes",item);fM();}
 function saveMsg(){var txt=gv("mt").trim();if(!txt)return;var p=gv("mp");var item={id:Date.now(),de:S.user.role,pour:p?parseInt(p):null,texte:txt,date:td(),heure:hr(),lu:false};(S.data.messages=S.data.messages||[]).push(item);fbSave("messages",item);fM();}
 function saveAv(){var cid=parseInt(gv("avc")),m=parseFloat(gv("avm"))||0,type=gv("avt");if(!cid||!m)return;var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===cid;})[0];if(!c)return;if(type==="avance"){c.avance=(c.avance||0)+m;c.solde=(c.solde||0)-m;}else{c.dette=Math.max(0,(c.dette||0)-m);}fbSave("chauffeurs",c);fM();}
-function confSuppr(id){var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===id;})[0];secConfirmPin("supprimer",function(){jLog("chauffeur_suppr","Suppression chauffeur: "+(c?c.nom:"id "+id));S.data.chauffeurs=(S.data.chauffeurs||[]).filter(function(c){return c.id!==id;});if(S.detCh&&S.detCh.id===id)S.detCh=null;fbDel("chauffeurs",id);fM();});}
+
+function showCorbeille(){
+  var archives = (S.data.chauffeurs||[]).filter(function(c){return c.statut==="archive";});
+  
+  var body = '<div style="padding:8px 0;">';
+  if(archives.length === 0){
+    body += '<div style="text-align:center;padding:40px 20px;color:#94a3b8;">'
+      +'<div style="font-size:48px;margin-bottom:12px;">🗑️</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#64748b;">Corbeille vide</div>'
+      +'<div style="font-size:12px;margin-top:4px;">Aucun chauffeur archivé</div>'
+      +'</div>';
+  } else {
+    archives.forEach(function(c){
+      body += '<div style="display:flex;align-items:center;gap:12px;padding:14px 4px;border-bottom:1px solid #f0f2f8;">'
+        +'<div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#94a3b8,#64748b);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">'+c.nom.charAt(0)+'</div>'
+        +'<div style="flex:1;">'
+        +'<div style="font-weight:700;font-size:14px;color:#0f172a;">'+c.nom+'</div>'
+        +'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Archivé le '+(c.dateArchive||"—")+' · par '+(c.archivePar||"—")+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button onclick="restaurerChauffeur('+c.id+');fM();" style="padding:7px 14px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">↩️ Restaurer</button>'
+        +'<button onclick="supprimerDefinitivement('+c.id+');" style="padding:7px 10px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:12px;cursor:pointer;font-family:inherit;">🗑️</button>'
+        +'</div>'
+        +'</div>';
+    });
+  }
+  body += '</div>';
+  oSheet("Corbeille", body);
+}
+
+function confSuppr(id){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===id;})[0];
+  if(!c) return;
+  
+  // Demander archiver ou supprimer définitivement
+  var choix = confirm("Voulez-vous archiver ce chauffeur ?\n\n✅ OK = Archiver (récupérable)\n❌ Annuler = Annuler l'action");
+  if(!choix) return;
+  
+  secConfirmPin("supprimer", function(){
+    // Archiver au lieu de supprimer
+    c.statut = "archive";
+    c.dateArchive = td();
+    c.archivePar = S.user ? S.user.pseudo : "Gerant";
+    jLog("chauffeur_archive", "Archivage chauffeur: "+(c?c.nom:"id "+id));
+    fbSave("chauffeurs", c);
+    if(S.detCh && S.detCh.id === id) S.detCh = null;
+    fM();
+    alert("✅ "+c.nom+" a été archivé.\nVous pouvez le restaurer depuis Paramètres → Corbeille.");
+  });
+}
+
+function restaurerChauffeur(id){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===id;})[0];
+  if(!c) return;
+  c.statut = "actif";
+  delete c.dateArchive;
+  delete c.archivePar;
+  fbSave("chauffeurs", c);
+  alert("✅ "+c.nom+" a été restauré !");
+  R();
+}
+
+function supprimerDefinitivement(id){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return x.id===id;})[0];
+  if(!confirm("⚠️ SUPPRESSION DÉFINITIVE\n"+(c?c.nom:"")+"\nCette action est irréversible !")) return;
+  secConfirmPin("supprimer", function(){
+    jLog("chauffeur_suppr","Suppression définitive: "+(c?c.nom:"id "+id));
+    S.data.chauffeurs=(S.data.chauffeurs||[]).filter(function(x){return x.id!==id;});
+    fbDel("chauffeurs", id);
+    R();
+  });
+}
 function chgSal(id,st){var s=(S.data.salonis||[]).filter(function(x){return x.id===id;})[0];if(s){s.statut=st;fbSave("salonis",s);rScreen();}}
 function payAm(id){var a=(S.data.amendes||[]).filter(function(x){return x.id===id;})[0];if(a){a.statut="payee";fbSave("amendes",a);rScreen();}}
 function mkLu(id){var m=S.data.messages.filter(function(x){return x.id===id;})[0];if(m){m.lu=true;fbSave("messages",m);rScreen();}}
