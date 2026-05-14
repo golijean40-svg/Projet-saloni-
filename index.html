@@ -720,13 +720,13 @@ function formatMsgDate(dateStr){
   if(!dateStr)return "";
   var today=td();
   var yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
-  var yStr=yesterday.toLocaleDateString("fr-FR");
+  var yStr=fmtISO(yesterday);
   if(dateStr===today)return "Aujourd\'hui";
   if(dateStr===yStr)return "Hier";
-  // Afficher le jour complet
   try{
-    var parts=dateStr.split("/");
-    var d=new Date(parts[2]+"-"+parts[1]+"-"+parts[0]);
+    var d;
+    if(dateStr.indexOf("-")>-1){var p=dateStr.split("-");d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));}
+    else{var parts=dateStr.split("/");d=new Date(parts[2]+"-"+parts[1]+"-"+parts[0]);}
     var jours=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
     var mois=["jan","fév","mars","avr","mai","juin","juil","août","sep","oct","nov","déc"];
     return jours[d.getDay()]+" "+d.getDate()+" "+mois[d.getMonth()];
@@ -1399,7 +1399,7 @@ function checkEtAppliquerSanctions(){
       var jours7=[];
       for(var i=1;i<=7;i++){
         var d=new Date();d.setDate(d.getDate()-i);
-        jours7.push(d.toLocaleDateString("fr-FR"));
+        jours7.push(fmtISO(d));
       }
       // Aucun versement sur toute la semaine ?
       var aVerseHebdo=S.data.versements.some(function(v){
@@ -1438,7 +1438,7 @@ function checkEtAppliquerSanctions(){
       var jours=[];
       for(var i=1;i<=7&&jours.length<2;i++){
         var d=new Date();d.setDate(d.getDate()-i);
-        if(d.getDay()!==0)jours.push(d.toLocaleDateString("fr-FR"));
+        if(d.getDay()!==0)jours.push(fmtISO(d));
       }
       var nonVerses=jours.filter(function(j){
         return !S.data.versements.some(function(v){
@@ -1723,19 +1723,20 @@ function getChauffeurDuCompte(){if(!S.user||!S.user.chauffeurId)return null;retu
 function hasPerm(p){if(!S.user)return false;if(S.user.niveau>=3)return true;if(estCompteChauf())return false;if(S.user.perms)return S.user.perms[p]===true;if(S.user.niveau>=2)return p!=="reinit"&&p!=="supprimer";return false;}
 
 // ══ UTILITAIRES ══
-function td(){return new Date().toLocaleDateString("fr-FR");}
+function td(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate();}
 function hr(){return new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
 function fc(n){return(n||0).toLocaleString("fr-FR")+" F";}
 function pc(a,b){return b>0?Math.min(Math.round(a/b*100),100):0;}
 function gv(id){var e=document.getElementById(id);return e?e.value:"";}
+function fmtISO(dt){return dt.getFullYear()+"-"+(dt.getMonth()<9?"0":"")+(dt.getMonth()+1)+"-"+(dt.getDate()<10?"0":"")+dt.getDate();}
 function getSem(){var d=[],n=new Date(),dw=n.getDay();var l=new Date(n);
 // Si dimanche (dw=0), la semaine va de lundi (-6j) à dimanche (aujourd'hui)
 // Si autre jour, la semaine va du lundi de cette semaine
 var reculer=dw===0?6:dw-1;
 l.setDate(n.getDate()-reculer);
 var nbJours=dw===0?7:6;// Dimanche: 7 jours (Lun-Dim), sinon 6 (Lun-Sam)
-for(var i=0;i<nbJours;i++){var x=new Date(l);x.setDate(l.getDate()+i);d.push(x.toLocaleDateString("fr-FR"));}return d;}
-function getMois(){var n=new Date(),d=[];var last=new Date(n.getFullYear(),n.getMonth()+1,0);for(var x=new Date(n.getFullYear(),n.getMonth(),1);x<=last;x.setDate(x.getDate()+1)){if(x.getDay()!==0)d.push(new Date(x).toLocaleDateString("fr-FR"));}return d;}
+for(var i=0;i<nbJours;i++){var x=new Date(l);x.setDate(l.getDate()+i);d.push(fmtISO(x));}return d;}
+function getMois(){var n=new Date(),d=[];var last=new Date(n.getFullYear(),n.getMonth()+1,0);for(var x=new Date(n.getFullYear(),n.getMonth(),1);x<=last;x.setDate(x.getDate()+1)){if(x.getDay()!==0)d.push(fmtISO(new Date(x)));}return d;}
 
 // ══ CHAT ══
 function getChatConvId(cid){return "conv_"+String(cid);}
@@ -2852,7 +2853,7 @@ function renderHistoriquePresence(sc, c){
   var days=[];
   for(var i=27;i>=0;i--){
     var d=new Date();d.setDate(d.getDate()-i);
-    days.push({date:d.toLocaleDateString("fr-FR"),dow:d.getDay(),d:d});
+    days.push({date:fmtISO(d),dow:d.getDay(),d:d});
   }
   var VE=S.data.versements;
   var versC=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
@@ -2959,7 +2960,7 @@ function getLast30Days(){
   var days=[];
   for(var i=29;i>=0;i--){
     var d=new Date();d.setDate(d.getDate()-i);
-    days.push(d.toLocaleDateString("fr-FR"));
+    days.push(fmtISO(d));
   }
   return days;
 }
@@ -3003,7 +3004,7 @@ function renderBI(sc){
     var nbJ=new Date(annee,mois,0).getDate();
     for(var i=1;i<=nbJ;i++){
       var d=new Date(annee,mois-1,i);
-      days.push(d.toLocaleDateString("fr-FR"));
+      days.push(fmtISO(d));
     }
     return days;
   }
@@ -3048,7 +3049,7 @@ function renderBI(sc){
     for(var i=0;i<7;i++){
       var d=new Date();
       d.setDate(d.getDate()-(offsetSemaines*7)+i);
-      var dateStr=d.toLocaleDateString("fr-FR");
+      var dateStr=fmtISO(d);
       total+=VE.filter(function(v){return v.date===dateStr;}).reduce(function(s,v){return s+v.montant;},0);
     }
     return total;
@@ -3238,7 +3239,7 @@ function renderRSI(sc){
     var now = new Date();
     for(var i=1;i<=now.getDate();i++){
       var d=new Date(now.getFullYear(),now.getMonth(),i);
-      joursMois.push(d.toLocaleDateString("fr-FR"));
+      joursMois.push(fmtISO(d));
     }
     var recettesMois = VE.filter(function(v){ return chIds.indexOf(String(v.chauffeurId))>=0 && joursMois.indexOf(v.date)>=0; }).reduce(function(s,v){ return s+v.montant; },0);
 
@@ -6747,7 +6748,7 @@ var WORKER_URL = "https://saloni.golijean40.workers.dev";
 if (!Array.isArray(window._iaHist)) window._iaHist = [];
 window._iaBusy = false;
 
-function td(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1)+"-"+(d.getDate()<10?"0":"")+d.getDate();}
+// td() défini dans les utilitaires principaux
 
 function iaBuildCtx(){
   try {
