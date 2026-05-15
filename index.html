@@ -2442,6 +2442,27 @@ function iaRunAutomations(){
     }
   }
 
+  // ─── 5. COMMUNICATION AUTO (félicitations, encouragements) ───
+  if(config.autoAnalyse){
+    try {
+      var msgsAuto=iaCommunicationAuto();
+      if(msgsAuto && msgsAuto.length>0){
+        msgsAuto.forEach(function(m){
+          var tel=m.tel.replace(/\D/g,"").replace(/^0/,"225");
+          window._iaPendingWA=window._iaPendingWA||[];
+          window._iaPendingWA.push({tel:tel,msg:m.msg,nom:m.chauffeur.nom+" ("+m.type+")"});
+          localStorage.setItem(m.memoKey, m.memoValue);
+          addIAJournal("communication",m.type==="felicitations"?"Félicitations préparées":"Encouragement préparé",m.chauffeur.nom);
+        });
+        actions.push({
+          type:"communication",
+          msg:"💌 "+msgsAuto.length+" message(s) auto préparés",
+          detail:msgsAuto.map(function(m){return m.chauffeur.nom;}).join(", ")
+        });
+      }
+    } catch(e){console.warn("Auto communication failed",e);}
+  }
+
   // Re-render si actions
   if(actions.length>0 && typeof render==="function") render();
   return actions;
@@ -2982,6 +3003,541 @@ function iaProcessPendingWA(){
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   IA AVANCÉE — Actions, Anomalies, Vocal, Prédictions, Coaching
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Système d'autorisation ───
+var _iaPendingAction=null;
+function iaRequestPermission(action){
+  _iaPendingAction=action;
+  var html='<div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:18px;padding:20px;margin:12px 0">';
+  html+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;opacity:.7;margin-bottom:8px">🔐 Demande d\'autorisation</div>';
+  html+='<div style="font-size:15px;font-weight:700;margin-bottom:8px">'+action.titre+'</div>';
+  html+='<div style="font-size:13px;opacity:.9;margin-bottom:14px;line-height:1.5">'+action.description+'</div>';
+  if(action.details){
+    html+='<div style="background:rgba(0,0,0,.2);border-radius:10px;padding:10px;font-size:12px;margin-bottom:14px;line-height:1.6;white-space:pre-wrap">'+action.details+'</div>';
+  }
+  html+='<div style="display:flex;gap:8px"><button style="flex:1;padding:11px;background:#fff;color:#5b21b6;border-radius:10px;font-weight:800;border:none;font-family:inherit;font-size:13px" onclick="iaApproveAction()">✅ Autoriser</button>';
+  html+='<button style="flex:1;padding:11px;background:rgba(0,0,0,.3);color:#fff;border-radius:10px;font-weight:800;border:none;font-family:inherit;font-size:13px" onclick="iaDenyAction()">❌ Refuser</button></div>';
+  html+='</div>';
+  addIAHist("bot",html);
+  renderAssistantAgain();
+}
+
+function iaApproveAction(){
+  if(!_iaPendingAction) return;
+  var act=_iaPendingAction;
+  _iaPendingAction=null;
+  try{
+    var result=act.execute();
+    addIAHist("bot","✅ **"+act.titre+"** exécutée avec succès !\n\n"+(result||""));
+    toast("Action effectuée","success");
+    if(typeof render==="function") render();
+  }catch(e){
+    addIAHist("bot","❌ Erreur lors de l'exécution : "+e.message);
+    toast("Erreur","error");
+  }
+  renderAssistantAgain();
+}
+
+function iaDenyAction(){
+  _iaPendingAction=null;
+  addIAHist("bot","🛑 Action annulée. Je n'ai rien fait.");
+  renderAssistantAgain();
+}
+
+/* ─── ACTIONS : ajout/modif/suppression par chat ─── */
+function iaDetectAction(q){
+  q=q.toLowerCase();
+
+  // ─── AJOUTER UN VERSEMENT ───
+  // Patterns: "verse X pour Y", "ajoute versement X de Y", "Y a versé X"
+  var m=q.match(/(?:verse|ajoute|enregistre|enregistrer|nouveau\s*versement)\s*(?:de\s+)?(\d{3,7})\s*(?:f|fcfa|francs?)?\s*(?:pour|de|par|à|chez)\s+([a-zà-ÿ\s]+?)(?:\s|$)/i);
+  if(!m) m=q.match(/([a-zà-ÿ\s]+?)\s+a\s+(?:vers[ée]|pay[ée])\s+(\d{3,7})/i);
+  if(!m) m=q.match(/(\d{3,7})\s*(?:f|fcfa)?\s+(?:pour|chez)\s+([a-zà-ÿ\s]+)/i);
+  if(m){
+    var montant, nomCh;
+    if(/\d/.test(m[1])){montant=parseInt(m[1]);nomCh=m[2].trim();}
+    else{nomCh=m[1].trim();montant=parseInt(m[2]);}
+    var ch=(S.data.chauffeurs||[]).find(function(c){
+      return (c.nom||"").toLowerCase().indexOf(nomCh)>=0 || nomCh.indexOf((c.nom||"").toLowerCase().split(" ")[0])>=0;
+    });
+    if(ch && montant>0){
+      return {
+        titre:"Enregistrer versement",
+        description:"Enregistrer un versement de "+fc(montant)+" pour "+ch.nom,
+        details:"💰 Montant : "+fc(montant)+"\n👤 Chauffeur : "+ch.nom+"\n📅 Date : aujourd'hui\n💳 Mode : Espèces (par défaut)",
+        execute:function(){
+          var item={id:Date.now(),chauffeurId:ch.id,montant:montant,date:td(),heure:hr(),mode:"Especes",ref:"",note:"Ajouté par IA"};
+          if(!S.data.versements)S.data.versements=[];
+          S.data.versements.push(item);
+          ch.solde=(ch.solde||0)+montant;
+          fbSave("chauffeurs",ch);
+          fbSave("versements",item);
+          addIAJournal("action_versement","Versement IA",ch.nom+" — "+fc(montant));
+          return "Versement de **"+fc(montant)+"** pour **"+ch.nom+"** enregistré ✓";
+        }
+      };
+    }
+  }
+
+  // ─── AJOUTER UN CHAUFFEUR ───
+  m=q.match(/(?:ajoute|cr[ée]er?|nouveau)\s+(?:un\s+)?chauffeur\s+([a-zà-ÿ\s]+)/i);
+  if(m){
+    var nom=m[1].trim().replace(/\s+/g," ");
+    return {
+      titre:"Ajouter un chauffeur",
+      description:"Créer le chauffeur "+nom+" dans votre équipe",
+      details:"👤 Nom : "+nom+"\n📍 Zone : à compléter après\n📞 Téléphone : à compléter après\n💰 Objectif : 5 000 F/jour (par défaut)",
+      execute:function(){
+        var item={id:Date.now(),nom:nom,zone:"",tel:"",saloniId:"",objectifJour:5000,freqPaiement:"Journalier",statut:"actif",solde:0,dette:0,dateAjout:td()};
+        S.data.chauffeurs=S.data.chauffeurs||[];
+        S.data.chauffeurs.push(item);
+        fbSave("chauffeurs",item);
+        addIAJournal("action_chauffeur","Chauffeur ajouté",nom);
+        return "Chauffeur **"+nom+"** ajouté ✓\nN'oubliez pas de compléter sa zone, téléphone et saloni dans l'onglet Équipe.";
+      }
+    };
+  }
+
+  // ─── DÉSACTIVER / VIRER UN CHAUFFEUR ───
+  m=q.match(/(?:vire|virer|d[ée]sactive|d[ée]sactiver|suspend|suspendre|retire)\s+([a-zà-ÿ\s]+)/i);
+  if(m){
+    var nomD=m[1].trim();
+    var chD=(S.data.chauffeurs||[]).find(function(c){return (c.nom||"").toLowerCase().indexOf(nomD)>=0;});
+    if(chD){
+      return {
+        titre:"Désactiver le chauffeur",
+        description:"Désactiver "+chD.nom+" (passer en statut inactif)",
+        details:"⚠️ Le chauffeur ne pourra plus enregistrer de versement.\nSes données historiques sont conservées.\nVous pouvez le réactiver à tout moment.",
+        execute:function(){
+          chD.statut="inactif";
+          fbSave("chauffeurs",chD);
+          addIAJournal("action_desactiver","Chauffeur désactivé",chD.nom);
+          return chD.nom+" est maintenant **inactif** ✓";
+        }
+      };
+    }
+  }
+
+  // ─── AJOUTER UNE DÉPENSE ───
+  m=q.match(/(?:ajoute|enregistre|nouvelle?)\s+(?:une\s+)?d[ée]pense\s+(?:de\s+)?(\d{3,7})\s*(?:f|fcfa)?\s*(?:pour|en)?\s*([a-zà-ÿ\s]+)?/i);
+  if(m){
+    var montantD=parseInt(m[1]);
+    var catD=m[2]?m[2].trim():"Autre";
+    return {
+      titre:"Enregistrer une dépense",
+      description:"Ajouter une dépense de "+fc(montantD)+" — "+catD,
+      details:"💸 Montant : "+fc(montantD)+"\n📂 Catégorie : "+catD+"\n📅 Date : aujourd'hui",
+      execute:function(){
+        var item={id:Date.now(),montant:montantD,categorie:catD,date:td(),note:"Ajouté par IA"};
+        S.data.depenses=S.data.depenses||[];
+        S.data.depenses.push(item);
+        fbSave("depenses",item);
+        addIAJournal("action_depense","Dépense ajoutée",catD+" — "+fc(montantD));
+        return "Dépense de **"+fc(montantD)+"** ("+catD+") enregistrée ✓";
+      }
+    };
+  }
+
+  // ─── BLOQUER UN SALONI ───
+  m=q.match(/(?:bloque|bloquer)\s+(?:le\s+)?saloni\s+(\w+)/i);
+  if(m){
+    var idSal=m[1];
+    var sal=(S.data.salonis||[]).find(function(s){return String(s.id)===idSal||String(s.immat||"").toLowerCase()===idSal.toLowerCase();});
+    if(sal){
+      return {
+        titre:"Bloquer un saloni",
+        description:"Bloquer le saloni "+sal.id+" à distance",
+        details:"🔒 Le saloni sera marqué comme bloqué\n⚠️ Le chauffeur ne pourra plus rouler\nVous pouvez le débloquer à tout moment",
+        execute:function(){
+          sal.statut="bloque";
+          fbSave("salonis",sal);
+          addIAJournal("action_bloquer","Saloni bloqué","Saloni "+sal.id);
+          return "Saloni **"+sal.id+"** bloqué 🔒 ✓";
+        }
+      };
+    }
+  }
+
+  // ─── ENVOYER UN MESSAGE WHATSAPP ───
+  m=q.match(/(?:envoie|envoyer)\s+(?:un\s+)?(?:message|whatsapp|wa)\s+(?:à|a|pour)\s+([a-zà-ÿ\s]+?)(?:\s+(?:disant|pour\s+lui\s+dire)\s+(.+))?$/i);
+  if(m){
+    var nomM=m[1].trim();
+    var msgM=m[2]?m[2].trim():"Bonjour, contactez-moi rapidement. Merci.";
+    var chM=(S.data.chauffeurs||[]).find(function(c){return (c.nom||"").toLowerCase().indexOf(nomM)>=0;});
+    if(chM && chM.tel){
+      return {
+        titre:"Envoyer un WhatsApp",
+        description:"Envoyer un message à "+chM.nom,
+        details:"📞 Numéro : "+chM.tel+"\n💬 Message :\n"+msgM,
+        execute:function(){
+          var tel=chM.tel.replace(/\D/g,"").replace(/^0/,"225");
+          window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msgM),"_blank");
+          addIAJournal("action_whatsapp","WhatsApp envoyé",chM.nom);
+          return "WhatsApp ouvert pour **"+chM.nom+"** 📞 ✓";
+        }
+      };
+    }
+  }
+
+  return null;
+}
+
+/* ─── DÉTECTION D'ANOMALIES ET FRAUDES ─── */
+function iaDetectAnomalies(){
+  var anomalies=[];
+  var VE=S.data.versements||[];
+  var CH=S.data.chauffeurs||[];
+
+  // 1. Doublons (même chauffeur, même montant, même jour, à <5min)
+  var grouped={};
+  VE.forEach(function(v){
+    var key=v.chauffeurId+"_"+v.date+"_"+v.montant;
+    if(!grouped[key])grouped[key]=[];
+    grouped[key].push(v);
+  });
+  Object.keys(grouped).forEach(function(k){
+    if(grouped[k].length>1){
+      var c=CH.find(function(x){return String(x.id)===String(grouped[k][0].chauffeurId);});
+      anomalies.push({
+        icon:"⚠️",
+        type:"doublon",
+        gravite:"haute",
+        titre:"Doublon détecté",
+        msg:(c?c.nom:"?")+" — "+fc(grouped[k][0].montant)+" enregistré "+grouped[k].length+" fois le "+formatDateRelative(grouped[k][0].date)
+      });
+    }
+  });
+
+  // 2. Versements suspects (montants ronds répétitifs)
+  CH.forEach(function(c){
+    var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).slice(-15);
+    if(versCh.length<5) return;
+    var roundCount=versCh.filter(function(v){return v.montant%1000===0 && v.montant>=5000;}).length;
+    if(roundCount===versCh.length && versCh.length>=8){
+      anomalies.push({
+        icon:"🤔",
+        type:"pattern",
+        gravite:"basse",
+        titre:"Versements trop réguliers",
+        msg:c.nom+" verse toujours des montants ronds. Peut-être qu'il garde les bouts ?"
+      });
+    }
+  });
+
+  // 3. Chauffeur "fantôme" (>7j sans versement, statut actif)
+  CH.filter(function(c){return c.statut==="actif";}).forEach(function(c){
+    var dernier=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).sort(function(a,b){return b.id-a.id;})[0];
+    if(!dernier) return;
+    var diffJ=(new Date()-new Date(dernier.date))/(1000*60*60*24);
+    if(diffJ>7){
+      anomalies.push({
+        icon:"👻",
+        type:"fantome",
+        gravite:"haute",
+        titre:"Chauffeur fantôme",
+        msg:c.nom+" n'a pas versé depuis "+Math.round(diffJ)+" jours. À contacter d'urgence."
+      });
+    }
+  });
+
+  // 4. Versements aberrants (3x la moyenne du chauffeur)
+  CH.forEach(function(c){
+    var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+    if(versCh.length<5) return;
+    var avg=versCh.reduce(function(s,v){return s+v.montant;},0)/versCh.length;
+    var recent=versCh.slice(-3);
+    recent.forEach(function(v){
+      if(v.montant>avg*3 && v.montant>20000){
+        anomalies.push({
+          icon:"💎",
+          type:"exceptionnel",
+          gravite:"info",
+          titre:"Versement exceptionnel",
+          msg:c.nom+" a versé "+fc(v.montant)+" (moyenne: "+fc(Math.round(avg))+") le "+formatDateRelative(v.date)
+        });
+      }
+    });
+  });
+
+  return anomalies;
+}
+
+/* ─── PRÉDICTIONS AVANCÉES ─── */
+function iaPredictions(){
+  var preds=[];
+  var VE=S.data.versements||[];
+  var CH=S.data.chauffeurs||[];
+  var SA=S.data.salonis||[];
+  var EN=S.data.entretiens||[];
+
+  // 1. Risque de démission (chute progressive sur 4 semaines)
+  CH.filter(function(c){return c.statut==="actif";}).forEach(function(c){
+    var w=[];
+    for(var i=0;i<4;i++){
+      var start=new Date();start.setDate(start.getDate()-(i+1)*7);
+      var end=new Date();end.setDate(end.getDate()-i*7);
+      var tot=VE.filter(function(v){
+        var d=new Date(v.date);
+        return String(v.chauffeurId)===String(c.id) && d>=start && d<end;
+      }).reduce(function(s,v){return s+v.montant;},0);
+      w.push(tot);
+    }
+    // w[0]=semaine la plus récente, w[3]=plus ancienne
+    if(w[3]>0 && w[0]<w[3]*0.4 && w[0]<w[1] && w[1]<w[2]){
+      preds.push({
+        icon:"🚪",
+        type:"demission",
+        risque:"élevé",
+        titre:"Risque de démission",
+        msg:c.nom+" en chute progressive (4 sem). À discuter avant qu'il parte.",
+        proba:Math.min(90,Math.round((1-w[0]/(w[3]||1))*100))
+      });
+    }
+  });
+
+  // 2. Saloni à risque de panne (entretien anciens + km élevé)
+  SA.forEach(function(s){
+    var entSal=EN.filter(function(e){return String(e.saloniId||"")===String(s.id);});
+    var dernierEnt=entSal.sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0];
+    var jDepuis=dernierEnt?Math.round((new Date()-new Date(dernierEnt.date))/(1000*60*60*24)):999;
+    if(jDepuis>90 || (s.km||0)>50000){
+      preds.push({
+        icon:"🔧",
+        type:"panne",
+        risque:jDepuis>180?"élevé":"modéré",
+        titre:"Risque de panne",
+        msg:"Saloni "+s.id+" — "+(jDepuis>180?"Aucun entretien depuis "+jDepuis+"j":"Entretien à prévoir")+(s.km>30000?". "+(s.km).toLocaleString("fr-FR")+" km au compteur":"")
+      });
+    }
+  });
+
+  // 3. Atteinte/manque objectif mensuel
+  var mois=getMois();
+  var caMois=VE.filter(function(v){return mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var objMois=CH.filter(function(c){return c.statut==="actif";}).reduce(function(s,c){return s+(getObjJ(c)||0)*mois.length;},0);
+  var jPasses=new Date().getDate();
+  var moyJ=caMois/Math.max(1,jPasses);
+  var projection=Math.round(caMois+moyJ*(mois.length-jPasses));
+  if(objMois>0){
+    var ecart=Math.round((projection-objMois)/objMois*100);
+    preds.push({
+      icon:ecart>=0?"🎯":"⚠️",
+      type:"objectif",
+      risque:ecart<-15?"élevé":(ecart<0?"modéré":"bon"),
+      titre:"Projection objectif mensuel",
+      msg:"Projection : "+fc(projection)+" vs objectif "+fc(objMois)+" — Écart : "+(ecart>=0?"+":"")+ecart+"%"
+    });
+  }
+
+  return preds;
+}
+
+/* ─── COACHING INDIVIDUEL ─── */
+function iaCoaching(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return null;
+  var VE=S.data.versements||[];
+  var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+  var sem=getSem(),mois=getMois();
+  var totalSem=versCh.filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var totalMois=versCh.filter(function(v){return mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var pctObj=pc(totalSem,getObjS(c));
+
+  var diagnostic="",actions=[];
+  if(pctObj>=100){
+    diagnostic="🏆 Excellent ! "+c.nom+" dépasse son objectif.";
+    actions.push("Maintenez sa motivation (prime, félicitations)");
+    actions.push("Étudiez ses méthodes pour les transmettre");
+  } else if(pctObj>=70){
+    diagnostic="💪 "+c.nom+" est sur la bonne voie ("+pctObj+"%).";
+    actions.push("Encourager les efforts");
+    actions.push("Identifier le petit obstacle qui empêche d'atteindre 100%");
+  } else if(pctObj>=40){
+    diagnostic="⚠️ "+c.nom+" est en difficulté ("+pctObj+"%).";
+    actions.push("Discussion individuelle pour comprendre");
+    actions.push("Vérifier l'état du saloni");
+    actions.push("Examiner les zones d'activité");
+  } else {
+    diagnostic="🚨 "+c.nom+" est en situation critique ("+pctObj+"%).";
+    actions.push("Convocation immédiate");
+    actions.push("Plan de redressement ou sanction");
+    actions.push("Évaluer s'il faut le remplacer");
+  }
+
+  return {chauffeur:c,diagnostic:diagnostic,actions:actions,totalSem:totalSem,totalMois:totalMois,pctObj:pctObj};
+}
+
+/* ─── COMMUNICATION AUTO ─── */
+function iaCommunicationAuto(){
+  var msgs=[];
+  var CH=S.data.chauffeurs||[];
+  var VE=S.data.versements||[];
+  var sem=getSem();
+
+  CH.filter(function(c){return c.statut==="actif" && c.tel;}).forEach(function(c){
+    var totalSem=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+    var pctObj=pc(totalSem,getObjS(c));
+
+    // Félicitations si objectif atteint
+    if(pctObj>=100){
+      var lastFelic=localStorage.getItem("sal_ia_felic_"+c.id);
+      var keySemaine=sem[0]; // semaine identifiée par son premier jour
+      if(lastFelic!==keySemaine){
+        msgs.push({
+          type:"felicitations",
+          chauffeur:c,
+          tel:c.tel,
+          msg:"🏆 Félicitations "+c.nom+" !\n\nVous avez atteint votre objectif cette semaine avec "+fc(totalSem)+" versés. Excellent travail !\n\nContinuez comme ça 💪\n\n— Saloni Manager",
+          memoKey:"sal_ia_felic_"+c.id,
+          memoValue:keySemaine
+        });
+      }
+    }
+    // Encouragement si proche de l'objectif (60-90%) en fin de semaine
+    else if(pctObj>=60 && pctObj<100 && new Date().getDay()>=5){
+      var lastEnc=localStorage.getItem("sal_ia_enc_"+c.id);
+      if(lastEnc!==sem[0]){
+        var manque=getObjS(c)-totalSem;
+        msgs.push({
+          type:"encouragement",
+          chauffeur:c,
+          tel:c.tel,
+          msg:"💪 Bonjour "+c.nom+",\n\nVous êtes à "+pctObj+"% de votre objectif. Plus que "+fc(manque)+" pour l'atteindre cette semaine !\n\nVous pouvez le faire 🎯\n\n— Saloni Manager",
+          memoKey:"sal_ia_enc_"+c.id,
+          memoValue:sem[0]
+        });
+      }
+    }
+  });
+
+  return msgs;
+}
+
+/* ─── RAPPORTS AUTOMATIQUES ─── */
+function iaGenerateFullReport(){
+  var t=td();
+  var VE=S.data.versements||[];
+  var CH=S.data.chauffeurs||[];
+  var SA=S.data.salonis||[];
+  var DE=S.data.depenses||[];
+  var sem=getSem(),mois=getMois();
+
+  var rep="📊 RAPPORT COMPLET SALONI MANAGER\n";
+  rep+="Date : "+formatDateFR(t)+"\n";
+  rep+="════════════════════════════════════════\n\n";
+
+  rep+="💰 REVENUS\n";
+  rep+="─────────────────────────────\n";
+  rep+="• Aujourd'hui : "+fc(VE.filter(function(v){return v.date===t;}).reduce(function(s,v){return s+v.montant;},0))+"\n";
+  rep+="• Cette semaine : "+fc(VE.filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0))+"\n";
+  rep+="• Ce mois : "+fc(VE.filter(function(v){return mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0))+"\n\n";
+
+  var caM=VE.filter(function(v){return mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var depM=DE.filter(function(d){return mois.indexOf(d.date)>=0;}).reduce(function(s,d){return s+d.montant;},0);
+  rep+="💵 BÉNÉFICE MENSUEL\n";
+  rep+="─────────────────────────────\n";
+  rep+="• CA : "+fc(caM)+"\n";
+  rep+="• Dépenses : "+fc(depM)+"\n";
+  rep+="• Bénéfice net : "+fc(caM-depM)+"\n";
+  rep+="• Marge : "+(caM>0?Math.round((caM-depM)/caM*100):0)+"%\n\n";
+
+  rep+="👥 ÉQUIPE\n";
+  rep+="─────────────────────────────\n";
+  var actifs=CH.filter(function(c){return c.statut==="actif";});
+  rep+="• Chauffeurs actifs : "+actifs.length+"/"+CH.length+"\n";
+
+  var top3=actifs.map(function(c){
+    var t=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+    return {c:c,t:t};
+  }).sort(function(a,b){return b.t-a.t;}).slice(0,3);
+  rep+="\n🏆 Top 3 ce mois :\n";
+  top3.forEach(function(x,i){rep+="  "+(i+1)+". "+x.c.nom+" — "+fc(x.t)+"\n";});
+
+  var dettes=CH.filter(function(c){return (c.dette||0)>0;});
+  if(dettes.length>0){
+    rep+="\n⚠️ Dettes en cours : "+dettes.length+"\n";
+    rep+="• Total : "+fc(dettes.reduce(function(s,c){return s+c.dette;},0))+"\n";
+  }
+
+  rep+="\n🛺 FLOTTE\n";
+  rep+="─────────────────────────────\n";
+  rep+="• Total : "+SA.length+" saloni(s)\n";
+  var bloq=SA.filter(function(s){return s.statut==="bloque";}).length;
+  if(bloq>0) rep+="• Bloqués : "+bloq+"\n";
+
+  // Anomalies
+  var anomalies=iaDetectAnomalies();
+  if(anomalies.length>0){
+    rep+="\n🚨 ANOMALIES DÉTECTÉES ("+anomalies.length+")\n";
+    rep+="─────────────────────────────\n";
+    anomalies.slice(0,5).forEach(function(a){rep+="• "+a.icon+" "+a.titre+" : "+a.msg+"\n";});
+  }
+
+  // Prédictions
+  var preds=iaPredictions();
+  var predsHaut=preds.filter(function(p){return p.risque==="élevé";});
+  if(predsHaut.length>0){
+    rep+="\n🔮 ALERTES PRÉDICTIVES\n";
+    rep+="─────────────────────────────\n";
+    predsHaut.forEach(function(p){rep+="• "+p.icon+" "+p.titre+" : "+p.msg+"\n";});
+  }
+
+  rep+="\n════════════════════════════════════════\n";
+  rep+="📱 Saloni Manager v20 · IA Auto-Report";
+
+  return rep;
+}
+
+function iaShareReport(){
+  var rep=iaGenerateFullReport();
+  if(navigator.share){
+    navigator.share({title:"Rapport Saloni",text:rep}).catch(function(){copyToClip(rep);});
+  } else {
+    copyToClip(rep);
+  }
+  addIAJournal("rapport","Rapport complet généré","Partagé");
+}
+
+/* ─── COMMANDE VOCALE ─── */
+var _iaVoice=null;
+function iaStartVoice(){
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)){
+    toast("❌ Reconnaissance vocale non supportée sur ce navigateur","error");
+    return;
+  }
+  var Rec=window.SpeechRecognition||window.webkitSpeechRecognition;
+  _iaVoice=new Rec();
+  _iaVoice.lang='fr-FR';
+  _iaVoice.continuous=false;
+  _iaVoice.interimResults=false;
+
+  // Indicateur visuel
+  var btn=document.getElementById("iaVoiceBtn");
+  if(btn){btn.textContent="🔴";btn.style.background="#dc2626";}
+
+  _iaVoice.onresult=function(event){
+    var transcript=event.results[0][0].transcript;
+    var inp=document.getElementById("iaInput");
+    if(inp){
+      inp.value=transcript;
+      iaSendQuestion();
+    }
+  };
+  _iaVoice.onerror=function(e){
+    toast("Erreur vocale : "+e.error,"error");
+  };
+  _iaVoice.onend=function(){
+    var btn=document.getElementById("iaVoiceBtn");
+    if(btn){btn.textContent="🎤";btn.style.background="";}
+  };
+
+  _iaVoice.start();
+  toast("🎤 Parlez maintenant...","success");
+}
+
 function iaSendQuestion(){
   var inp=document.getElementById("iaInput");
   if(!inp) return;
@@ -2989,14 +3545,23 @@ function iaSendQuestion(){
   if(!q) return;
   addIAHist("user",q);
   inp.value="";
-  // Petite anim
   setTimeout(function(){
+    // ─── PRIORITÉ 1 : DÉTECTER UNE ACTION (ajout/modif/suppression) ───
+    try {
+      var action=iaDetectAction(q);
+      if(action){
+        iaRequestPermission(action);
+        var i=document.getElementById("iaInput");
+        if(i) i.focus();
+        return;
+      }
+    } catch(e){console.warn("Action detection failed",e);}
+
+    // ─── PRIORITÉ 2 : Réponse normale (Claude ou bot simple) ───
     var rep=iaAnswer(q);
     addIAHist("bot",rep);
-    // Re-render
     var content=document.getElementById("content-generic");
     if(content) content.innerHTML='<div class="content-inner">'+renderAssistant()+'</div>';
-    // Scroll en bas
     setTimeout(function(){
       var box=document.getElementById("iaChatBox");
       if(box) box.scrollTop=box.scrollHeight;
@@ -3064,6 +3629,8 @@ function renderAssistant(){
   h+='<div class="filter-chips" style="margin-bottom:14px">';
   h+='<button class="chip '+(window._iaTab==="chat"||!window._iaTab?"active":"")+'" onclick="window._iaTab=\'chat\';renderAssistantAgain()">💬 Chat</button>';
   h+='<button class="chip '+(window._iaTab==="insights"?"active":"")+'" onclick="window._iaTab=\'insights\';renderAssistantAgain()">💡 Insights</button>';
+  h+='<button class="chip '+(window._iaTab==="anomalies"?"active":"")+'" onclick="window._iaTab=\'anomalies\';renderAssistantAgain()">🚨 Anomalies</button>';
+  h+='<button class="chip '+(window._iaTab==="predictions"?"active":"")+'" onclick="window._iaTab=\'predictions\';renderAssistantAgain()">🔮 Prédictions</button>';
   h+='<button class="chip '+(window._iaTab==="journal"?"active":"")+'" onclick="window._iaTab=\'journal\';renderAssistantAgain()">📋 Journal</button>';
   h+='<button class="chip '+(window._iaTab==="config"?"active":"")+'" onclick="window._iaTab=\'config\';renderAssistantAgain()">⚙️ Config</button>';
   h+='</div>';
@@ -3111,14 +3678,32 @@ function renderAssistant(){
     });
     h+='</div>';
 
-    // Input
+    // Input avec micro
     h+='<div style="display:flex;gap:8px;align-items:center">';
+    h+='<button id="iaVoiceBtn" style="width:46px;height:46px;border-radius:14px;background:var(--surface-2);font-size:18px;border:1.5px solid var(--border);flex-shrink:0;font-family:inherit" onclick="iaStartVoice()" title="Parler à l\'IA">🎤</button>';
     h+='<input id="iaInput" placeholder="Posez votre question..." style="flex:1;padding:13px 16px;border:1.5px solid var(--border);border-radius:14px;font-size:14px;background:var(--surface);color:var(--txt);font-family:inherit" onkeydown="if(event.key===\'Enter\')iaSendQuestion()"/>';
-    h+='<button class="btn-accent" style="width:auto;padding:13px 18px;margin:0" onclick="iaSendQuestion()">➤</button>';
+    h+='<button class="btn-accent" style="width:46px;height:46px;padding:0;margin:0;font-size:18px;flex-shrink:0" onclick="iaSendQuestion()">➤</button>';
     h+='</div>';
+
+    // Actions rapides en bas
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">';
+    h+='<button class="btn-ghost" style="font-size:12px;padding:10px" onclick="iaShareReport()">📊 Rapport complet</button>';
     if(hist.length>0){
-      h+='<button class="btn-ghost" style="margin-top:8px;font-size:12px;padding:8px" onclick="iaResetHist()">🗑 Effacer historique</button>';
+      h+='<button class="btn-ghost" style="font-size:12px;padding:10px" onclick="iaResetHist()">🗑 Effacer</button>';
+    } else {
+      h+='<button class="btn-ghost" style="font-size:12px;padding:10px" onclick="iaQuickQ(\'aide\')">❓ Aide</button>';
     }
+    h+='</div>';
+
+    // Exemples de commandes
+    h+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:12px;margin-top:12px;font-size:11.5px;line-height:1.6">';
+    h+='💡 <strong>Exemples de commandes</strong> :<br>';
+    h+='• <em>"Verse 5000 pour Jean"</em> → enregistre un versement<br>';
+    h+='• <em>"Ajoute chauffeur Marie"</em> → crée un chauffeur<br>';
+    h+='• <em>"Envoie message à Paul"</em> → ouvre WhatsApp<br>';
+    h+='• <em>"Bloque saloni 001"</em> → bloque à distance<br>';
+    h+='• Toute autre question → réponse IA';
+    h+='</div>';
   }
 
   // ─── TAB INSIGHTS ───
@@ -3136,7 +3721,55 @@ function renderAssistant(){
     }
   }
 
-  // ─── TAB JOURNAL (actions auto) ───
+  // ─── TAB ANOMALIES ───
+  if(tab==="anomalies"){
+    var anomalies=iaDetectAnomalies();
+    if(anomalies.length===0){
+      h+='<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Aucune anomalie détectée !<br>Tout semble en ordre.</div></div>';
+    } else {
+      h+='<p style="font-size:12px;color:var(--txt-2);margin-bottom:14px">'+anomalies.length+' anomalie(s) détectée(s) par surveillance automatique</p>';
+      var couleurs={haute:"var(--danger)",basse:"var(--warning)",info:"var(--info)"};
+      var bgs={haute:"var(--danger-soft)",basse:"var(--warning-soft)",info:"var(--info-soft)"};
+      anomalies.forEach(function(a){
+        var col=couleurs[a.gravite]||"var(--info)";
+        var bg=bgs[a.gravite]||"var(--info-soft)";
+        h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col+';border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm)">';
+        h+='<div style="display:flex;gap:12px"><div style="font-size:24px">'+a.icon+'</div>';
+        h+='<div style="flex:1">';
+        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-weight:800;font-size:14px">'+a.titre+'</div>';
+        h+='<span style="background:'+bg+';color:'+col+';padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase">'+a.gravite+'</span>';
+        h+='</div>';
+        h+='<div style="font-size:13px;color:var(--txt-2);line-height:1.5">'+a.msg+'</div></div></div>';
+        h+='</div>';
+      });
+    }
+  }
+
+  // ─── TAB PRÉDICTIONS ───
+  if(tab==="predictions"){
+    var preds=iaPredictions();
+    if(preds.length===0){
+      h+='<div class="empty"><div class="empty-icon">🔮</div><div class="empty-text">Pas assez de données pour générer des prédictions.</div></div>';
+    } else {
+      h+='<p style="font-size:12px;color:var(--txt-2);margin-bottom:14px">Analyses prédictives basées sur les tendances</p>';
+      var couleursR={"élevé":"var(--danger)","modéré":"var(--warning)","bon":"var(--success)"};
+      var bgsR={"élevé":"var(--danger-soft)","modéré":"var(--warning-soft)","bon":"var(--success-soft)"};
+      preds.forEach(function(p){
+        var col=couleursR[p.risque]||"var(--info)";
+        var bg=bgsR[p.risque]||"var(--info-soft)";
+        h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col+';border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm)">';
+        h+='<div style="display:flex;gap:12px"><div style="font-size:24px">'+p.icon+'</div>';
+        h+='<div style="flex:1">';
+        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-weight:800;font-size:14px">'+p.titre+'</div>';
+        h+='<span style="background:'+bg+';color:'+col+';padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase">'+p.risque+'</span>';
+        h+='</div>';
+        h+='<div style="font-size:13px;color:var(--txt-2);line-height:1.5">'+p.msg+'</div>';
+        if(p.proba) h+='<div style="margin-top:8px;font-size:11px;color:'+col+';font-weight:700">Probabilité estimée : '+p.proba+'%</div>';
+        h+='</div></div>';
+        h+='</div>';
+      });
+    }
+  }
   if(tab==="journal"){
     var allJournal=getIAJournal().slice().reverse();
     if(allJournal.length===0){
