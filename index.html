@@ -190,6 +190,13 @@ body.dark .alert-sub{color:#fcd34d}
 
 /* ═══ NAV ═══ */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--nav-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:8px 0 18px;display:flex;justify-content:space-around;align-items:center;z-index:100}
+/* Mode chauffeur : cacher nav standard + menu burger */
+body.mode-chauffeur .nav,body.mode-chauffeur .menu-btn{display:none !important}
+body.mode-chauffeur .app{padding-bottom:30px}
+.ch-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+.ch-tab{padding:12px 4px;border-radius:14px;background:transparent;font-size:22px;border:none;font-family:inherit;cursor:pointer;transition:all .2s}
+.ch-tab.active{background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;transform:scale(1.05);box-shadow:0 4px 12px rgba(10,31,68,.25)}
+body.dark .ch-tab.active{background:linear-gradient(135deg,#1e3a8a,#3b82f6)}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 10px;border-radius:12px;color:var(--txt-3);transition:all .2s}
 .nav-item.active{color:var(--primary-2)}
 .nav-item svg{width:22px;height:22px;stroke-width:2}
@@ -590,6 +597,19 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
       </button>
 
       <div class="sidebar-divider"></div>
+      <div class="sidebar-section-title">Paiements</div>
+      <button class="sidebar-item" onclick="goGeneric('waveconfig')" style="background:linear-gradient(135deg,rgba(26,159,255,.08),rgba(0,103,204,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#1a9fff,#0067cc);color:#fff">💸</div>
+        <div class="sidebar-item-label">Paiements Wave</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('wavepreuves')">
+        <div class="sidebar-item-icon">🔍</div>
+        <div class="sidebar-item-label">Vérifier preuves</div>
+        <div class="sidebar-item-badge" id="sbPreuvesBadge" style="display:none">0</div>
+      </button>
+
+      <div class="sidebar-divider"></div>
       <div class="sidebar-section-title">Système</div>
       <button class="sidebar-item" onclick="goGeneric('souscomptes')">
         <div class="sidebar-item-icon">👥</div>
@@ -897,6 +917,9 @@ function logout(){
     }catch(e){}
     S.user=null;
     try{ localStorage.removeItem("sal_session"); }catch(e){}
+    // ─── Sortir du mode chauffeur ───
+    document.body.classList.remove("mode-chauffeur");
+    S.chTab="home";
     // Reset UI
     var loginEl=document.getElementById("login");
     var appEl=document.getElementById("app");
@@ -914,9 +937,762 @@ function logout(){
     window.scrollTo(0,0);
   },200);
 }
+/* ═══ PERMISSIONS & MODE CHAUFFEUR ═══ */
+function estChauffeur(){
+  if(!S.user) return false;
+  return S.user.niveau===0 || S.user.typeCompte==="chauffeur";
+}
+function hasPerm(p){
+  if(!S.user) return false;
+  if(S.user.niveau>=3) return true; // Gérant = tout
+  if(estChauffeur()) return false; // Chauffeur = aucune perm gestion
+  if(S.user.niveau>=2){
+    // Admin/Collaborateur : perms granulaires
+    if(S.user.permissions) return S.user.permissions[p]===true;
+    return false;
+  }
+  return false;
+}
+function getChauffeurDuCompte(){
+  if(!S.user || !S.user.chauffeurId) return null;
+  return (S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(S.user.chauffeurId);}) || null;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME DE PAIEMENT WAVE
+   ═══════════════════════════════════════════════════════════════ */
+
+// Récupère la config Wave du gérant
+function getWaveConfig(){
+  try{
+    var c=JSON.parse(localStorage.getItem("sal_wave_config")||"{}");
+    return {
+      numero:c.numero||"",
+      devise:c.devise||"XOF",
+      activee:c.activee!==false
+    };
+  }catch(e){return {numero:"",devise:"XOF",activee:true};}
+}
+function setWaveConfig(cfg){
+  try{ localStorage.setItem("sal_wave_config",JSON.stringify(cfg)); }catch(e){}
+}
+
+// Génère le lien de paiement Wave
+function genWaveLink(montant, ref){
+  var cfg=getWaveConfig();
+  if(!cfg.numero) return null;
+  // Format Wave : https://pay.wave.com/m/<NUMERO>/c/<DEVISE>?amount=<MONTANT>
+  // Le numéro doit être au format international sans le +
+  var num=cfg.numero.replace(/\D/g,"");
+  if(num.startsWith("0")) num="225"+num.substring(1);
+  if(!num.startsWith("225")) num="225"+num;
+  var url="https://pay.wave.com/m/M-"+num+"/c/"+cfg.devise+"?amount="+(montant||0);
+  if(ref) url+="&ref="+encodeURIComponent(ref);
+  return url;
+}
+
+// Génère un QR code via une API publique gratuite
+function genQRCodeURL(data, size){
+  size=size||280;
+  return "https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(data)+"&format=png&margin=10&ecc=M";
+}
+
+// Ouvre directement l'app Wave avec le montant pré-rempli
+function openWavePayment(montant, ref){
+  var link=genWaveLink(montant, ref);
+  if(!link){
+    toast("⚠️ Configurez d'abord votre numéro Wave dans les Paramètres","error");
+    return;
+  }
+  window.open(link,"_blank");
+}
+
+// Modal pour générer un paiement Wave
+function openWaveModal(chauffeurId, montantDefaut){
+  var cfg=getWaveConfig();
+  if(!cfg.numero){
+    if(confirm("⚠️ Aucun numéro Wave configuré.\n\nVoulez-vous le configurer maintenant ?")){
+      goGeneric("waveconfig");
+    }
+    return;
+  }
+  var ch=chauffeurId?(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(chauffeurId);}):null;
+  var body='';
+
+  // Sélection chauffeur si non fourni
+  if(!ch){
+    var actifs=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu" && c.statut!=="inactif";});
+    if(actifs.length===0){
+      toast("Aucun chauffeur actif","error");
+      return;
+    }
+    body+='<div class="field"><label>Chauffeur</label><select id="waveCh">';
+    actifs.forEach(function(c){body+='<option value="'+c.id+'">'+c.nom+'</option>';});
+    body+='</select></div>';
+  } else {
+    body+='<div style="background:var(--surface-2);padding:12px;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;gap:12px">';
+    body+='<div style="width:44px;height:44px;border-radius:12px;background:'+avatarColor(ch.id)+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">'+initials(ch.nom)+'</div>';
+    body+='<div><div style="font-weight:700;font-size:14px">'+ch.nom+'</div><div style="font-size:12px;color:var(--txt-2)">'+(ch.zone||"—")+'</div></div></div>';
+    body+='<input type="hidden" id="waveCh" value="'+ch.id+'"/>';
+  }
+
+  // Montant
+  body+='<div class="field"><label>Montant à payer (FCFA)</label><input id="waveAmount" type="number" inputmode="numeric" value="'+(montantDefaut||5000)+'" placeholder="Ex: 5000"/></div>';
+
+  // Aperçu QR Code en direct (mis à jour au changement de montant)
+  body+='<div id="waveQRPreview" style="text-align:center;background:#fff;padding:16px;border-radius:16px;margin:14px 0;border:1px solid var(--border)">';
+  body+='<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px">QR Code Wave</div>';
+  body+='<img id="waveQRImg" src="" alt="QR" style="max-width:220px;width:100%;height:auto;display:block;margin:0 auto"/>';
+  body+='<div id="waveQRInfo" style="font-size:12px;color:#64748b;margin-top:8px"></div>';
+  body+='</div>';
+
+  // Boutons d'action
+  body+='<button class="btn-primary" style="margin-bottom:8px;background:linear-gradient(135deg,#1a9fff,#0067cc)" onclick="waveOpenApp()">📱 Ouvrir Wave maintenant</button>';
+  body+='<button class="btn-ghost" style="margin-bottom:8px" onclick="waveShareLink()">🔗 Copier / Partager le lien</button>';
+  body+='<button class="btn-ghost" style="margin-bottom:8px" onclick="waveSendWA()">💬 Envoyer par WhatsApp</button>';
+  body+='<button class="btn-accent" style="background:linear-gradient(135deg,#059669,#047857)" onclick="waveConfirmePaiement()">✅ J\'ai reçu le paiement</button>';
+
+  body+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:10px;margin-top:12px;font-size:11.5px;line-height:1.5">';
+  body+='ℹ️ Le chauffeur scanne ce QR ou clique sur le lien. Quand l\'argent arrive sur Wave, cliquez sur <strong>"J\'ai reçu le paiement"</strong> pour l\'enregistrer.';
+  body+='</div>';
+
+  openModal("💸 Paiement Wave", body);
+
+  // Mettre à jour le QR au chargement et à chaque changement
+  setTimeout(updateWaveQR,50);
+  var amtInput=document.getElementById("waveAmount");
+  if(amtInput) amtInput.addEventListener("input",updateWaveQR);
+}
+
+function updateWaveQR(){
+  var amt=parseInt(document.getElementById("waveAmount").value)||0;
+  var chId=document.getElementById("waveCh").value;
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(chId);});
+  var ref=ch?("Saloni-"+(ch.saloniId||ch.nom)).replace(/\s+/g,"_"):"Saloni";
+  var link=genWaveLink(amt, ref);
+  if(!link) return;
+  var qrImg=document.getElementById("waveQRImg");
+  if(qrImg) qrImg.src=genQRCodeURL(link);
+  var info=document.getElementById("waveQRInfo");
+  if(info) info.textContent=fc(amt)+" · vers "+getWaveConfig().numero;
+}
+
+function waveOpenApp(){
+  var amt=parseInt(document.getElementById("waveAmount").value)||0;
+  var chId=document.getElementById("waveCh").value;
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(chId);});
+  var ref=ch?("Saloni-"+(ch.saloniId||ch.nom)).replace(/\s+/g,"_"):"Saloni";
+  openWavePayment(amt, ref);
+}
+
+function waveShareLink(){
+  var amt=parseInt(document.getElementById("waveAmount").value)||0;
+  var chId=document.getElementById("waveCh").value;
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(chId);});
+  var ref=ch?("Saloni-"+(ch.saloniId||ch.nom)).replace(/\s+/g,"_"):"Saloni";
+  var link=genWaveLink(amt, ref);
+  if(!link){toast("Configurez Wave d'abord","error");return;}
+  var msg="💸 Lien de paiement Wave\n\nMontant : "+fc(amt)+"\n"+(ch?"Pour : "+ch.nom+"\n":"")+"\n👉 "+link+"\n\nCliquez pour payer.";
+  if(navigator.share){
+    navigator.share({title:"Paiement Wave",text:msg}).catch(function(){copyToClip(link);});
+  } else {
+    copyToClip(link);
+  }
+}
+
+function waveSendWA(){
+  var amt=parseInt(document.getElementById("waveAmount").value)||0;
+  var chId=document.getElementById("waveCh").value;
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(chId);});
+  if(!ch || !ch.tel){toast("Numéro du chauffeur non renseigné","error");return;}
+  var ref=("Saloni-"+(ch.saloniId||ch.nom)).replace(/\s+/g,"_");
+  var link=genWaveLink(amt, ref);
+  if(!link){toast("Configurez Wave d'abord","error");return;}
+  var msg="💸 Bonjour "+ch.nom+",\n\nMerci d'effectuer votre versement de "+fc(amt)+" via Wave :\n\n👉 "+link+"\n\nCliquez sur le lien pour payer en un clic.\n\n— Saloni Manager";
+  var tel=ch.tel.replace(/\D/g,"").replace(/^0/,"225");
+  window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");
+  addIAJournal("wave_envoi","Lien Wave envoyé",ch.nom+" — "+fc(amt));
+}
+
+function waveConfirmePaiement(){
+  var amt=parseInt(document.getElementById("waveAmount").value)||0;
+  var chId=parseInt(document.getElementById("waveCh").value);
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(chId);});
+  if(!ch || !amt){toast("Données invalides","error");return;}
+  if(!confirm("Confirmer la réception de "+fc(amt)+" via Wave de "+ch.nom+" ?")) return;
+  var item={
+    id:Date.now(),
+    chauffeurId:ch.id,
+    montant:amt,
+    date:td(),
+    heure:hr(),
+    mode:"Wave",
+    ref:"WAVE-"+Date.now().toString().substring(7),
+    note:"Paiement Wave confirmé"
+  };
+  if(!S.data.versements) S.data.versements=[];
+  S.data.versements.push(item);
+  ch.solde=(ch.solde||0)+amt;
+  try{
+    fbSave("chauffeurs",ch);
+    fbSave("versements",item);
+  }catch(e){}
+  addIAJournal("wave_recu","Paiement Wave reçu",ch.nom+" — "+fc(amt));
+  toast("✅ Paiement Wave de "+fc(amt)+" enregistré","success");
+  closeModal();
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME DE VÉRIFICATION DES PAIEMENTS WAVE
+   ═══════════════════════════════════════════════════════════════ */
+
+// Stockage des preuves de paiement en attente
+function getPreuvesAttente(){
+  try{ return JSON.parse(localStorage.getItem("sal_wave_preuves")||"[]"); }catch(e){return [];}
+}
+function savePreuvesAttente(p){
+  try{ localStorage.setItem("sal_wave_preuves",JSON.stringify(p.slice(-100))); }catch(e){}
+}
+function addPreuveAttente(preuve){
+  var p=getPreuvesAttente();
+  p.push(preuve);
+  savePreuvesAttente(p);
+}
+function removePreuveAttente(id){
+  var p=getPreuvesAttente().filter(function(x){return x.id!==id;});
+  savePreuvesAttente(p);
+}
+
+/* ─── PARSER SMS WAVE (regex) ─── */
+function parseSMSWave(texte){
+  if(!texte) return null;
+  var t=texte.toLowerCase().replace(/\s+/g," ");
+
+  // Détecter si c'est bien un SMS Wave
+  if(!/wave/.test(t) && !/transfert/.test(t) && !/re[çc]u/.test(t)) return null;
+
+  var result={raw:texte};
+
+  // Extraire le montant (formats : "5000 F", "5,000 FCFA", "5000 CFA", "5.000 F")
+  var mMontant=t.match(/(\d{1,3}(?:[\s.,]\d{3})*|\d+)\s*(?:f|fcfa|cfa|xof)\b/i);
+  if(mMontant) result.montant=parseInt(mMontant[1].replace(/[\s.,]/g,""));
+
+  // Extraire l'expéditeur (numéro après "de" ou "from")
+  var mExp=t.match(/(?:de|from|exp[ée]diteur)[^\d]*(\+?\d{8,15})/i);
+  if(mExp) result.expediteur=mExp[1].replace(/\D/g,"");
+
+  // Extraire la référence TXN
+  var mRef=t.match(/(?:ref|r[ée]f[ée]rence|transaction|id)[\s.:]*([A-Z0-9]{6,20})/i);
+  if(mRef) result.reference=mRef[1].toUpperCase();
+  else {
+    // Tenter une autre forme: code seul "TXN12345" ou "PAY12345"
+    var mRefAlt=t.match(/\b((?:txn|pay|wave|wv|ref)[a-z0-9]{4,15})\b/i);
+    if(mRefAlt) result.reference=mRefAlt[1].toUpperCase();
+  }
+
+  // Extraire la date/heure (si présente)
+  var mDate=t.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+  if(mDate) result.dateSms=mDate[1];
+  var mHeure=t.match(/(\d{1,2}[h:]\d{2})/);
+  if(mHeure) result.heureSms=mHeure[1];
+
+  // Nouveau solde (utile pour vérifier)
+  var mSolde=t.match(/(?:solde|balance)[^\d]*(\d{1,3}(?:[\s.,]\d{3})*|\d+)/i);
+  if(mSolde) result.nouveauSolde=parseInt(mSolde[1].replace(/[\s.,]/g,""));
+
+  return result.montant ? result : null;
+}
+
+/* ─── OCR via Claude Vision (lit l'image de capture d'écran) ─── */
+function ocrCaptureWave(imageBase64, callback){
+  var cfg=getIAConfig();
+  if(!cfg.claudeKey){
+    callback(null,"Clé API Claude non configurée. Activez l'IA Claude dans la Config.");
+    return;
+  }
+
+  var prompt="Tu vas analyser une capture d'écran de paiement Wave. Extrait les informations suivantes au format JSON STRICT (sans texte autour) :\n";
+  prompt+="{\"montant\": <nombre en FCFA sans espaces>, \"expediteur\": \"<nom ou numéro>\", \"reference\": \"<ref TXN>\", \"date\": \"<date>\", \"heure\": \"<heure>\", \"statut\": \"<reussi/echec/en_attente>\"}\n";
+  prompt+="Si une info manque, mets null. Si ce n'est PAS un paiement Wave, renvoie {\"erreur\": \"description\"}.";
+
+  fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key":cfg.claudeKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify({
+      model:"claude-haiku-4-5-20251001",
+      max_tokens:500,
+      messages:[{
+        role:"user",
+        content:[
+          {type:"image",source:{type:"base64",media_type:"image/jpeg",data:imageBase64}},
+          {type:"text",text:prompt}
+        ]
+      }]
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    if(data.error){callback(null,data.error.message);return;}
+    if(!data.content||!data.content[0]){callback(null,"Réponse vide");return;}
+    var txt=data.content[0].text.trim();
+    // Nettoyer le JSON (parfois Claude met des ```json...```)
+    txt=txt.replace(/```json\s*|\s*```/g,"").trim();
+    try{
+      var parsed=JSON.parse(txt);
+      callback(parsed,null);
+    }catch(e){
+      callback(null,"Impossible de parser la réponse : "+txt);
+    }
+  }).catch(function(e){callback(null,e.message);});
+}
+
+/* ─── VÉRIFICATION CROISÉE : détecter incohérences ─── */
+function verifierPreuveCoherence(preuve, ch){
+  var alertes=[];
+
+  // Montant suspect (très différent de l'objectif)
+  if(ch && preuve.montant){
+    var obj=getObjJ(ch);
+    if(preuve.montant<obj*0.3) alertes.push("⚠️ Montant très faible vs objectif jour ("+fc(obj)+")");
+    if(preuve.montant>obj*5) alertes.push("⚠️ Montant inhabituellement élevé");
+  }
+
+  // Référence déjà utilisée ?
+  if(preuve.reference){
+    var dejaUtilise=(S.data.versements||[]).some(function(v){return v.ref===preuve.reference;});
+    if(dejaUtilise) alertes.push("🚨 RÉFÉRENCE DÉJÀ UTILISÉE — possible fraude !");
+  }
+
+  // Date dans le futur ou trop ancienne ?
+  if(preuve.dateSms){
+    try{
+      var p=preuve.dateSms.split("/");
+      if(p.length===3){
+        var smsDate=new Date(p[2].length===2?"20"+p[2]:p[2],parseInt(p[1])-1,parseInt(p[0]));
+        var diff=(new Date()-smsDate)/(1000*60*60*24);
+        if(diff>7) alertes.push("⚠️ SMS de plus de 7 jours");
+        if(diff<-1) alertes.push("🚨 Date dans le futur !");
+      }
+    }catch(e){}
+  }
+
+  // Expéditeur cohérent avec le chauffeur ?
+  if(preuve.expediteur && ch && ch.tel){
+    var telCh=ch.tel.replace(/\D/g,"");
+    var telExp=preuve.expediteur.replace(/\D/g,"");
+    if(telCh.slice(-8)!==telExp.slice(-8)){
+      alertes.push("⚠️ Numéro expéditeur différent du chauffeur");
+    }
+  }
+
+  return alertes;
+}
+
+/* ─── MODAL : Chauffeur soumet sa preuve de paiement ─── */
+function chOpenPreuveModal(){
+  var c=getChauffeurDuCompte();
+  if(!c){toast("Compte non lié","error");return;}
+
+  var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Choisissez comment prouver votre paiement Wave :</div>';
+
+  // 3 onglets
+  body+='<div id="preuveTabsContainer">';
+  body+='<div style="display:flex;gap:6px;background:var(--surface-2);padding:6px;border-radius:14px;margin-bottom:14px">';
+  body+='<button class="preuveTab active" data-tab="capture" onclick="chSwitchPreuveTab(\'capture\')" style="flex:1;padding:10px;background:var(--surface);color:var(--txt);border-radius:10px;font-weight:700;font-size:12px;border:none;font-family:inherit">📷 Capture</button>';
+  body+='<button class="preuveTab" data-tab="sms" onclick="chSwitchPreuveTab(\'sms\')" style="flex:1;padding:10px;background:transparent;color:var(--txt-2);border-radius:10px;font-weight:700;font-size:12px;border:none;font-family:inherit">💬 SMS</button>';
+  body+='<button class="preuveTab" data-tab="ref" onclick="chSwitchPreuveTab(\'ref\')" style="flex:1;padding:10px;background:transparent;color:var(--txt-2);border-radius:10px;font-weight:700;font-size:12px;border:none;font-family:inherit">🔢 Réf</button>';
+  body+='</div>';
+  body+='</div>';
+
+  // CONTENU CAPTURE
+  body+='<div id="preuvePane_capture">';
+  body+='<div style="background:var(--info-soft);color:var(--info);padding:12px;border-radius:12px;font-size:12px;line-height:1.5;margin-bottom:12px">🤖 L\'IA va lire automatiquement votre capture pour extraire le montant et la référence.</div>';
+  body+='<input type="file" id="preuveImg" accept="image/*" style="display:none" onchange="chPreviewImage(event)"/>';
+  body+='<button class="btn-primary" onclick="document.getElementById(\'preuveImg\').click()">📷 Sélectionner une capture</button>';
+  body+='<div id="preuveImgPreview" style="margin-top:14px;text-align:center"></div>';
+  body+='<button id="preuveImgAnalyser" class="btn-accent" style="display:none;margin-top:10px;background:linear-gradient(135deg,#7c3aed,#5b21b6)" onclick="chAnalyserImage()">✨ Analyser avec l\'IA</button>';
+  body+='<div id="preuveImgResult" style="margin-top:14px"></div>';
+  body+='</div>';
+
+  // CONTENU SMS
+  body+='<div id="preuvePane_sms" style="display:none">';
+  body+='<div style="background:var(--info-soft);color:var(--info);padding:12px;border-radius:12px;font-size:12px;line-height:1.5;margin-bottom:12px">💬 Collez le SMS reçu de Wave. Le système extrait automatiquement le montant et la référence.</div>';
+  body+='<textarea id="preuveSmsText" placeholder="Exemple : Vous avez envoyé 5000 FCFA à... Ref: TXN12345..." style="width:100%;min-height:120px;padding:12px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-family:inherit;background:var(--surface-2);color:var(--txt);resize:vertical" oninput="chPreviewSms()"></textarea>';
+  body+='<div id="preuveSmsResult" style="margin-top:14px"></div>';
+  body+='<button class="btn-accent" style="margin-top:10px" onclick="chSoumettreSms()">✓ Soumettre cette preuve</button>';
+  body+='</div>';
+
+  // CONTENU RÉF
+  body+='<div id="preuvePane_ref" style="display:none">';
+  body+='<div style="background:var(--info-soft);color:var(--info);padding:12px;border-radius:12px;font-size:12px;line-height:1.5;margin-bottom:12px">🔢 Saisissez juste la référence du paiement (visible dans l\'app Wave).</div>';
+  body+='<div class="field"><label>Référence TXN</label><input id="preuveRef" type="text" placeholder="TXN12345..." style="font-family:monospace;font-size:16px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/></div>';
+  body+='<div class="field"><label>Montant payé (FCFA)</label><input id="preuveRefAmount" type="number" inputmode="numeric" placeholder="Ex: 5000"/></div>';
+  body+='<button class="btn-accent" style="margin-top:10px" onclick="chSoumettreRef()">✓ Soumettre cette preuve</button>';
+  body+='</div>';
+
+  body+='<div style="background:var(--warning-soft);color:var(--warning);border-radius:12px;padding:12px;margin-top:14px;font-size:12px;line-height:1.5">';
+  body+='⚠️ <strong>Important</strong> : votre preuve sera vérifiée par le gérant avant d\'être enregistrée. Toute fausse preuve est sévèrement sanctionnée.';
+  body+='</div>';
+
+  openModal("✅ Prouver mon paiement Wave",body);
+}
+
+function chSwitchPreuveTab(tab){
+  ["capture","sms","ref"].forEach(function(t){
+    var pane=document.getElementById("preuvePane_"+t);
+    if(pane) pane.style.display=t===tab?"block":"none";
+  });
+  document.querySelectorAll(".preuveTab").forEach(function(btn){
+    if(btn.dataset.tab===tab){
+      btn.style.background="var(--surface)";
+      btn.style.color="var(--txt)";
+    } else {
+      btn.style.background="transparent";
+      btn.style.color="var(--txt-2)";
+    }
+  });
+}
+
+window._preuveImageData=null;
+function chPreviewImage(e){
+  var file=e.target.files[0];
+  if(!file) return;
+  if(file.size>5*1024*1024){toast("Image trop lourde (max 5MB)","error");return;}
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var dataUrl=ev.target.result;
+    window._preuveImageData=dataUrl.split(",")[1]; // base64 sans préfixe
+    var prev=document.getElementById("preuveImgPreview");
+    if(prev) prev.innerHTML='<img src="'+dataUrl+'" style="max-width:200px;width:100%;border-radius:12px;border:1px solid var(--border)"/>';
+    var btn=document.getElementById("preuveImgAnalyser");
+    if(btn) btn.style.display="block";
+  };
+  reader.readAsDataURL(file);
+}
+
+function chAnalyserImage(){
+  if(!window._preuveImageData){toast("Pas d'image","error");return;}
+  var btn=document.getElementById("preuveImgAnalyser");
+  btn.innerHTML="⏳ Analyse en cours...";
+  btn.disabled=true;
+  var resultDiv=document.getElementById("preuveImgResult");
+  resultDiv.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt-2)"><div class="spinner"></div><div style="margin-top:10px;font-size:13px">L\'IA lit votre capture...</div></div>';
+
+  ocrCaptureWave(window._preuveImageData, function(result, err){
+    btn.innerHTML="✨ Analyser avec l'IA";
+    btn.disabled=false;
+
+    if(err){
+      resultDiv.innerHTML='<div style="background:var(--danger-soft);color:var(--danger);padding:12px;border-radius:12px;font-size:13px">❌ Erreur : '+err+'</div>';
+      return;
+    }
+    if(result.erreur){
+      resultDiv.innerHTML='<div style="background:var(--warning-soft);color:var(--warning);padding:12px;border-radius:12px;font-size:13px">⚠️ '+result.erreur+'</div>';
+      return;
+    }
+
+    var c=getChauffeurDuCompte();
+    var html='<div style="background:var(--success-soft);color:var(--success);padding:12px;border-radius:12px;margin-bottom:10px">';
+    html+='<div style="font-weight:700;margin-bottom:8px">✅ Informations extraites</div>';
+    if(result.montant) html+='<div style="font-size:13px">💰 Montant : <strong>'+fc(result.montant)+'</strong></div>';
+    if(result.reference) html+='<div style="font-size:13px">🔢 Référence : <strong>'+result.reference+'</strong></div>';
+    if(result.expediteur) html+='<div style="font-size:13px">👤 Expéditeur : <strong>'+result.expediteur+'</strong></div>';
+    if(result.date) html+='<div style="font-size:13px">📅 Date : '+result.date+'</div>';
+    if(result.statut) html+='<div style="font-size:13px">📊 Statut : '+result.statut+'</div>';
+    html+='</div>';
+
+    // Vérifications
+    var alertes=verifierPreuveCoherence(result,c);
+    if(alertes.length>0){
+      html+='<div style="background:var(--warning-soft);color:var(--warning);padding:12px;border-radius:12px;font-size:12px;margin-bottom:10px">';
+      alertes.forEach(function(a){html+='<div>'+a+'</div>';});
+      html+='</div>';
+    }
+
+    html+='<button class="btn-primary" onclick="chSoumettrePreuveCapture('+JSON.stringify(result).replace(/"/g,'&quot;')+')">✓ Soumettre cette preuve</button>';
+    resultDiv.innerHTML=html;
+  });
+}
+
+function chPreviewSms(){
+  var txt=document.getElementById("preuveSmsText").value;
+  var parsed=parseSMSWave(txt);
+  var resultDiv=document.getElementById("preuveSmsResult");
+  if(!parsed){
+    resultDiv.innerHTML='';
+    return;
+  }
+  var c=getChauffeurDuCompte();
+  var html='<div style="background:var(--success-soft);color:var(--success);padding:12px;border-radius:12px">';
+  html+='<div style="font-weight:700;margin-bottom:8px">✅ SMS Wave détecté</div>';
+  if(parsed.montant) html+='<div style="font-size:13px">💰 Montant : <strong>'+fc(parsed.montant)+'</strong></div>';
+  if(parsed.reference) html+='<div style="font-size:13px">🔢 Référence : <strong>'+parsed.reference+'</strong></div>';
+  if(parsed.expediteur) html+='<div style="font-size:13px">👤 Expéditeur : <strong>'+parsed.expediteur+'</strong></div>';
+  if(parsed.heureSms) html+='<div style="font-size:13px">🕐 Heure : '+parsed.heureSms+'</div>';
+  html+='</div>';
+
+  var alertes=verifierPreuveCoherence(parsed,c);
+  if(alertes.length>0){
+    html+='<div style="background:var(--warning-soft);color:var(--warning);padding:12px;border-radius:12px;font-size:12px;margin-top:10px">';
+    alertes.forEach(function(a){html+='<div>'+a+'</div>';});
+    html+='</div>';
+  }
+  resultDiv.innerHTML=html;
+}
+
+function chSoumettrePreuveCapture(parsed){
+  if(typeof parsed==="string") parsed=JSON.parse(parsed);
+  chCreerPreuve(parsed,"capture",window._preuveImageData);
+}
+
+function chSoumettreSms(){
+  var txt=document.getElementById("preuveSmsText").value.trim();
+  if(!txt){toast("SMS vide","error");return;}
+  var parsed=parseSMSWave(txt);
+  if(!parsed){toast("SMS non reconnu comme un SMS Wave","error");return;}
+  parsed.smsBrut=txt;
+  chCreerPreuve(parsed,"sms");
+}
+
+function chSoumettreRef(){
+  var ref=document.getElementById("preuveRef").value.trim().toUpperCase();
+  var amt=parseInt(document.getElementById("preuveRefAmount").value)||0;
+  if(!ref || !amt){toast("Référence et montant requis","error");return;}
+  if(ref.length<6){toast("Référence trop courte","error");return;}
+  chCreerPreuve({reference:ref,montant:amt},"ref");
+}
+
+function chCreerPreuve(parsed,type,imageData){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var preuve={
+    id:Date.now(),
+    chauffeurId:c.id,
+    nomChauffeur:c.nom,
+    type:type, // capture / sms / ref
+    montant:parsed.montant||0,
+    reference:parsed.reference||"",
+    expediteur:parsed.expediteur||"",
+    statut:"en_attente_validation",
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    raw:parsed,
+    imageData:imageData||null
+  };
+  // Vérif fraude (référence déjà utilisée)
+  if(preuve.reference){
+    var dejaUtilise=(S.data.versements||[]).some(function(v){return v.ref===preuve.reference;});
+    if(dejaUtilise){
+      toast("🚨 Cette référence est DÉJÀ utilisée pour un autre versement !","error");
+      return;
+    }
+  }
+  addPreuveAttente(preuve);
+
+  // Notif gérant via chat
+  var msgGerant={
+    id:Date.now()+1,
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:"💸 Preuve de paiement Wave soumise :\n• Montant : "+fc(preuve.montant)+"\n• Référence : "+(preuve.reference||"—")+"\n• Type : "+type+"\n\nMerci de valider.",
+    date:td(),
+    heure:hr(),
+    ts:Date.now()+1,
+    lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msgGerant);
+  try{ fbSave("chats",msgGerant); }catch(e){}
+
+  // Notif via Firebase si possible
+  try{ if(db) db.collection("sal_preuves").doc(String(preuve.id)).set(Object.assign({},preuve,{_t:firebase.firestore.FieldValue.serverTimestamp()})); }catch(e){}
+
+  toast("✅ Preuve envoyée au gérant","success");
+  closeModal();
+  renderChauffeurApp();
+}
+
+/* ─── ÉCRAN GÉRANT : Voir et valider les preuves ─── */
+function renderWavePreuves(){
+  var preuves=getPreuvesAttente();
+  // Ajouter aussi celles de Firebase
+  var enAttente=preuves.filter(function(p){return p.statut==="en_attente_validation";});
+  var validees=preuves.filter(function(p){return p.statut==="validee";});
+  var rejetees=preuves.filter(function(p){return p.statut==="rejetee";});
+
+  var h='<div class="screen-title">🔍 Preuves de paiement Wave</div>';
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b3">⏳</div><div class="kpi-label">En attente</div><div class="kpi-val">'+enAttente.length+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2">✅</div><div class="kpi-label">Validées</div><div class="kpi-val">'+validees.length+'</div></div>';
+  h+='</div>';
+
+  if(enAttente.length===0){
+    h+='<div class="empty" style="margin-top:18px"><div class="empty-icon">✅</div><div class="empty-text">Aucune preuve en attente de validation.</div></div>';
+  } else {
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">⏳ À valider</div>';
+    enAttente.slice().reverse().forEach(function(p){
+      var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(p.chauffeurId);});
+      var alertes=verifierPreuveCoherence(p,ch);
+      var typeIcons={capture:"📷",sms:"💬",ref:"🔢"};
+
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid #1a9fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm)">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">';
+      h+='<div style="flex:1"><div style="font-weight:800;font-size:14.5px">'+(ch?ch.nom:"—")+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px">'+formatDateRelative(p.date)+' · '+p.heure+' · '+(typeIcons[p.type]||"📋")+' '+p.type+'</div></div>';
+      h+='<div style="font-weight:800;color:#1a9fff;font-size:16px">+'+fc(p.montant)+'</div>';
+      h+='</div>';
+
+      if(p.reference){
+        h+='<div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px"><strong>Réf :</strong> <code style="font-family:monospace">'+p.reference+'</code></div>';
+      }
+      if(p.expediteur){
+        h+='<div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px"><strong>Expéditeur :</strong> '+p.expediteur+'</div>';
+      }
+
+      if(p.imageData){
+        h+='<div style="text-align:center;margin:10px 0"><img src="data:image/jpeg;base64,'+p.imageData+'" style="max-width:200px;width:100%;border-radius:10px;border:1px solid var(--border);cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>';
+      }
+      if(p.raw && p.raw.smsBrut){
+        h+='<details style="margin:8px 0"><summary style="font-size:12px;color:var(--info);cursor:pointer">📄 Voir SMS brut</summary><div style="background:var(--surface-2);padding:10px;border-radius:8px;font-size:11px;margin-top:6px;font-family:monospace;white-space:pre-wrap">'+escapeHtml(p.raw.smsBrut)+'</div></details>';
+      }
+
+      if(alertes.length>0){
+        h+='<div style="background:var(--warning-soft);color:var(--warning);padding:10px;border-radius:10px;font-size:11.5px;margin:8px 0">';
+        alertes.forEach(function(a){h+='<div>'+a+'</div>';});
+        h+='</div>';
+      }
+
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">';
+      h+='<button class="btn-primary" style="background:linear-gradient(135deg,#059669,#047857);padding:11px;font-size:13px" onclick="validerPreuve('+p.id+')">✅ Valider</button>';
+      h+='<button class="btn-ghost" style="color:var(--danger);border-color:var(--danger);padding:11px;font-size:13px" onclick="rejeterPreuve('+p.id+')">❌ Rejeter</button>';
+      h+='</div>';
+      h+='</div>';
+    });
+  }
+
+  // Historique validé
+  if(validees.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">✅ Récemment validées</div>';
+    validees.slice(-5).reverse().forEach(function(p){
+      var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(p.chauffeurId);});
+      h+='<div style="background:var(--success-soft);color:var(--success);border-radius:10px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">';
+      h+='<div><div style="font-size:13px;font-weight:700">'+(ch?ch.nom:"—")+' — '+fc(p.montant)+'</div>';
+      h+='<div style="font-size:10.5px;opacity:.8">'+formatDateRelative(p.date)+(p.reference?' · '+p.reference:'')+'</div></div>';
+      h+='<div style="font-size:18px">✓</div>';
+      h+='</div>';
+    });
+  }
+
+  return h;
+}
+
+function validerPreuve(id){
+  var preuves=getPreuvesAttente();
+  var p=preuves.find(function(x){return x.id===id;});
+  if(!p) return;
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(p.chauffeurId);});
+  if(!ch){toast("Chauffeur introuvable","error");return;}
+
+  if(!confirm("Valider et enregistrer ce paiement Wave ?\n\n• Chauffeur : "+ch.nom+"\n• Montant : "+fc(p.montant)+(p.reference?"\n• Réf : "+p.reference:""))) return;
+
+  // Créer le versement
+  var versement={
+    id:Date.now(),
+    chauffeurId:ch.id,
+    montant:p.montant,
+    date:p.date,
+    heure:p.heure,
+    mode:"Wave",
+    ref:p.reference||"WAVE-"+Date.now().toString().substring(7),
+    note:"Validé via preuve "+p.type+" — IA Saloni"
+  };
+  if(!S.data.versements) S.data.versements=[];
+  S.data.versements.push(versement);
+  ch.solde=(ch.solde||0)+p.montant;
+  try{
+    fbSave("chauffeurs",ch);
+    fbSave("versements",versement);
+  }catch(e){}
+
+  // Marquer la preuve comme validée
+  p.statut="validee";
+  p.validationDate=td();
+  p.validationHeure=hr();
+  p.versementId=versement.id;
+  savePreuvesAttente(preuves);
+  try{ if(db) db.collection("sal_preuves").doc(String(p.id)).set(Object.assign({},p,{_t:firebase.firestore.FieldValue.serverTimestamp()})); }catch(e){}
+
+  // Notifier le chauffeur
+  var msg={
+    id:Date.now()+1,
+    convId:"conv_"+ch.id,
+    de:"admin",
+    auteur:S.user.pseudo,
+    texte:"✅ Votre paiement Wave de "+fc(p.montant)+" a été validé et enregistré. Merci !",
+    date:td(),heure:hr(),ts:Date.now()+1,lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  addIAJournal("preuve_validee","Preuve Wave validée",ch.nom+" — "+fc(p.montant));
+  toast("✅ Paiement validé et enregistré","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderWavePreuves()+'</div>';
+  render();
+}
+
+function rejeterPreuve(id){
+  var preuves=getPreuvesAttente();
+  var p=preuves.find(function(x){return x.id===id;});
+  if(!p) return;
+  var motif=prompt("Motif du rejet (envoyé au chauffeur) :","Preuve non conforme");
+  if(motif===null) return;
+  var ch=(S.data.chauffeurs||[]).find(function(c){return String(c.id)===String(p.chauffeurId);});
+  p.statut="rejetee";
+  p.motifRejet=motif;
+  savePreuvesAttente(preuves);
+  try{ if(db) db.collection("sal_preuves").doc(String(p.id)).set(Object.assign({},p,{_t:firebase.firestore.FieldValue.serverTimestamp()})); }catch(e){}
+
+  // Notifier chauffeur
+  if(ch){
+    var msg={
+      id:Date.now()+1,
+      convId:"conv_"+ch.id,
+      de:"admin",
+      auteur:S.user.pseudo,
+      texte:"❌ Votre preuve de paiement Wave de "+fc(p.montant)+" a été rejetée.\n\nMotif : "+motif+"\n\nMerci de soumettre une nouvelle preuve.",
+      date:td(),heure:hr(),ts:Date.now()+1,lu:false
+    };
+    if(!S.data.chats) S.data.chats=[];
+    S.data.chats.push(msg);
+    try{ fbSave("chats",msg); }catch(e){}
+  }
+
+  addIAJournal("preuve_rejetee","Preuve Wave rejetée",(ch?ch.nom:"?")+" — "+motif);
+  toast("Preuve rejetée","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderWavePreuves()+'</div>';
+}
+
 function showApp(){
   document.getElementById("login").style.display="none";
   document.getElementById("app").style.display="block";
+
+  // ─── Si sous-compte chauffeur, basculer en mode chauffeur ───
+  if(estChauffeur()){
+    showChauffeurMode();
+    return;
+  }
+
+  // Mode gérant / admin normal
+  document.body.classList.remove("mode-chauffeur");
   // Topbar
   document.getElementById("topName").textContent=S.user.pseudo.charAt(0).toUpperCase()+S.user.pseudo.slice(1);
   var nb=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";}).length;
@@ -955,6 +1731,475 @@ function showApp(){
       try{ iaCheckEvents(); }catch(e){}
     },2*60*1000);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE CHAUFFEUR — Interface dédiée pour sous-compte chauffeur
+   ═══════════════════════════════════════════════════════════════ */
+function showChauffeurMode(){
+  document.body.classList.add("mode-chauffeur");
+  var c=getChauffeurDuCompte();
+  var nomDisplay=c?c.nom:(S.user.nom||S.user.pseudo);
+
+  // Topbar
+  document.getElementById("topName").textContent=nomDisplay;
+  document.getElementById("topStatus").textContent="🛺 Chauffeur"+(c&&c.saloniId?" · Saloni "+c.saloniId:"");
+  document.getElementById("topAvatar").textContent=nomDisplay.substring(0,2).toUpperCase();
+  // Sidebar
+  document.getElementById("sbAvatar").textContent=nomDisplay.substring(0,2).toUpperCase();
+  document.getElementById("sbName").textContent=nomDisplay;
+  document.getElementById("sbRole").textContent="Chauffeur";
+
+  S.chTab=S.chTab||"home";
+  renderChauffeurApp();
+}
+
+function renderChauffeurApp(){
+  var c=getChauffeurDuCompte();
+  if(!c){
+    document.getElementById("content-home").innerHTML='<div class="content-inner"><div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Votre compte n\'est lié à aucun chauffeur.<br>Contactez le gérant.</div></div></div>';
+    return;
+  }
+
+  // Remplacer entièrement le contenu
+  var screen=document.getElementById("content-home");
+  if(!screen) return;
+  var html='<div class="content-inner">';
+
+  // Tabs chauffeur
+  html+='<div class="ch-tabs">';
+  html+='<button class="ch-tab '+(S.chTab==="home"?"active":"")+'" onclick="goChTab(\'home\')">🏠</button>';
+  html+='<button class="ch-tab '+(S.chTab==="vers"?"active":"")+'" onclick="goChTab(\'vers\')">💵</button>';
+  html+='<button class="ch-tab '+(S.chTab==="chat"?"active":"")+'" onclick="goChTab(\'chat\')">💬</button>';
+  html+='<button class="ch-tab '+(S.chTab==="entretien"?"active":"")+'" onclick="goChTab(\'entretien\')">🔧</button>';
+  html+='<button class="ch-tab '+(S.chTab==="profil"?"active":"")+'" onclick="goChTab(\'profil\')">👤</button>';
+  html+='</div>';
+
+  // Contenu de l'onglet
+  if(S.chTab==="home") html+=renderChAccueil(c);
+  else if(S.chTab==="vers") html+=renderChVersements(c);
+  else if(S.chTab==="chat") html+=renderChChat(c);
+  else if(S.chTab==="entretien") html+=renderChEntretien(c);
+  else if(S.chTab==="profil") html+=renderChProfil(c);
+
+  html+='</div>';
+  screen.innerHTML=html;
+  // Force affichage écran home
+  document.querySelectorAll(".screen").forEach(function(s){s.style.display="none";});
+  var sh=document.getElementById("screen-home");
+  if(sh) sh.style.display="block";
+}
+
+function goChTab(tab){
+  S.chTab=tab;
+  renderChauffeurApp();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ─── ACCUEIL CHAUFFEUR ─── */
+function renderChAccueil(c){
+  var t=td();
+  var sem=getSem();
+  var mois=getMois();
+  var VE=S.data.versements||[];
+  var verToday=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && v.date===t;});
+  var verSem=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && sem.indexOf(v.date)>=0;});
+  var verMois=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && mois.indexOf(v.date)>=0;});
+  var totalJ=verToday.reduce(function(s,v){return s+(v.montant||0);},0);
+  var totalS=verSem.reduce(function(s,v){return s+(v.montant||0);},0);
+  var totalM=verMois.reduce(function(s,v){return s+(v.montant||0);},0);
+  var objJ=getObjJ(c);
+  var objS=getObjS(c);
+  var pctJ=pc(totalJ,objJ);
+  var pctS=pc(totalS,objS);
+
+  var html='';
+
+  // Hero card
+  var heroColor=pctJ>=100?"linear-gradient(135deg,#059669,#047857)":(pctJ>=50?"linear-gradient(135deg,#0a1f44,#1e3a8a)":"linear-gradient(135deg,#dc2626,#991b1b)");
+  html+='<div class="caisse" style="background:'+heroColor+'">';
+  html+='<div class="caisse-label">Aujourd\'hui</div>';
+  html+='<div class="caisse-amount">'+totalJ.toLocaleString("fr-FR")+'<span class="unit">F</span></div>';
+  html+='<div class="caisse-sub">';
+  if(pctJ>=100) html+='🎉 Objectif atteint !';
+  else html+='Objectif : '+fc(objJ)+' · '+pctJ+'%';
+  html+='</div></div>';
+
+  // Progress bar visible
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow-sm)">';
+  html+='<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--txt-2);font-weight:600">Progression du jour</span><span style="font-weight:800;font-size:13px">'+pctJ+'%</span></div>';
+  html+='<div class="driver-bar" style="height:10px"><div class="driver-bar-fill '+(pctJ>=80?"":(pctJ>=50?"warn":"danger"))+'" style="width:'+pctJ+'%"></div></div>';
+  if(pctJ<100) html+='<div style="font-size:11px;color:var(--txt-3);margin-top:8px">Plus que '+fc(objJ-totalJ)+' à verser</div>';
+  html+='</div>';
+
+  // KPI
+  html+='<div class="kpi-grid">';
+  html+='<div class="kpi"><div class="kpi-icon b2">📅</div><div class="kpi-label">Cette semaine</div><div class="kpi-val">'+(totalS/1000).toFixed(0)+'k F</div><div class="kpi-trend '+(pctS>=80?"up":"down")+'">'+pctS+'% objectif</div></div>';
+  html+='<div class="kpi"><div class="kpi-icon b1">📆</div><div class="kpi-label">Ce mois</div><div class="kpi-val">'+(totalM/1000).toFixed(0)+'k F</div><div class="kpi-trend">'+verMois.length+' versement(s)</div></div>';
+  html+='</div>';
+
+  // Actions rapides
+  html+='<div class="actions" style="margin-top:14px">';
+  html+='<button class="action" onclick="goChTab(\'vers\')"><div class="action-icon">💵</div><div class="action-label">Mes versements</div></button>';
+  html+='<button class="action" onclick="goChTab(\'entretien\')"><div class="action-icon">🚨</div><div class="action-label">Signaler</div></button>';
+  html+='<button class="action" onclick="goChTab(\'chat\')"><div class="action-icon">💬</div><div class="action-label">Chat</div></button>';
+  html+='</div>';
+
+  // ─── BOUTON PAYER VIA WAVE ───
+  var waveCfg=getWaveConfig();
+  if(waveCfg.numero){
+    var manqueObj=Math.max(0,objJ-totalJ);
+    html+='<div style="background:linear-gradient(135deg,#1a9fff,#0067cc);color:#fff;border-radius:18px;padding:18px;margin-top:18px;text-align:center;box-shadow:0 8px 20px rgba(26,159,255,.3)">';
+    html+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;opacity:.8;margin-bottom:8px">💸 Payer maintenant</div>';
+    html+='<div style="font-size:13px;opacity:.9;margin-bottom:14px">'+(manqueObj>0?"Versez vos "+fc(manqueObj)+" du jour":"Effectuer un versement")+'</div>';
+    html+='<button style="background:#fff;color:#0067cc;border-radius:12px;padding:13px 24px;font-weight:800;font-size:14px;border:none;font-family:inherit;width:100%;margin-bottom:8px" onclick="chPayerWave('+(manqueObj>0?manqueObj:objJ)+')">📱 Payer via Wave</button>';
+    html+='<button style="background:rgba(255,255,255,.2);color:#fff;border-radius:12px;padding:11px 24px;font-weight:700;font-size:13px;border:1px solid rgba(255,255,255,.3);font-family:inherit;width:100%" onclick="chOpenPreuveModal()">✅ J\'ai déjà payé, je prouve</button>';
+    html+='</div>';
+  }
+
+  // Dernier versement
+  var derniers=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).sort(function(a,b){return (b.id||0)-(a.id||0);}).slice(0,3);
+  if(derniers.length>0){
+    html+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">Derniers versements</div>';
+    derniers.forEach(function(v){
+      html+='<div style="display:flex;justify-content:space-between;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:6px">';
+      html+='<div><div style="font-size:13px;font-weight:700">'+formatDateRelative(v.date)+(v.heure?" · "+v.heure:"")+'</div>';
+      html+='<div style="font-size:11px;color:var(--txt-2)">'+(v.mode||"Especes")+'</div></div>';
+      html+='<div style="font-weight:800;color:var(--success)">+'+(v.montant||0).toLocaleString("fr-FR")+' F</div>';
+      html+='</div>';
+    });
+  }
+
+  // Sanctions actives le concernant
+  var mesSanctions=(S.data.sanctions||[]).filter(function(s){return String(s.chauffeurId)===String(c.id) && s.statut==="active";});
+  if(mesSanctions.length>0){
+    html+='<div class="alert-card" style="margin-top:14px;background:linear-gradient(135deg,#fee2e2,#fecaca)">';
+    html+='<div class="alert-icon">⚠️</div>';
+    html+='<div class="alert-text"><div class="alert-title" style="color:#991b1b">'+mesSanctions.length+' sanction(s) active(s)</div>';
+    html+='<div class="alert-sub" style="color:#7f1d1d">Contactez le gérant pour régulariser</div></div></div>';
+  }
+
+  return html;
+}
+
+/* ─── MES VERSEMENTS (lecture seule) ─── */
+function renderChVersements(c){
+  var html='<div class="screen-title">💵 Mes versements</div>';
+  var versC=(S.data.versements||[]).filter(function(v){return String(v.chauffeurId)===String(c.id);}).sort(function(a,b){return (b.id||0)-(a.id||0);});
+
+  var sem=getSem();
+  var totalSem=versC.filter(function(v){return sem.indexOf(v.date)>=0;}).reduce(function(s,v){return s+(v.montant||0);},0);
+
+  html+='<div class="kpi-grid">';
+  html+='<div class="kpi"><div class="kpi-icon b2">📅</div><div class="kpi-label">Cette semaine</div><div class="kpi-val">'+fcShort(totalSem)+' F</div></div>';
+  html+='<div class="kpi"><div class="kpi-icon b1">📈</div><div class="kpi-label">Total versements</div><div class="kpi-val">'+versC.length+'</div></div>';
+  html+='</div>';
+
+  html+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:12px;margin:14px 0;font-size:12px;line-height:1.5">';
+  html+='ℹ️ Les versements sont enregistrés par le gérant. Si un versement manque, contactez-le via le chat.';
+  html+='</div>';
+
+  if(versC.length===0){
+    html+='<div class="empty"><div class="empty-icon">💵</div><div class="empty-text">Aucun versement enregistré pour le moment.</div></div>';
+  } else {
+    versC.slice(0,50).forEach(function(v){
+      var modeColors={"Wave":"#1a9fff","Orange Money":"#f97316","MTN Money":"#eab308","Virement":"#7c3aed","Especes":"#059669"};
+      var mc=modeColors[v.mode||"Especes"]||"#64748b";
+      html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">';
+      html+='<div><div style="font-size:13px;font-weight:700">'+formatDateRelative(v.date)+(v.heure?" · "+v.heure:"")+'</div>';
+      html+='<div style="font-size:11px;color:'+mc+';font-weight:700;margin-top:2px">'+(v.mode||"Especes")+'</div></div>';
+      html+='<div style="font-weight:800;font-size:15px;color:var(--success)">+'+(v.montant||0).toLocaleString("fr-FR")+' F</div>';
+      html+='</div>';
+    });
+  }
+  return html;
+}
+
+/* ─── CHAT CHAUFFEUR ↔ GÉRANT ─── */
+function renderChChat(c){
+  var html='<div class="screen-title">💬 Chat avec le gérant</div>';
+  var convId="conv_"+c.id;
+  var msgs=(S.data.chats||[]).filter(function(m){return m.convId===convId;}).sort(function(a,b){return (a.ts||0)-(b.ts||0);});
+
+  // Marquer comme lus (côté chauffeur)
+  msgs.forEach(function(m){
+    if(!m.lu && m.de==="admin"){
+      m.lu=true;
+      try{ fbSave("chats",m); }catch(e){}
+    }
+  });
+
+  html+='<div id="chChatBox" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px;min-height:300px;max-height:500px;overflow-y:auto;margin-bottom:12px">';
+  if(msgs.length===0){
+    html+='<div style="text-align:center;padding:40px 10px;color:var(--txt-2)"><div style="font-size:42px;margin-bottom:10px">💬</div><div style="font-size:13px">Aucun message pour le moment.<br>Écrivez le premier !</div></div>';
+  } else {
+    msgs.forEach(function(m){
+      if(m.de==="chauffeur"){
+        html+='<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;padding:10px 14px;border-radius:16px 16px 4px 16px;max-width:80%;font-size:13.5px;line-height:1.5">'+escapeHtml(m.texte)+'<div style="font-size:10px;opacity:.6;margin-top:4px;text-align:right">'+(m.heure||"")+'</div></div></div>';
+      } else {
+        html+='<div style="display:flex;gap:8px;margin-bottom:10px"><div style="width:32px;height:32px;background:linear-gradient(135deg,#f97316,#ea580c);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:800;flex-shrink:0">G</div>';
+        html+='<div style="background:var(--surface-2);padding:10px 14px;border-radius:4px 16px 16px 16px;max-width:80%;font-size:13.5px;line-height:1.5;color:var(--txt)">'+escapeHtml(m.texte)+'<div style="font-size:10px;color:var(--txt-3);margin-top:4px">'+(m.heure||"")+'</div></div></div>';
+      }
+    });
+  }
+  html+='</div>';
+
+  html+='<div style="display:flex;gap:8px"><input id="chChatInput" placeholder="Écrire au gérant..." style="flex:1;padding:13px 16px;border:1.5px solid var(--border);border-radius:14px;font-size:14px;background:var(--surface);color:var(--txt);font-family:inherit" onkeydown="if(event.key===\'Enter\')chSendMsg()"/>';
+  html+='<button class="btn-accent" style="width:46px;height:46px;padding:0;margin:0;font-size:18px;flex-shrink:0" onclick="chSendMsg()">➤</button></div>';
+
+  setTimeout(function(){ var b=document.getElementById("chChatBox"); if(b) b.scrollTop=b.scrollHeight; },100);
+  return html;
+}
+
+/* ─── PAIEMENT WAVE CÔTÉ CHAUFFEUR ─── */
+function chPayerWave(montantDefaut){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var cfg=getWaveConfig();
+  if(!cfg.numero){
+    toast("⚠️ Le gérant n'a pas configuré Wave","error");
+    return;
+  }
+  // Modal personnalisé pour chauffeur
+  var body='';
+  body+='<div style="text-align:center;margin-bottom:14px">';
+  body+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:8px">Vous allez payer à</div>';
+  body+='<div style="font-weight:800;font-size:18px;color:#1a9fff">'+cfg.numero+'</div>';
+  body+='</div>';
+
+  body+='<div class="field"><label>Montant (FCFA)</label>';
+  body+='<input id="chWaveAmount" type="number" inputmode="numeric" value="'+(montantDefaut||5000)+'" placeholder="Ex: 5000" style="font-size:20px;font-weight:800;text-align:center"/></div>';
+
+  // QR Code
+  body+='<div id="chWaveQR" style="text-align:center;background:#fff;padding:16px;border-radius:16px;margin:14px 0;border:1px solid var(--border)">';
+  body+='<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px">Scannez ce QR avec Wave</div>';
+  body+='<img id="chWaveQRImg" src="" alt="QR" style="max-width:220px;width:100%;height:auto;display:block;margin:0 auto"/>';
+  body+='</div>';
+
+  // Bouton principal
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#1a9fff,#0067cc);margin-bottom:8px" onclick="chOpenWaveApp()">📱 Ouvrir l\'app Wave</button>';
+  body+='<button class="btn-ghost" onclick="closeModal()">Annuler</button>';
+
+  body+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:10px;margin-top:12px;font-size:11.5px;line-height:1.5">';
+  body+='ℹ️ Après paiement, le gérant confirmera la réception et vous verrez le versement apparaître dans votre historique.';
+  body+='</div>';
+
+  openModal("💸 Payer mon versement",body);
+
+  // Update QR
+  setTimeout(function(){
+    updateChWaveQR();
+    var inp=document.getElementById("chWaveAmount");
+    if(inp) inp.addEventListener("input",updateChWaveQR);
+  },50);
+}
+
+function updateChWaveQR(){
+  var amt=parseInt(document.getElementById("chWaveAmount").value)||0;
+  var c=getChauffeurDuCompte();
+  var ref=c?("Saloni-"+(c.saloniId||c.nom)).replace(/\s+/g,"_"):"Saloni";
+  var link=genWaveLink(amt,ref);
+  if(!link) return;
+  var qr=document.getElementById("chWaveQRImg");
+  if(qr) qr.src=genQRCodeURL(link);
+}
+
+function chOpenWaveApp(){
+  var amt=parseInt(document.getElementById("chWaveAmount").value)||0;
+  var c=getChauffeurDuCompte();
+  var ref=c?("Saloni-"+(c.saloniId||c.nom)).replace(/\s+/g,"_"):"Saloni";
+  if(amt<100){toast("Montant trop faible","error");return;}
+  openWavePayment(amt,ref);
+  // Notifier le gérant via le chat automatiquement
+  var msgNotif={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:"💸 Je viens de lancer un paiement Wave de "+fc(amt)+" via l'app. Merci de confirmer la réception.",
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msgNotif);
+  try{ fbSave("chats",msgNotif); }catch(e){}
+  toast("📱 App Wave ouverte. Notification envoyée au gérant.","success");
+  closeModal();
+}
+
+function chSendMsg(){
+  var inp=document.getElementById("chChatInput");
+  if(!inp || !inp.value.trim()) return;
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var txt=inp.value.trim();
+  var item={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:txt,
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(item);
+  try{ fbSave("chats",item); }catch(e){}
+  inp.value="";
+  renderChauffeurApp();
+  toast("Message envoyé","success");
+}
+
+/* ─── ENTRETIEN / DÉCLARER PANNE ─── */
+function renderChEntretien(c){
+  var html='<div class="screen-title">🔧 Entretien & Panne</div>';
+  html+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Signalez tout problème ou besoin d\'entretien à votre gérant.</div>';
+
+  // Boutons d'action principaux
+  html+='<div style="background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px">';
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">🚨</div><div><div style="font-weight:800;font-size:16px">Panne urgente</div><div style="font-size:12px;opacity:.85">Je ne peux pas rouler aujourd\'hui</div></div></div>';
+  html+='<button style="width:100%;padding:12px;background:#fff;color:#dc2626;border-radius:12px;font-weight:800;border:none;font-family:inherit;font-size:14px" onclick="chDeclarerPanne(\'panne\')">Déclarer une panne</button>';
+  html+='</div>';
+
+  html+='<div style="background:linear-gradient(135deg,#d97706,#b45309);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px">';
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">🔧</div><div><div style="font-weight:800;font-size:16px">Vidange / Entretien</div><div style="font-size:12px;opacity:.85">Programmer un entretien</div></div></div>';
+  html+='<button style="width:100%;padding:12px;background:#fff;color:#b45309;border-radius:12px;font-weight:800;border:none;font-family:inherit;font-size:14px" onclick="chDeclarerPanne(\'entretien\')">Demander entretien</button>';
+  html+='</div>';
+
+  html+='<div style="background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px">';
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">🤒</div><div><div style="font-weight:800;font-size:16px">Maladie / Absence</div><div style="font-size:12px;opacity:.85">Signaler une absence justifiée</div></div></div>';
+  html+='<button style="width:100%;padding:12px;background:#fff;color:#0369a1;border-radius:12px;font-weight:800;border:none;font-family:inherit;font-size:14px" onclick="chDeclarerPanne(\'maladie\')">Signaler absence</button>';
+  html+='</div>';
+
+  // Historique
+  var mesEnt=(S.data.entretiens||[]).filter(function(e){return String(e.chauffeurId)===String(c.id);}).sort(function(a,b){return (b.id||0)-(a.id||0);});
+  html+='<div class="section-title" style="font-size:14px;margin:20px 0 10px">📋 Mes déclarations</div>';
+  if(mesEnt.length===0){
+    html+='<div class="empty"><div class="empty-text">Aucune déclaration enregistrée</div></div>';
+  } else {
+    mesEnt.slice(0,15).forEach(function(e){
+      var typeIcons={panne:"🚨",entretien:"🔧",maladie:"🤒",vidange:"🛢️"};
+      var typeColors={panne:"var(--danger)",entretien:"var(--warning)",maladie:"var(--info)"};
+      var ic=typeIcons[e.type]||"📋";
+      var col=typeColors[e.type]||"var(--txt-2)";
+      var statutBg=e.statut==="resolu"?"var(--success-soft)":(e.statut==="en cours"?"var(--info-soft)":"var(--warning-soft)");
+      var statutCol=e.statut==="resolu"?"var(--success)":(e.statut==="en cours"?"var(--info)":"var(--warning)");
+      html+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col+';border-radius:12px;padding:12px;margin-bottom:8px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">';
+      html+='<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-size:18px">'+ic+'</div><div style="font-weight:700;font-size:13.5px;text-transform:capitalize">'+(e.type||"—")+'</div>';
+      html+='<span style="background:'+statutBg+';color:'+statutCol+';padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase">'+(e.statut||"demande")+'</span></div>';
+      if(e.note) html+='<div style="font-size:12px;color:var(--txt-2);line-height:1.5;margin-top:4px">'+escapeHtml(e.note)+'</div>';
+      html+='<div style="font-size:10.5px;color:var(--txt-3);margin-top:6px">'+formatDateRelative(e.date)+(e.heure?" · "+e.heure:"")+'</div>';
+      html+='</div></div></div>';
+    });
+  }
+
+  return html;
+}
+
+function chDeclarerPanne(type){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var note=prompt("Décrivez le problème (optionnel) :","");
+  if(note===null) return; // Annulé
+  var item={
+    id:Date.now(),
+    chauffeurId:c.id,
+    nomChauffeur:c.nom,
+    saloniId:c.saloniId||"",
+    type:type,
+    note:note||"",
+    date:td(),
+    heure:hr(),
+    statut:"demande",
+    auteur:S.user.pseudo
+  };
+  if(!S.data.entretiens) S.data.entretiens=[];
+  S.data.entretiens.push(item);
+  try{ fbSave("entretiens",item); }catch(e){}
+
+  // Notification au gérant via chat
+  var msgGerant={
+    id:Date.now()+1,
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:"🚨 J'ai déclaré : "+type.toUpperCase()+(note?"\nDétails : "+note:""),
+    date:td(),
+    heure:hr(),
+    ts:Date.now()+1,
+    lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msgGerant);
+  try{ fbSave("chats",msgGerant); }catch(e){}
+
+  toast("✅ Déclaration envoyée au gérant","success");
+  renderChauffeurApp();
+}
+
+/* ─── PROFIL CHAUFFEUR ─── */
+function renderChProfil(c){
+  var html='<div class="screen-title">👤 Mon profil</div>';
+
+  html+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;border-radius:18px;padding:20px;margin-bottom:14px;text-align:center">';
+  html+='<div style="width:80px;height:80px;background:'+avatarColor(c.id)+';border-radius:24px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;margin-bottom:12px;border:3px solid #fff">'+initials(c.nom)+'</div>';
+  html+='<div style="font-weight:800;font-size:18px">'+(c.nom||"—")+'</div>';
+  html+='<div style="font-size:13px;opacity:.8;margin-top:4px">'+(c.zone||"—")+(c.saloniId?" · Saloni "+c.saloniId:"")+'</div>';
+  html+='</div>';
+
+  // Infos
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px">';
+  html+='<div style="font-weight:700;margin-bottom:10px;font-size:14px">Informations</div>';
+  var infos=[
+    {l:"Téléphone",v:c.tel||"—"},
+    {l:"Zone",v:c.zone||"—"},
+    {l:"Saloni",v:c.saloniId||"—"},
+    {l:"Objectif jour",v:fc(getObjJ(c))},
+    {l:"Fréquence",v:c.freqPaiement||"Journalier"},
+    {l:"Date d'entrée",v:c.dateAjout?formatDateFR(c.dateAjout):"—"}
+  ];
+  infos.forEach(function(I,idx){
+    html+='<div style="display:flex;justify-content:space-between;padding:8px 0;'+(idx<infos.length-1?"border-bottom:1px solid var(--border)":"")+'">';
+    html+='<span style="font-size:13px;color:var(--txt-2)">'+I.l+'</span>';
+    html+='<span style="font-weight:700;font-size:13px">'+I.v+'</span></div>';
+  });
+  html+='</div>';
+
+  // Primes obtenues
+  var mesPrimes=(S.data.primes||[]).filter(function(p){return String(p.chauffeurId)===String(c.id);});
+  if(mesPrimes.length>0){
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px">';
+    html+='<div style="font-weight:700;margin-bottom:10px;font-size:14px">⭐ Mes primes ('+mesPrimes.length+')</div>';
+    mesPrimes.forEach(function(p){
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">';
+      html+='<div><div style="font-size:13px;font-weight:600">'+(p.motif||"Prime")+'</div><div style="font-size:11px;color:var(--txt-3)">'+formatDateRelative(p.date)+'</div></div>';
+      html+='<span style="font-weight:800;color:var(--success)">+'+fc(p.montant)+'</span></div>';
+    });
+    html+='</div>';
+  }
+
+  // Sanctions
+  var mesSanc=(S.data.sanctions||[]).filter(function(s){return String(s.chauffeurId)===String(c.id);});
+  if(mesSanc.length>0){
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px">';
+    html+='<div style="font-weight:700;margin-bottom:10px;font-size:14px">⚖️ Mes sanctions ('+mesSanc.length+')</div>';
+    mesSanc.slice(-5).forEach(function(s){
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">';
+      html+='<div><div style="font-size:12px;font-weight:600">'+(s.motif||"—")+'</div><div style="font-size:11px;color:var(--txt-3)">'+formatDateRelative(s.date)+'</div></div>';
+      html+='<span class="badge '+(s.statut==="active"?"stopped":"active")+'">'+(s.statut||"")+'</span></div>';
+    });
+    html+='</div>';
+  }
+
+  // Bouton déconnexion
+  html+='<button class="btn-ghost" style="margin-top:14px;color:var(--danger);border-color:var(--danger);width:100%" onclick="logout()">🚪 Se déconnecter</button>';
+
+  return html;
 }
 
 // ═══ NAVIGATION ═══
@@ -998,6 +2243,19 @@ function openSidebar(){
     var dotEl=document.getElementById("qaAssistantDot");
     if(subEl) subEl.textContent=todayActions>0?todayActions+" action(s)":"Chat & Auto";
     if(dotEl) dotEl.style.display=todayActions>0?"block":"none";
+  }catch(e){}
+  // Update preuves Wave badge
+  try{
+    var enAttente=getPreuvesAttente().filter(function(p){return p.statut==="en_attente_validation";}).length;
+    var badgeEl=document.getElementById("sbPreuvesBadge");
+    if(badgeEl){
+      if(enAttente>0){
+        badgeEl.textContent=enAttente;
+        badgeEl.style.display="inline-block";
+      } else {
+        badgeEl.style.display="none";
+      }
+    }
   }catch(e){}
   // Refresh dashboard
   updateSidebarDashboard();
@@ -1093,20 +2351,6 @@ function closeModal(){
 }
 
 // ═══ RENDER ROUTER ═══
-function render(){
-  if(!S.user)return;
-  // Topbar refresh
-  var nb=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";}).length;
-  document.getElementById("topStatus").textContent=S.user.role+" · "+nb+" chauffeur"+(nb>1?"s":"")+" actif"+(nb>1?"s":"");
-
-  if(S.tab==="home")renderHome();
-  else if(S.tab==="vers")renderVers();
-  else if(S.tab==="team")renderTeam();
-  else if(S.tab==="fleet")renderFleet();
-  else if(S.tab==="fin")renderFin();
-  else if(S.tab==="generic")renderGeneric();
-}
-
 /* ═══════════════════════════════════════════════════════════
    SCREEN: ACCUEIL
    ═══════════════════════════════════════════════════════════ */
@@ -1297,6 +2541,10 @@ function delVersement(id){
    MODALS: VERSEMENT, CHAUFFEUR, SALONI...
    ═══════════════════════════════════════════════════════════ */
 function openVersementModal(){
+  if(!hasPerm("versements") && S.user && S.user.niveau<3){
+    toast("⛔ Vous n'avez pas la permission d'enregistrer des versements","error");
+    return;
+  }
   var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
   if(CH.length===0){
     toast("Ajoutez d'abord un chauffeur","error");
@@ -1343,6 +2591,10 @@ function saveVersement(){
 }
 
 function openChauffeurModal(existing){
+  if(!hasPerm("chauffeurs") && S.user && S.user.niveau<3){
+    toast("⛔ Vous n'avez pas la permission de gérer les chauffeurs","error");
+    return;
+  }
   var c=existing||{};
   var body='';
   body+='<div class="field"><label>Nom complet</label><input id="cn" type="text" value="'+(c.nom||"")+'" /></div>';
@@ -1397,6 +2649,10 @@ function saveChauffeur(id){
 }
 
 function openSaloniModal(existing){
+  if(!hasPerm("flotte") && S.user && S.user.niveau<3){
+    toast("⛔ Vous n'avez pas la permission de gérer la flotte","error");
+    return;
+  }
   var s=existing||{};
   var body='';
   body+='<div class="field"><label>N° immatriculation</label><input id="sNum" type="text" value="'+(s.numero||"")+'" placeholder="ex: 001" /></div>';
@@ -1553,6 +2809,10 @@ function openDetailChauffeur(id){
   body+='<button class="btn-secondary" onclick="closeModal();openChauffeurModal('+JSON.stringify(c).replace(/"/g,'&quot;')+')">✏️ Modifier</button>';
   body+='<button class="btn-secondary" onclick="rateChauffeur('+c.id+')">⭐ Noter</button>';
   body+='</div>';
+  // Bouton Wave (si configuré)
+  if(getWaveConfig().numero){
+    body+='<button class="btn-primary" style="background:linear-gradient(135deg,#1a9fff,#0067cc);margin-bottom:8px" onclick="closeModal();openWaveModal('+c.id+','+(c.objectifJour||5000)+')">💸 Demander paiement Wave</button>';
+  }
   if(c.tel){
     body+='<button class="btn-accent" style="margin-bottom:14px" onclick="window.open(\'https://wa.me/'+(c.tel.replace(/\D/g,"").replace(/^0/,"225"))+'\',\'_blank\')">📲 WhatsApp '+c.tel+'</button>';
   }
@@ -1741,6 +3001,8 @@ function renderGeneric(){
   else if(p==="rsi")html+=renderRSI();
   else if(p==="reglement")html+=renderReglement();
   else if(p==="souscomptes")html+=renderSousComptes();
+  else if(p==="waveconfig")html+=renderWaveConfig();
+  else if(p==="wavepreuves")html+=renderWavePreuves();
   else if(p==="journal")html+=renderJournal();
   else if(p==="sanctions")html+=renderSanctions();
   else if(p==="primes")html+=renderPrimes();
@@ -1903,6 +3165,105 @@ function renderBI(){
 }
 
 /* ═══ SOUS-COMPTES (Admin, Collaborateur, Chauffeur) ═══ */
+/* ═══ ÉCRAN CONFIGURATION & GESTION WAVE ═══ */
+function renderWaveConfig(){
+  var cfg=getWaveConfig();
+  var h='<div class="screen-title">💸 Paiements Wave</div>';
+
+  // Header Wave
+  h+='<div class="caisse" style="background:linear-gradient(135deg,#1a9fff,#0067cc);margin-bottom:18px">';
+  h+='<div class="caisse-label">Numéro Wave actif</div>';
+  h+='<div style="font-size:24px;font-weight:800;letter-spacing:-.5px;margin:4px 0">'+(cfg.numero||"Non configuré")+'</div>';
+  h+='<div class="caisse-sub">'+(cfg.numero?"✅ Wave activé":"⚠️ Configurez votre numéro")+'</div>';
+  h+='</div>';
+
+  // Stats Wave
+  var versWave=(S.data.versements||[]).filter(function(v){return v.mode==="Wave";});
+  var totalWave=versWave.reduce(function(s,v){return s+v.montant;},0);
+  var mois=getMois();
+  var waveMois=versWave.filter(function(v){return mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b1">💸</div><div class="kpi-label">Total Wave</div><div class="kpi-val">'+fcShort(totalWave)+' F</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2">📅</div><div class="kpi-label">Ce mois</div><div class="kpi-val">'+fcShort(waveMois)+' F</div><div class="kpi-trend">'+versWave.filter(function(v){return mois.indexOf(v.date)>=0;}).length+' transactions</div></div>';
+  h+='</div>';
+
+  // Action principale
+  if(cfg.numero){
+    h+='<button class="btn-primary" style="margin:18px 0 10px;background:linear-gradient(135deg,#1a9fff,#0067cc)" onclick="openWaveModal()">💸 Nouveau paiement Wave</button>';
+  }
+
+  // Configuration
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">⚙️ Configuration</div>';
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px">';
+  h+='<div class="field"><label>Votre numéro Wave</label>';
+  h+='<input id="waveNumero" type="tel" inputmode="tel" value="'+(cfg.numero||"").replace(/"/g,"&quot;")+'" placeholder="07 XX XX XX XX" style="font-family:monospace;font-size:15px"/></div>';
+  h+='<div style="font-size:11px;color:var(--txt-2);margin-top:-8px;margin-bottom:12px">Votre numéro Wave qui recevra les paiements (format ivoirien)</div>';
+
+  h+='<div class="field"><label>Devise</label>';
+  h+='<select id="waveDevise">';
+  h+='<option value="XOF"'+(cfg.devise==="XOF"?" selected":"")+'>XOF (Franc CFA)</option>';
+  h+='<option value="XAF"'+(cfg.devise==="XAF"?" selected":"")+'>XAF (Franc CFA Centrale)</option>';
+  h+='</select></div>';
+
+  h+='<button class="btn-primary" onclick="saveWaveConfig()">💾 Enregistrer la configuration</button>';
+  h+='</div>';
+
+  // Tester
+  if(cfg.numero){
+    h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px">';
+    h+='<div style="font-weight:700;margin-bottom:10px;font-size:14px">🧪 Tester la configuration</div>';
+    h+='<div style="font-size:12px;color:var(--txt-2);margin-bottom:10px">Générer un QR de test pour vérifier que Wave reconnaît votre numéro</div>';
+    var testLink=genWaveLink(100,"Test-Saloni");
+    h+='<div style="text-align:center;background:#fff;padding:16px;border-radius:12px;margin-bottom:10px">';
+    h+='<img src="'+genQRCodeURL(testLink,200)+'" alt="QR test" style="max-width:160px;width:100%;display:block;margin:0 auto"/>';
+    h+='<div style="font-size:11px;color:#64748b;margin-top:8px">QR de test : 100 FCFA</div></div>';
+    h+='<button class="btn-ghost" onclick="window.open(\''+testLink+'\',\'_blank\')">📱 Tester le lien Wave (100 F)</button>';
+    h+='</div>';
+  }
+
+  // Historique des paiements Wave récents
+  if(versWave.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📋 Historique Wave</div>';
+    versWave.slice(-10).reverse().forEach(function(v){
+      var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(v.chauffeurId);});
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid #1a9fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">';
+      h+='<div><div style="font-weight:700;font-size:13px">'+(c?c.nom:"—")+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt-2);margin-top:2px">'+formatDateRelative(v.date)+(v.heure?" · "+v.heure:"")+(v.ref?" · "+v.ref:"")+'</div></div>';
+      h+='<div style="font-weight:800;color:#1a9fff;font-size:14px">+'+fc(v.montant)+'</div>';
+      h+='</div>';
+    });
+  }
+
+  // Info
+  h+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:12px;margin-top:14px;font-size:12px;line-height:1.6">';
+  h+='ℹ️ <strong>Mode "Numéro Wave personnel"</strong><br>';
+  h+='• Le chauffeur scanne le QR ou clique sur le lien<br>';
+  h+='• Il paie depuis son app Wave<br>';
+  h+='• Vous confirmez manuellement la réception<br>';
+  h+='• Pour une vérification automatique, passez à un compte Wave Business avec API';
+  h+='</div>';
+
+  return h;
+}
+
+function saveWaveConfig(){
+  var num=(document.getElementById("waveNumero").value||"").trim();
+  var dev=document.getElementById("waveDevise").value||"XOF";
+  if(num){
+    var numClean=num.replace(/\D/g,"");
+    if(numClean.length<8){
+      toast("Numéro invalide","error");
+      return;
+    }
+  }
+  setWaveConfig({numero:num,devise:dev,activee:true});
+  toast("✅ Configuration Wave enregistrée","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderWaveConfig()+'</div>';
+}
+
 function renderSousComptes(){
   if(!S.user || S.user.niveau<3){
     return '<div class="screen-title">👥 Sous-comptes</div><div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">Accès réservé au Gérant.</div></div>';
@@ -3362,6 +4723,33 @@ function iaDetectAction(q){
           fbSave("salonis",sal);
           addIAJournal("action_bloquer","Saloni bloqué","Saloni "+sal.id);
           return "Saloni **"+sal.id+"** bloqué 🔒 ✓";
+        }
+      };
+    }
+  }
+
+  // ─── ENVOYER UN LIEN DE PAIEMENT WAVE ───
+  m=q.match(/(?:envoie|envoyer|demande|demander)\s+(?:un\s+)?(?:lien\s+)?(?:de\s+)?(?:paiement\s+)?wave\s+(?:de\s+)?(?:(\d{3,7})\s*(?:f|fcfa)?\s+)?(?:à|a|pour|chez)\s+([a-zà-ÿ\s]+)/i);
+  if(m){
+    var amtW=m[1]?parseInt(m[1]):5000;
+    var nomW=m[2].trim();
+    var chW=(S.data.chauffeurs||[]).find(function(c){return (c.nom||"").toLowerCase().indexOf(nomW)>=0;});
+    if(chW){
+      return {
+        titre:"Envoyer un lien Wave",
+        description:"Envoyer un lien de paiement Wave de "+fc(amtW)+" à "+chW.nom,
+        details:"💸 Montant : "+fc(amtW)+"\n👤 Chauffeur : "+chW.nom+"\n📱 Téléphone : "+(chW.tel||"Non renseigné")+"\n\nLe lien sera envoyé par WhatsApp.",
+        execute:function(){
+          if(!chW.tel) return "❌ Pas de numéro de téléphone";
+          var cfg=getWaveConfig();
+          if(!cfg.numero) return "❌ Numéro Wave non configuré";
+          var ref="Saloni-"+(chW.saloniId||chW.nom).replace(/\s+/g,"_");
+          var link=genWaveLink(amtW,ref);
+          var msg="💸 Bonjour "+chW.nom+",\n\nMerci d'effectuer votre versement de "+fc(amtW)+" via Wave :\n\n👉 "+link+"\n\n— Saloni Manager";
+          var tel=chW.tel.replace(/\D/g,"").replace(/^0/,"225");
+          window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");
+          addIAJournal("wave_envoi","Lien Wave envoyé via IA",chW.nom+" — "+fc(amtW));
+          return "Lien Wave de **"+fc(amtW)+"** envoyé à **"+chW.nom+"** sur WhatsApp ✓";
         }
       };
     }
