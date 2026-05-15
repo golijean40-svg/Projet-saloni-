@@ -2560,6 +2560,21 @@ function iaAnswer(question){
   var SA=S.data.salonis||[];
   var DE=S.data.depenses||[];
 
+  // ─── ROUTAGE CLAUDE EN PRIORITÉ ───
+  // Si Claude activé + clé présente, TOUTES les questions vont à Claude
+  // SAUF les commandes système (aide, effacer, etc.)
+  var iaCfgTop=getIAConfig();
+  if(iaCfgTop.useClaude && iaCfgTop.claudeKey){
+    // Exception : commandes courtes/système qui restent en local
+    if(/^(aide|help)$/.test(q)){
+      // Continue vers le bot simple pour l'aide
+    } else {
+      // Routage vers Claude
+      iaAskClaude(question);
+      return "⏳ _L'IA Claude réfléchit..._";
+    }
+  }
+
   // ─── Salutations ───
   if(/^(bonjour|salut|hello|hi|coucou|hey)/.test(q)){
     return "Bonjour ! 👋 Je suis votre assistant Saloni. Vous pouvez me demander :\n• Combien j'ai gagné aujourd'hui ?\n• Qui n'a pas versé ?\n• Top chauffeurs\n• Mes meilleurs salonis\n• Conseils pour augmenter mes revenus";
@@ -2819,6 +2834,8 @@ function iaAskClaude(question){
     var hist=getIAHist();
     hist.push({r:"bot",t:"⚠️ Clé API Claude manquante. Allez dans Config pour l'ajouter.",ts:Date.now()});
     saveIAHist(hist);
+    var content0=document.getElementById("content-generic");
+    if(content0) content0.innerHTML='<div class="content-inner">'+renderAssistant()+'</div>';
     return;
   }
   var t=td();
@@ -2832,20 +2849,73 @@ function iaAskClaude(question){
   var caM=VE.filter(function(v){return mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
   var depM=DE.filter(function(d){return mois.indexOf(d.date)>=0;}).reduce(function(s,d){return s+d.montant;},0);
 
-  var ctx="Tu es l'assistant business d'un gérant de flotte de tricycles-taxis (salonis) à Abidjan, Côte d'Ivoire.\n";
-  ctx+="DONNÉES :\n- Chauffeurs actifs : "+CH.filter(function(c){return c.statut!=="inactif";}).length;
-  ctx+="\n- Salonis : "+SA.length+"\n- CA jour : "+caJ+" F\n- CA semaine : "+caS+" F\n- CA mois : "+caM+" F";
-  ctx+="\n- Dépenses mois : "+depM+" F\n- Bénéfice mois : "+(caM-depM)+" F\n";
-  ctx+="\nRéponds en français, concis (max 4-5 phrases), avec emojis. Conseils concrets basés sur les chiffres.";
+  // Préparer liste chauffeurs pour Claude
+  var chList=CH.filter(function(c){return c.statut!=="inactif";}).slice(0,15).map(function(c){
+    var totalMois=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && mois.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
+    return "  - "+c.nom+" (zone:"+(c.zone||"?")+", saloni:"+(c.saloniId||"?")+", CA mois:"+totalMois+"F"+(c.dette>0?", dette:"+c.dette+"F":"")+(c.tel?", tel:"+c.tel:"")+")";
+  }).join("\n");
+
+  var ctx="Tu es l'assistant business intelligent d'un gérant de flotte de tricycles-taxis (appelés 'salonis') à Abidjan, Côte d'Ivoire.\n\n";
+  ctx+="═══ DONNÉES BUSINESS ACTUELLES ═══\n";
+  ctx+="📊 Chiffres clés :\n";
+  ctx+="- Chauffeurs actifs : "+CH.filter(function(c){return c.statut!=="inactif";}).length+" sur "+CH.length+"\n";
+  ctx+="- Salonis dans la flotte : "+SA.length+"\n";
+  ctx+="- CA aujourd'hui : "+caJ+" FCFA\n";
+  ctx+="- CA cette semaine : "+caS+" FCFA\n";
+  ctx+="- CA ce mois : "+caM+" FCFA\n";
+  ctx+="- Dépenses ce mois : "+depM+" FCFA\n";
+  ctx+="- Bénéfice mensuel : "+(caM-depM)+" FCFA\n";
+  ctx+="- Dettes totales chauffeurs : "+CH.reduce(function(s,c){return s+(c.dette||0);},0)+" FCFA\n";
+  ctx+="- Sanctions actives : "+(S.data.sanctions||[]).filter(function(s){return s.statut==="active";}).length+"\n";
+  if(chList) ctx+="\n👥 Chauffeurs :\n"+chList+"\n";
+  ctx+="\n═══ TES INSTRUCTIONS ═══\n";
+  ctx+="- Réponds en français, de manière concise (3-6 phrases max)\n";
+  ctx+="- Sois convivial mais professionnel, comme un assistant business\n";
+  ctx+="- Utilise des emojis pertinents 📊💰🎯\n";
+  ctx+="- Base tes réponses sur les CHIFFRES RÉELS ci-dessus\n";
+  ctx+="- Donne des conseils concrets et actionnables\n";
+  ctx+="- Si on te demande des informations sur un chauffeur, utilise les données ci-dessus\n";
+  ctx+="- Ne dis jamais 'je n'ai pas accès aux données', tu les as ci-dessus\n";
+  ctx+="- Formate avec des sauts de ligne et listes à puces si utile";
+
+  // Log pour debug
+  console.log("[IA Claude] Question:",question);
+  console.log("[IA Claude] Clé présente:",cfg.claudeKey?cfg.claudeKey.substring(0,15)+"...":"AUCUNE");
 
   fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":cfg.claudeKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:500,system:ctx,messages:[{role:"user",content:question}]})
-  }).then(function(r){return r.json();}).then(function(data){
-    var reply="Erreur IA";
-    if(data && data.content && data.content[0]) reply=data.content[0].text;
-    else if(data && data.error) reply="❌ "+(data.error.message||"Erreur API");
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key":cfg.claudeKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify({
+      model:"claude-haiku-4-5-20251001",
+      max_tokens:600,
+      system:ctx,
+      messages:[{role:"user",content:question}]
+    })
+  }).then(function(r){
+    console.log("[IA Claude] Statut HTTP:",r.status);
+    if(!r.ok){
+      return r.json().then(function(err){
+        throw new Error("HTTP "+r.status+": "+(err.error&&err.error.message?err.error.message:JSON.stringify(err)));
+      }).catch(function(){
+        throw new Error("HTTP "+r.status);
+      });
+    }
+    return r.json();
+  }).then(function(data){
+    console.log("[IA Claude] Réponse:",data);
+    var reply="";
+    if(data && data.content && data.content[0] && data.content[0].text){
+      reply=data.content[0].text;
+    } else if(data && data.error){
+      reply="❌ Erreur API Claude : "+data.error.message;
+    } else {
+      reply="❌ Réponse inattendue : "+JSON.stringify(data).substring(0,200);
+    }
     var h=getIAHist();
     if(h.length>0 && h[h.length-1].t.indexOf("réfléchit")>=0) h.pop();
     h.push({r:"bot",t:reply,ts:Date.now(),source:"claude"});
@@ -2853,9 +2923,21 @@ function iaAskClaude(question){
     var content=document.getElementById("content-generic");
     if(content) content.innerHTML='<div class="content-inner">'+renderAssistant()+'</div>';
   }).catch(function(e){
+    console.error("[IA Claude] Erreur:",e);
     var h=getIAHist();
     if(h.length>0 && h[h.length-1].t.indexOf("réfléchit")>=0) h.pop();
-    h.push({r:"bot",t:"❌ Erreur connexion Claude.\n"+e.message,ts:Date.now()});
+    var msg="❌ **Impossible de joindre Claude**\n\n**Erreur :** "+(e.message||e)+"\n\n";
+    msg+="**Causes possibles :**\n";
+    msg+="• Clé API invalide ou expirée\n";
+    msg+="• Pas de crédit sur votre compte Anthropic\n";
+    msg+="• Connexion internet instable\n";
+    msg+="• Restriction CORS du navigateur\n\n";
+    msg+="**Solutions :**\n";
+    msg+="1. Vérifiez votre clé sur console.anthropic.com\n";
+    msg+="2. Vérifiez votre crédit (Billing)\n";
+    msg+="3. Essayez sur un autre navigateur\n\n";
+    msg+="En attendant, je continue en mode simple. Tapez \"aide\" pour la liste des commandes.";
+    h.push({r:"bot",t:msg,ts:Date.now()});
     saveIAHist(h);
     var content=document.getElementById("content-generic");
     if(content) content.innerHTML='<div class="content-inner">'+renderAssistant()+'</div>';
@@ -2951,7 +3033,14 @@ function iaSaveClaudeKey(){
     if(!confirm("La clé ne commence pas par 'sk-ant-'. Êtes-vous sûr ?")) return;
   }
   setIAConfig("claudeKey",key);
-  toast(key?"✅ Clé API enregistrée":"Clé effacée","success");
+  // ─── ACTIVER AUTOMATIQUEMENT si une clé valide est fournie ───
+  if(key){
+    setIAConfig("useClaude",true);
+    toast("✅ IA Claude activée !","success");
+  } else {
+    setIAConfig("useClaude",false);
+    toast("Clé effacée","success");
+  }
   var content=document.getElementById("content-generic");
   if(content) content.innerHTML='<div class="content-inner">'+renderAssistant()+'</div>';
 }
@@ -2983,6 +3072,17 @@ function renderAssistant(){
 
   // ─── TAB CHAT ───
   if(tab==="chat"){
+    // Badge indiquant le mode actif
+    var iaModeBadge='';
+    if(config.useClaude && config.claudeKey){
+      iaModeBadge='<div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700"><span>🧠</span><span>Mode IA Claude actif</span><span style="margin-left:auto;background:rgba(255,255,255,.25);padding:2px 8px;border-radius:8px;font-size:10px">CONNECTÉ</span></div>';
+    } else if(config.claudeKey && !config.useClaude){
+      iaModeBadge='<div style="background:var(--warning-soft);color:var(--warning);padding:10px 14px;border-radius:12px;margin-bottom:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px"><span>⚠️</span><span>Clé Claude présente mais IA Claude désactivée</span></div>';
+    } else {
+      iaModeBadge='<div style="background:var(--info-soft);color:var(--info);padding:10px 14px;border-radius:12px;margin-bottom:10px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px"><span>🤖</span><span>Mode simple (sans Claude)</span></div>';
+    }
+    h+=iaModeBadge;
+
     h+='<div id="iaChatBox" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px;min-height:300px;max-height:400px;overflow-y:auto;margin-bottom:12px">';
     if(hist.length===0){
       h+='<div style="text-align:center;padding:30px 10px;color:var(--txt-2)">';
@@ -2995,8 +3095,9 @@ function renderAssistant(){
         if(m.r==="user"){
           h+='<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;padding:10px 14px;border-radius:16px 16px 4px 16px;max-width:80%;font-size:13.5px;line-height:1.5">'+escapeHtml(m.t)+'</div></div>';
         } else {
-          h+='<div style="display:flex;gap:8px;margin-bottom:10px"><div style="width:32px;height:32px;background:linear-gradient(135deg,#7c3aed,#5b21b6);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🤖</div>';
-          h+='<div style="background:var(--surface-2);padding:10px 14px;border-radius:4px 16px 16px 16px;max-width:80%;font-size:13.5px;line-height:1.6;white-space:pre-wrap">'+formatIAMsg(m.t)+'</div></div>';
+          var srcBadge=m.source==="claude"?'<span style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;margin-bottom:4px;display:inline-block">CLAUDE</span><br>':'';
+          h+='<div style="display:flex;gap:8px;margin-bottom:10px"><div style="width:32px;height:32px;background:linear-gradient(135deg,'+(m.source==="claude"?"#7c3aed,#5b21b6":"#0a1f44,#1e3a8a")+');border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">'+(m.source==="claude"?"🧠":"🤖")+'</div>';
+          h+='<div style="background:var(--surface-2);padding:10px 14px;border-radius:4px 16px 16px 16px;max-width:80%;font-size:13.5px;line-height:1.6;white-space:pre-wrap">'+srcBadge+formatIAMsg(m.t)+'</div></div>';
         }
       });
     }
