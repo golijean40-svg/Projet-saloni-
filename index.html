@@ -760,6 +760,55 @@ function avatarHTML(c,idx){
   return initials;
 }
 
+// Helpers manquants
+function avatarColor(id){
+  var colors=[
+    "linear-gradient(135deg,#f97316,#ea580c)",
+    "linear-gradient(135deg,#3b82f6,#1e40af)",
+    "linear-gradient(135deg,#10b981,#059669)",
+    "linear-gradient(135deg,#a855f7,#7c3aed)",
+    "linear-gradient(135deg,#ec4899,#db2777)",
+    "linear-gradient(135deg,#06b6d4,#0891b2)"
+  ];
+  var idx=Math.abs(parseInt(id)||0)%colors.length;
+  return colors[idx];
+}
+function initials(nom){
+  if(!nom) return "?";
+  var p=nom.trim().split(/\s+/);
+  if(p.length>=2) return (p[0][0]+p[1][0]).toUpperCase();
+  return nom.substring(0,2).toUpperCase();
+}
+function escapeHtml(s){
+  if(s==null) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function copyToClip(txt){
+  try{
+    var ta=document.createElement("textarea");
+    ta.value=txt;document.body.appendChild(ta);ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    if(typeof toast==="function") toast("Copié","success");
+  }catch(e){
+    alert(txt);
+  }
+}
+function formatDateFR(iso){
+  if(!iso) return "";
+  if(iso.indexOf("-")===-1) return iso;
+  var p=iso.split("-");
+  return p[2]+"/"+p[1]+"/"+p[0];
+}
+function formatDateRelative(iso){
+  if(!iso) return "";
+  var today=td();
+  if(iso===today) return "Aujourd'hui";
+  var y=new Date();y.setDate(y.getDate()-1);
+  if(iso===fmtISO(y)) return "Hier";
+  return formatDateFR(iso);
+}
+
 // ═══ STOCKAGE ═══
 function save(){try{localStorage.setItem("sal_v20",JSON.stringify(S.data));}catch(e){}}
 function load(){
@@ -2351,6 +2400,36 @@ function closeModal(){
 }
 
 // ═══ RENDER ROUTER ═══
+function render(){
+  if(!S.user) return;
+  // Si chauffeur, c'est renderChauffeurApp qui gère
+  if(estChauffeur()){
+    renderChauffeurApp();
+    return;
+  }
+  // Topbar refresh
+  var nb=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";}).length;
+  var ts=document.getElementById("topStatus");
+  if(ts) ts.textContent=S.user.role+" · "+nb+" chauffeur"+(nb>1?"s":"")+" actif"+(nb>1?"s":"");
+
+  // Router
+  var page=S.genericPage;
+  var tab=S.tab||"home";
+
+  if(page){
+    // Rendu page générique — renderGeneric écrit elle-même dans le DOM
+    if(typeof renderGeneric==="function") renderGeneric();
+    return;
+  }
+
+  // Rendu onglet — les fonctions écrivent elles-mêmes dans le DOM
+  if(tab==="home" && typeof renderHome==="function") renderHome();
+  else if(tab==="vers" && typeof renderVers==="function") renderVers();
+  else if(tab==="team" && typeof renderTeam==="function") renderTeam();
+  else if(tab==="fleet" && typeof renderFleet==="function") renderFleet();
+  else if(tab==="fin" && typeof renderFin==="function") renderFin();
+}
+
 /* ═══════════════════════════════════════════════════════════
    SCREEN: ACCUEIL
    ═══════════════════════════════════════════════════════════ */
