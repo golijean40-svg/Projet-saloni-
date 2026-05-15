@@ -591,6 +591,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
 
       <div class="sidebar-divider"></div>
       <div class="sidebar-section-title">Système</div>
+      <button class="sidebar-item" onclick="goGeneric('souscomptes')">
+        <div class="sidebar-item-icon">👥</div>
+        <div class="sidebar-item-label">Sous-comptes</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
       <button class="sidebar-item" onclick="goGeneric('reglement')">
         <div class="sidebar-item-icon">📜</div>
         <div class="sidebar-item-label">Règlement intérieur</div>
@@ -1735,6 +1740,7 @@ function renderGeneric(){
   else if(p==="bi")html+=renderBI();
   else if(p==="rsi")html+=renderRSI();
   else if(p==="reglement")html+=renderReglement();
+  else if(p==="souscomptes")html+=renderSousComptes();
   else if(p==="journal")html+=renderJournal();
   else if(p==="sanctions")html+=renderSanctions();
   else if(p==="primes")html+=renderPrimes();
@@ -1894,6 +1900,206 @@ function renderBI(){
   });
 
   return h;
+}
+
+/* ═══ SOUS-COMPTES (Admin, Collaborateur, Chauffeur) ═══ */
+function renderSousComptes(){
+  if(!S.user || S.user.niveau<3){
+    return '<div class="screen-title">👥 Sous-comptes</div><div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">Accès réservé au Gérant.</div></div>';
+  }
+  var sc=S.data.sousComptes||[];
+  var h='<div class="screen-title">👥 Sous-comptes</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Créez des accès pour vos collaborateurs et chauffeurs.</div>';
+
+  // KPI
+  var admins=sc.filter(function(c){return c.niveau===2;}).length;
+  var chauffeurs=sc.filter(function(c){return c.niveau===0;}).length;
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b1">👔</div><div class="kpi-label">Admins / Collaborateurs</div><div class="kpi-val">'+admins+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2">🛺</div><div class="kpi-label">Chauffeurs</div><div class="kpi-val">'+chauffeurs+'</div></div>';
+  h+='</div>';
+
+  // Bouton ajouter
+  h+='<button class="btn-primary" style="margin:14px 0" onclick="openSousCompteModal()">+ Créer un sous-compte</button>';
+
+  // Liste
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">Comptes existants</div>';
+  if(sc.length===0){
+    h+='<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Aucun sous-compte pour le moment.</div></div>';
+  } else {
+    sc.forEach(function(c){
+      var rolColor=c.niveau===2?"var(--info)":(c.niveau===0?"var(--success)":"var(--txt-2)");
+      var rolBg=c.niveau===2?"var(--info-soft)":(c.niveau===0?"var(--success-soft)":"var(--surface-2)");
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;box-shadow:var(--shadow-sm)">';
+      h+='<div style="display:flex;align-items:center;gap:12px">';
+      h+='<div style="width:44px;height:44px;border-radius:14px;background:'+rolBg+';color:'+rolColor+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">'+(c.pseudo||"?").substring(0,2).toUpperCase()+'</div>';
+      h+='<div style="flex:1;min-width:0">';
+      h+='<div style="font-weight:800;font-size:14.5px">'+(c.pseudo||"—")+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px"><span style="background:'+rolBg+';color:'+rolColor+';padding:2px 8px;border-radius:8px;font-weight:700;font-size:10px">'+(c.role||"—")+'</span>';
+      if(c.nom) h+=' · '+c.nom;
+      h+='</div>';
+      if(c.permissions){
+        var permsList=Object.keys(c.permissions).filter(function(k){return c.permissions[k];});
+        if(permsList.length>0) h+='<div style="font-size:10.5px;color:var(--txt-3);margin-top:4px">🔓 '+permsList.join(", ")+'</div>';
+      }
+      h+='</div>';
+      h+='<button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;margin:0" onclick="event.stopPropagation();delSousCompte(\''+(c.pseudo||"")+'\')">🗑</button>';
+      h+='</div></div>';
+    });
+  }
+
+  // Info sécurité
+  h+='<div style="background:var(--warning-soft);color:var(--warning);border-radius:12px;padding:12px;margin-top:14px;font-size:12px;line-height:1.6">';
+  h+='⚠️ <strong>Important</strong> : transmettez l\'identifiant et le code uniquement à la personne concernée. Le code peut être changé à tout moment.';
+  h+='</div>';
+
+  return h;
+}
+
+function openSousCompteModal(existing){
+  var c=existing||{};
+  var isEdit=!!existing;
+  var body='';
+
+  body+='<div class="field"><label>Type de compte</label><select id="scNiveau" onchange="onSousCompteNiveauChange()">';
+  body+='<option value="2"'+(c.niveau===2?" selected":"")+'>👔 Admin / Collaborateur (gestion)</option>';
+  body+='<option value="0"'+(c.niveau===0?" selected":"")+'>🛺 Chauffeur (chat seulement)</option>';
+  body+='</select></div>';
+
+  body+='<div class="field"><label>Identifiant (pseudo)</label><input id="scPseudo" type="text" value="'+(c.pseudo||"").replace(/"/g,"&quot;")+'" placeholder="ex: marie" autocapitalize="off" autocomplete="off" '+(isEdit?'readonly':'')+'/></div>';
+
+  body+='<div class="field"><label>Code d\'accès</label><input id="scMdp" type="text" value="'+(c.mdp||"").replace(/"/g,"&quot;")+'" placeholder="ex: 1234" autocomplete="new-password"/></div>';
+
+  body+='<div class="field"><label>Nom complet (optionnel)</label><input id="scNom" type="text" value="'+(c.nom||"").replace(/"/g,"&quot;")+'" placeholder="Marie Doe"/></div>';
+
+  // Permissions pour niveau 2 (Admin/Collaborateur)
+  body+='<div id="scPermsBox" style="margin-top:14px;padding:12px;background:var(--surface-2);border-radius:12px">';
+  body+='<div style="font-weight:700;font-size:13px;margin-bottom:10px">🔐 Permissions</div>';
+  var perms=c.permissions||{};
+  var permsList=[
+    {k:"versements", l:"Enregistrer des versements"},
+    {k:"chauffeurs", l:"Gérer les chauffeurs"},
+    {k:"flotte", l:"Gérer la flotte"},
+    {k:"depenses", l:"Enregistrer des dépenses"},
+    {k:"rapports", l:"Voir les rapports"},
+    {k:"chat", l:"Utiliser le chat"}
+  ];
+  permsList.forEach(function(p){
+    body+='<label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;cursor:pointer">';
+    body+='<input type="checkbox" id="scPerm_'+p.k+'" '+(perms[p.k]?"checked":"")+' style="width:18px;height:18px;cursor:pointer"/>';
+    body+='<span>'+p.l+'</span></label>';
+  });
+  body+='</div>';
+
+  // Choix chauffeur (pour niveau 0)
+  body+='<div id="scChauffeurBox" style="display:none;margin-top:14px"><div class="field"><label>Lié à quel chauffeur ?</label><select id="scChauffeurId">';
+  body+='<option value="">— Aucun —</option>';
+  (S.data.chauffeurs||[]).forEach(function(ch){
+    body+='<option value="'+ch.id+'"'+(c.chauffeurId===ch.id?" selected":"")+'>'+ch.nom+'</option>';
+  });
+  body+='</select></div></div>';
+
+  // Bouton de validation
+  body+='<button class="btn-primary" style="margin-top:16px;width:100%" onclick="saveSousCompte('+(isEdit?'true':'false')+')">'+(isEdit?'Mettre à jour':'✓ Créer le compte')+'</button>';
+
+  openModal((isEdit?"Modifier":"Créer un")+" sous-compte", body);
+
+  // Appel après render du modal
+  setTimeout(function(){ onSousCompteNiveauChange(); },50);
+}
+
+function onSousCompteNiveauChange(){
+  var niveau=parseInt(document.getElementById("scNiveau").value);
+  var permsBox=document.getElementById("scPermsBox");
+  var chBox=document.getElementById("scChauffeurBox");
+  if(niveau===2){
+    if(permsBox) permsBox.style.display="block";
+    if(chBox) chBox.style.display="none";
+  } else {
+    if(permsBox) permsBox.style.display="none";
+    if(chBox) chBox.style.display="block";
+  }
+}
+
+function saveSousCompte(isEdit){
+  var pseudo=(document.getElementById("scPseudo").value||"").trim().toLowerCase();
+  var mdp=(document.getElementById("scMdp").value||"").trim();
+  var nom=(document.getElementById("scNom").value||"").trim();
+  var niveau=parseInt(document.getElementById("scNiveau").value);
+
+  if(!pseudo){toast("Identifiant requis","error");return;}
+  if(!mdp){toast("Code d'accès requis","error");return;}
+  if(pseudo.length<3){toast("Identifiant trop court (min 3 caractères)","error");return;}
+
+  // Vérifier unicité (sauf si modification)
+  if(!isEdit){
+    var existe=(S.data.sousComptes||[]).some(function(c){return c.pseudo===pseudo;});
+    if(existe){toast("Cet identifiant existe déjà","error");return;}
+    // Vérifier aussi contre les comptes de base
+    if(pseudo==="gerant"||pseudo==="admin"){toast("Identifiant réservé","error");return;}
+  }
+
+  var item={
+    pseudo:pseudo,
+    mdp:mdp,
+    nom:nom,
+    niveau:niveau,
+    role:niveau===2?"Collaborateur":"Chauffeur",
+    dateCreation:isEdit?(item.dateCreation||td()):td()
+  };
+
+  if(niveau===2){
+    // Récupérer permissions
+    var perms={};
+    ["versements","chauffeurs","flotte","depenses","rapports","chat"].forEach(function(k){
+      var el=document.getElementById("scPerm_"+k);
+      if(el && el.checked) perms[k]=true;
+    });
+    item.permissions=perms;
+  } else {
+    // Chauffeur lié
+    var chId=parseInt(document.getElementById("scChauffeurId").value);
+    if(chId) item.chauffeurId=chId;
+    item.permissions={chat:true};
+  }
+
+  if(!S.data.sousComptes) S.data.sousComptes=[];
+
+  if(isEdit){
+    S.data.sousComptes=S.data.sousComptes.map(function(c){return c.pseudo===pseudo?item:c;});
+  } else {
+    S.data.sousComptes.push(item);
+  }
+
+  // Save Firebase
+  try {
+    if(db){
+      db.collection("sal_sousComptes").doc(pseudo).set(Object.assign({},item,{_t:firebase.firestore.FieldValue.serverTimestamp()}));
+    }
+  } catch(e){console.warn("FB save failed",e);}
+
+  // Save local
+  save();
+  closeModal();
+  toast("✅ Sous-compte "+(isEdit?"mis à jour":"créé"),"success");
+  if(typeof render==="function") render();
+  // Refresh écran si on est dessus
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
+}
+
+function delSousCompte(pseudo){
+  if(!pseudo) return;
+  if(!confirm("Supprimer le sous-compte « "+pseudo+" » ?\n\nCette action est irréversible.")) return;
+  S.data.sousComptes=(S.data.sousComptes||[]).filter(function(c){return c.pseudo!==pseudo;});
+  try {
+    if(db) db.collection("sal_sousComptes").doc(pseudo).delete();
+  } catch(e){}
+  save();
+  toast("Sous-compte supprimé","success");
+  if(typeof render==="function") render();
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
 }
 
 function renderReglement(){
