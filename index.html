@@ -2160,12 +2160,339 @@ function renderChVersements(c){
 }
 
 /* ─── CHAT CHAUFFEUR ↔ GÉRANT ─── */
+/* ═══════════════════════════════════════════════════════════════
+   MÉDIAS POUR CHAT — Photo, Vidéo, Audio, Vue unique
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Compression d'image (réduit à 800px, qualité 0.75) ───
+function compressImage(file, callback){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var maxW=800;
+      var ratio=Math.min(maxW/img.width, maxW/img.height, 1);
+      var canvas=document.createElement("canvas");
+      canvas.width=img.width*ratio;
+      canvas.height=img.height*ratio;
+      var ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      var dataUrl=canvas.toDataURL("image/jpeg",0.75);
+      callback(dataUrl);
+    };
+    img.onerror=function(){callback(null);};
+    img.src=e.target.result;
+  };
+  reader.onerror=function(){callback(null);};
+  reader.readAsDataURL(file);
+}
+
+// ─── Lire un fichier en base64 (pour vidéo/audio sans compression) ───
+function fileToBase64(file, callback){
+  var reader=new FileReader();
+  reader.onload=function(e){callback(e.target.result);};
+  reader.onerror=function(){callback(null);};
+  reader.readAsDataURL(file);
+}
+
+// ─── Vérifie la durée d'une vidéo/audio ───
+function checkMediaDuration(file, maxSeconds, callback){
+  var url=URL.createObjectURL(file);
+  var el=file.type.startsWith("video")?document.createElement("video"):document.createElement("audio");
+  el.preload="metadata";
+  el.onloadedmetadata=function(){
+    URL.revokeObjectURL(url);
+    if(el.duration>maxSeconds){
+      callback(false, "Trop long ("+Math.round(el.duration)+"s). Maximum "+maxSeconds+"s.");
+    } else {
+      callback(true);
+    }
+  };
+  el.onerror=function(){URL.revokeObjectURL(url);callback(false,"Fichier illisible");};
+  el.src=url;
+}
+
+// ─── Modal de capture média (caméra/galerie pour photo, etc.) ───
+function chatOpenMediaPicker(callback){
+  // callback(mediaObject) où mediaObject={type:"image"/"video"/"audio", data:base64, duration:seconds}
+  window._chatMediaCallback=callback;
+  var body='';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
+
+  // Photo
+  body+='<button onclick="chatPickPhoto()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">📷</div><div>Photo</div></button>';
+
+  // Vidéo (max 10s)
+  body+='<button onclick="chatPickVideo()" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">🎥</div><div>Vidéo (10s max)</div></button>';
+
+  // Audio enregistré
+  body+='<button onclick="chatStartAudioRecord()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">🎤</div><div>Audio (1min max)</div></button>';
+
+  // Vue unique
+  body+='<button onclick="chatPickVueUnique()" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">👁</div><div>Vue unique</div></button>';
+
+  body+='</div>';
+
+  body+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:10px;font-size:11.5px;line-height:1.5">';
+  body+='💡 <strong>Vue unique</strong> : le destinataire ne peut voir le média qu\'<strong>une seule fois</strong>. Il disparaît après visualisation (comme sur WhatsApp).';
+  body+='</div>';
+
+  // Inputs cachés
+  body+='<input type="file" id="chatMediaInputPhoto" accept="image/*" capture="environment" style="display:none" onchange="chatHandlePhoto(event,false)"/>';
+  body+='<input type="file" id="chatMediaInputVueUnique" accept="image/*" capture="environment" style="display:none" onchange="chatHandlePhoto(event,true)"/>';
+  body+='<input type="file" id="chatMediaInputVideo" accept="video/*" capture="environment" style="display:none" onchange="chatHandleVideo(event)"/>';
+
+  openModal("📎 Joindre un média", body);
+}
+
+function chatPickPhoto(){document.getElementById("chatMediaInputPhoto").click();}
+function chatPickVueUnique(){document.getElementById("chatMediaInputVueUnique").click();}
+function chatPickVideo(){document.getElementById("chatMediaInputVideo").click();}
+
+function chatHandlePhoto(e, vueUnique){
+  var file=e.target.files[0];
+  if(!file) return;
+  toast("⏳ Compression...","info");
+  compressImage(file, function(dataUrl){
+    if(!dataUrl){toast("Erreur","error");return;}
+    if(dataUrl.length>1024*1024){
+      toast("Image trop lourde après compression","error");
+      return;
+    }
+    closeModal();
+    if(window._chatMediaCallback){
+      window._chatMediaCallback({
+        type:"image",
+        data:dataUrl,
+        vueUnique:vueUnique||false
+      });
+    }
+  });
+}
+
+function chatHandleVideo(e){
+  var file=e.target.files[0];
+  if(!file) return;
+  if(file.size>3*1024*1024){
+    toast("⚠️ Vidéo trop lourde (max 3 MB). Filmez moins long.","error");
+    return;
+  }
+  toast("⏳ Vérification...","info");
+  checkMediaDuration(file, 10, function(ok, err){
+    if(!ok){toast(err,"error");return;}
+    fileToBase64(file, function(dataUrl){
+      if(!dataUrl){toast("Erreur","error");return;}
+      closeModal();
+      if(window._chatMediaCallback){
+        window._chatMediaCallback({
+          type:"video",
+          data:dataUrl,
+          mimeType:file.type
+        });
+      }
+    });
+  });
+}
+
+// ─── ENREGISTREMENT AUDIO ───
+var _chatRecorder=null;
+var _chatRecorderChunks=[];
+var _chatRecorderStartTime=0;
+var _chatRecorderInterval=null;
+
+function chatStartAudioRecord(){
+  if(!navigator.mediaDevices || !window.MediaRecorder){
+    toast("Enregistrement audio non supporté sur ce navigateur","error");
+    return;
+  }
+
+  // Remplacer le contenu du modal par l'UI d'enregistrement
+  var body='';
+  body+='<div style="text-align:center;padding:20px 0">';
+  body+='<div id="chatRecordIcon" style="width:80px;height:80px;background:linear-gradient(135deg,#dc2626,#991b1b);border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;animation:pulse 1s infinite">🎙️</div>';
+  body+='<div id="chatRecordTime" style="font-size:32px;font-weight:800;font-family:monospace;color:var(--danger);margin-bottom:8px">00:00</div>';
+  body+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:20px">Enregistrement en cours...</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  body+='<button class="btn-ghost" onclick="chatCancelAudioRecord()">❌ Annuler</button>';
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#059669,#047857)" onclick="chatStopAudioRecord()">✓ Envoyer</button>';
+  body+='</div>';
+  body+='</div>';
+  body+='<style>@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}</style>';
+
+  openModal("🎤 Enregistrement audio", body);
+
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    _chatRecorder=new MediaRecorder(stream);
+    _chatRecorderChunks=[];
+    _chatRecorder.ondataavailable=function(e){if(e.data.size>0) _chatRecorderChunks.push(e.data);};
+    _chatRecorder.onstop=function(){
+      stream.getTracks().forEach(function(t){t.stop();});
+      var blob=new Blob(_chatRecorderChunks,{type:"audio/webm"});
+      if(blob.size>1024*1024){
+        toast("Audio trop lourd","error");
+        closeModal();
+        return;
+      }
+      var reader=new FileReader();
+      reader.onload=function(e){
+        closeModal();
+        if(window._chatMediaCallback){
+          window._chatMediaCallback({
+            type:"audio",
+            data:e.target.result,
+            duration:Math.floor((Date.now()-_chatRecorderStartTime)/1000),
+            mimeType:"audio/webm"
+          });
+        }
+      };
+      reader.readAsDataURL(blob);
+    };
+    _chatRecorder.start();
+    _chatRecorderStartTime=Date.now();
+
+    // Timer
+    _chatRecorderInterval=setInterval(function(){
+      var sec=Math.floor((Date.now()-_chatRecorderStartTime)/1000);
+      var m=Math.floor(sec/60);
+      var s=sec%60;
+      var t=document.getElementById("chatRecordTime");
+      if(t) t.textContent=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+      // Auto-stop à 60s
+      if(sec>=60){
+        chatStopAudioRecord();
+      }
+    },200);
+  }).catch(function(e){
+    toast("Permission micro refusée","error");
+    closeModal();
+  });
+}
+
+function chatStopAudioRecord(){
+  if(_chatRecorderInterval){clearInterval(_chatRecorderInterval);_chatRecorderInterval=null;}
+  if(_chatRecorder && _chatRecorder.state!=="inactive"){
+    _chatRecorder.stop();
+  }
+}
+
+function chatCancelAudioRecord(){
+  if(_chatRecorderInterval){clearInterval(_chatRecorderInterval);_chatRecorderInterval=null;}
+  if(_chatRecorder && _chatRecorder.state!=="inactive"){
+    _chatRecorder.stream.getTracks().forEach(function(t){t.stop();});
+    _chatRecorder.stop();
+    _chatRecorder=null;
+    _chatRecorderChunks=[];
+  }
+  closeModal();
+}
+
+// ─── Rendu d'un message média dans le chat ───
+function renderChatMedia(m, role){
+  // role = "self" ou "other"
+  if(!m.media) return "";
+  var media=m.media;
+
+  // Vue unique - déjà vue
+  if(media.vueUnique && m.vue){
+    return '<div style="background:rgba(0,0,0,.05);padding:12px;border-radius:10px;font-size:12px;color:var(--txt-2);text-align:center;font-style:italic">👁 Photo vue unique (déjà visualisée)</div>';
+  }
+
+  // Vue unique - non encore vue (pour le destinataire seulement)
+  if(media.vueUnique && role==="other" && !m.vue){
+    return '<div onclick="chatViewVueUnique('+m.id+')" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:18px;border-radius:12px;text-align:center;cursor:pointer">'
+      +'<div style="font-size:36px">👁</div>'
+      +'<div style="font-size:13px;font-weight:800;margin-top:6px">Toucher pour voir</div>'
+      +'<div style="font-size:11px;opacity:.85;margin-top:2px">Cette image sera supprimée après visualisation</div>'
+      +'</div>';
+  }
+
+  if(media.type==="image"){
+    var src=media.data;
+    return '<img src="'+src+'" style="max-width:240px;width:100%;border-radius:10px;cursor:pointer;display:block" onclick="chatViewFullImage(\''+m.id+'\')"/>';
+  }
+  if(media.type==="video"){
+    return '<video controls preload="metadata" src="'+media.data+'" style="max-width:240px;width:100%;border-radius:10px;display:block"></video>';
+  }
+  if(media.type==="audio"){
+    var dur=media.duration||0;
+    var min=Math.floor(dur/60),sec=dur%60;
+    var durStr=(min<10?"0":"")+min+":"+(sec<10?"0":"")+sec;
+    return '<div style="background:rgba(0,0,0,.1);padding:10px;border-radius:10px;min-width:180px">'
+      +'<audio controls src="'+media.data+'" style="width:100%;height:36px"></audio>'
+      +'<div style="font-size:11px;margin-top:4px;opacity:.7">🎵 '+durStr+'</div>'
+      +'</div>';
+  }
+  return "";
+}
+
+// Vue unique : visualiser et supprimer
+function chatViewVueUnique(msgId){
+  var msg=(S.data.chats||[]).find(function(m){return m.id===msgId;});
+  if(!msg || !msg.media) return;
+  var body='<div style="text-align:center"><img src="'+msg.media.data+'" style="max-width:100%;max-height:60vh;border-radius:12px"/></div>';
+  body+='<div style="background:var(--warning-soft);color:var(--warning);padding:10px;border-radius:10px;font-size:12px;margin-top:14px">⚠️ Cette image va être supprimée à la fermeture.</div>';
+  body+='<button class="btn-ghost" style="margin-top:10px" onclick="chatConfirmVue('+msgId+')">✓ J\'ai bien vu, supprimer</button>';
+  openModal("👁 Vue unique", body);
+}
+
+function chatConfirmVue(msgId){
+  var msg=(S.data.chats||[]).find(function(m){return m.id===msgId;});
+  if(!msg) return;
+  // Marquer comme vu et supprimer le contenu
+  msg.vue=true;
+  msg.media={vueUnique:true, type:msg.media.type, deleted:true}; // garder type pour affichage, mais sans data
+  try{ fbSave("chats",msg); }catch(e){}
+  save();
+  closeModal();
+  toast("Image supprimée","success");
+  // Re-render chat
+  if(estChauffeur()) renderChauffeurApp();
+  else if(typeof render==="function") render();
+}
+
+function chatViewFullImage(msgId){
+  var msg=(S.data.chats||[]).find(function(m){return String(m.id)===String(msgId);});
+  if(!msg || !msg.media) return;
+  var body='<div style="text-align:center"><img src="'+msg.media.data+'" style="max-width:100%;max-height:80vh;border-radius:12px"/></div>';
+  openModal("📷 Image", body);
+}
+
+// ─── Bouton appel téléphonique ───
+function chatAppelerChauffeur(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c || !c.tel){toast("Pas de numéro de téléphone","error");return;}
+  if(confirm("📞 Appeler "+c.nom+" au "+c.tel+" ?")){
+    window.location.href="tel:"+c.tel.replace(/\s/g,"");
+  }
+}
+
+function chatAppelerGerant(){
+  // Le chauffeur appelle le gérant
+  // Pour l'instant, pas de numéro de gérant stocké, on peut le mettre dans la config Wave ou ajouter une option
+  var cfg=getWaveConfig();
+  var tel=cfg.numero;
+  if(!tel){
+    toast("Le gérant n'a pas renseigné son numéro","error");
+    return;
+  }
+  if(confirm("📞 Appeler le gérant au "+tel+" ?")){
+    window.location.href="tel:"+tel.replace(/\s/g,"");
+  }
+}
+
 function renderChChat(c){
-  var html='<div class="screen-title">💬 Chat avec le gérant</div>';
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  html+='<div class="screen-title" style="margin-bottom:0">💬 Chat avec le gérant</div>';
+  html+='<button onclick="chatAppelerGerant()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;font-family:inherit;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,.3)">📞</button>';
+  html+='</div>';
+
   var convId="conv_"+c.id;
   var msgs=(S.data.chats||[]).filter(function(m){return m.convId===convId;}).sort(function(a,b){return (a.ts||0)-(b.ts||0);});
 
-  // Marquer comme lus (côté chauffeur)
   msgs.forEach(function(m){
     if(!m.lu && m.de==="admin"){
       m.lu=true;
@@ -2178,21 +2505,61 @@ function renderChChat(c){
     html+='<div style="text-align:center;padding:40px 10px;color:var(--txt-2)"><div style="font-size:42px;margin-bottom:10px">💬</div><div style="font-size:13px">Aucun message pour le moment.<br>Écrivez le premier !</div></div>';
   } else {
     msgs.forEach(function(m){
-      if(m.de==="chauffeur"){
-        html+='<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;padding:10px 14px;border-radius:16px 16px 4px 16px;max-width:80%;font-size:13.5px;line-height:1.5">'+escapeHtml(m.texte)+'<div style="font-size:10px;opacity:.6;margin-top:4px;text-align:right">'+(m.heure||"")+'</div></div></div>';
+      var role=m.de==="chauffeur"?"self":"other";
+      if(role==="self"){
+        html+='<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;padding:10px 14px;border-radius:16px 16px 4px 16px;max-width:85%;font-size:13.5px;line-height:1.5">';
+        if(m.media) html+='<div style="margin-bottom:'+(m.texte?"8px":"0")+'">'+renderChatMedia(m,role)+'</div>';
+        if(m.texte) html+=escapeHtml(m.texte);
+        html+='<div style="font-size:10px;opacity:.6;margin-top:4px;text-align:right">'+(m.heure||"")+'</div></div></div>';
       } else {
         html+='<div style="display:flex;gap:8px;margin-bottom:10px"><div style="width:32px;height:32px;background:linear-gradient(135deg,#f97316,#ea580c);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:800;flex-shrink:0">G</div>';
-        html+='<div style="background:var(--surface-2);padding:10px 14px;border-radius:4px 16px 16px 16px;max-width:80%;font-size:13.5px;line-height:1.5;color:var(--txt)">'+escapeHtml(m.texte)+'<div style="font-size:10px;color:var(--txt-3);margin-top:4px">'+(m.heure||"")+'</div></div></div>';
+        html+='<div style="background:var(--surface-2);padding:10px 14px;border-radius:4px 16px 16px 16px;max-width:85%;font-size:13.5px;line-height:1.5;color:var(--txt)">';
+        if(m.media) html+='<div style="margin-bottom:'+(m.texte?"8px":"0")+'">'+renderChatMedia(m,role)+'</div>';
+        if(m.texte) html+=escapeHtml(m.texte);
+        html+='<div style="font-size:10px;color:var(--txt-3);margin-top:4px">'+(m.heure||"")+'</div></div></div>';
       }
     });
   }
   html+='</div>';
 
-  html+='<div style="display:flex;gap:8px"><input id="chChatInput" placeholder="Écrire au gérant..." style="flex:1;padding:13px 16px;border:1.5px solid var(--border);border-radius:14px;font-size:14px;background:var(--surface);color:var(--txt);font-family:inherit" onkeydown="if(event.key===\'Enter\')chSendMsg()"/>';
-  html+='<button class="btn-accent" style="width:46px;height:46px;padding:0;margin:0;font-size:18px;flex-shrink:0" onclick="chSendMsg()">➤</button></div>';
+  // Barre d'envoi avec bouton média
+  html+='<div style="display:flex;gap:6px;align-items:center">';
+  html+='<button onclick="chatOpenMediaPicker(chSendMediaChauffeur)" style="width:44px;height:44px;border-radius:14px;background:var(--surface-2);border:1.5px solid var(--border);font-size:20px;flex-shrink:0;font-family:inherit;cursor:pointer">📎</button>';
+  html+='<input id="chChatInput" placeholder="Message..." style="flex:1;padding:13px 16px;border:1.5px solid var(--border);border-radius:14px;font-size:14px;background:var(--surface);color:var(--txt);font-family:inherit" onkeydown="if(event.key===\'Enter\')chSendMsg()"/>';
+  html+='<button class="btn-accent" style="width:44px;height:44px;padding:0;margin:0;font-size:18px;flex-shrink:0;border-radius:14px" onclick="chSendMsg()">➤</button>';
+  html+='</div>';
 
   setTimeout(function(){ var b=document.getElementById("chChatBox"); if(b) b.scrollTop=b.scrollHeight; },100);
   return html;
+}
+
+// Callback quand le chauffeur envoie un média
+function chSendMediaChauffeur(mediaObj){
+  if(!mediaObj) return;
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var item={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:"",
+    media:mediaObj,
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false,
+    vue:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(item);
+  try{ fbSave("chats",item); }catch(e){
+    console.warn("Média trop gros pour Firebase, garde en local",e);
+    // Le média reste en local
+    save();
+  }
+  toast("✅ Média envoyé","success");
+  renderChauffeurApp();
 }
 
 /* ─── PAIEMENT WAVE CÔTÉ CHAUFFEUR ─── */
@@ -3740,16 +4107,38 @@ function renderChat(){
     var msgs=CHATS.filter(function(m){return m.convId==="conv_"+c.id;}).sort(function(a,b){return(a.ts||0)-(b.ts||0);});
     // Marquer lus
     msgs.forEach(function(m){if(m.de==="chauffeur"&&!m.lu){m.lu=true;fbSave("chats",m);}});
-    var h='<button class="btn-secondary" style="width:auto;padding:8px 14px;margin-bottom:14px" onclick="S.chatConv=null;render()">← Liste</button>';
-    h+='<div class="screen-title">'+c.nom+'</div>';
-    h+='<div class="chat-list">';
+    var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">';
+    h+='<button class="btn-secondary" style="width:auto;padding:8px 14px;margin:0" onclick="S.chatConv=null;render()">← Liste</button>';
+    if(c.tel){
+      h+='<button onclick="chatAppelerChauffeur('+c.id+')" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:18px;font-family:inherit;cursor:pointer;flex-shrink:0">📞</button>';
+    }
+    h+='</div>';
+    h+='<div style="font-weight:800;font-size:18px;margin-bottom:14px">'+c.nom+'</div>';
+    h+='<div class="chat-list" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px;min-height:300px;max-height:500px;overflow-y:auto;margin-bottom:12px">';
     if(msgs.length===0)h+='<div class="empty"><div class="empty-text">Aucun message</div></div>';
     msgs.forEach(function(m){
       var mine=m.de!=="chauffeur";
-      h+='<div class="chat-msg '+(mine?"mine":"theirs")+'">'+m.texte+'<div class="chat-time">'+(m.heure||"")+'</div></div>';
+      var role=mine?"self":"other";
+      if(mine){
+        h+='<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;padding:10px 14px;border-radius:16px 16px 4px 16px;max-width:85%;font-size:13.5px;line-height:1.5">';
+        if(m.media) h+='<div style="margin-bottom:'+(m.texte?"8px":"0")+'">'+renderChatMedia(m,role)+'</div>';
+        if(m.texte) h+=escapeHtml(m.texte);
+        h+='<div style="font-size:10px;opacity:.6;margin-top:4px;text-align:right">'+(m.heure||"")+'</div></div></div>';
+      } else {
+        h+='<div style="display:flex;gap:8px;margin-bottom:10px"><div style="width:32px;height:32px;background:'+avatarColor(c.id)+';border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:800;flex-shrink:0">'+initials(c.nom)+'</div>';
+        h+='<div style="background:var(--surface-2);padding:10px 14px;border-radius:4px 16px 16px 16px;max-width:85%;font-size:13.5px;line-height:1.5;color:var(--txt)">';
+        if(m.media) h+='<div style="margin-bottom:'+(m.texte?"8px":"0")+'">'+renderChatMedia(m,role)+'</div>';
+        if(m.texte) h+=escapeHtml(m.texte);
+        h+='<div style="font-size:10px;color:var(--txt-3);margin-top:4px">'+(m.heure||"")+'</div></div></div>';
+      }
     });
     h+='</div>';
-    h+='<div class="chat-input-bar"><input id="chatInp" placeholder="Message..." onkeydown="if(event.keyCode===13)sendChat()"/><button class="chat-send" onclick="sendChat()">➤</button></div>';
+    // Barre d'envoi avec média
+    h+='<div style="display:flex;gap:6px;align-items:center">';
+    h+='<button onclick="chatOpenMediaPicker(sendChatMedia)" style="width:44px;height:44px;border-radius:14px;background:var(--surface-2);border:1.5px solid var(--border);font-size:20px;flex-shrink:0;font-family:inherit;cursor:pointer">📎</button>';
+    h+='<input id="chatInp" placeholder="Message..." style="flex:1;padding:13px 16px;border:1.5px solid var(--border);border-radius:14px;font-size:14px;background:var(--surface);color:var(--txt);font-family:inherit" onkeydown="if(event.keyCode===13)sendChat()"/>';
+    h+='<button class="btn-accent" style="width:44px;height:44px;padding:0;margin:0;font-size:18px;flex-shrink:0;border-radius:14px" onclick="sendChat()">➤</button>';
+    h+='</div>';
     return h;
   }
   // Liste conversations
@@ -3759,9 +4148,19 @@ function renderChat(){
     var msgs=CHATS.filter(function(m){return m.convId==="conv_"+c.id;});
     var last=msgs.sort(function(a,b){return(b.ts||0)-(a.ts||0);})[0];
     var unread=msgs.filter(function(m){return m.de==="chauffeur"&&!m.lu;}).length;
+    var preview="Pas encore de message";
+    if(last){
+      if(last.media){
+        var icons={image:"📷 Photo",video:"🎥 Vidéo",audio:"🎵 Audio"};
+        preview=icons[last.media.type]||"📎 Média";
+        if(last.media.vueUnique) preview="👁 Vue unique";
+      } else if(last.texte){
+        preview=last.texte.substring(0,40)+(last.texte.length>40?"...":"");
+      }
+    }
     h+='<div class="driver" onclick="S.chatConv='+c.id+';render()">';
     h+='<div class="driver-avatar '+avatarClass(idx)+'">'+avatarHTML(c,idx)+'</div>';
-    h+='<div class="driver-info"><div class="driver-name">'+c.nom+'</div><div class="driver-meta">'+(last?(last.texte||"").substring(0,40)+(last.texte&&last.texte.length>40?"...":""):"Pas encore de message")+'</div></div>';
+    h+='<div class="driver-info"><div class="driver-name">'+c.nom+'</div><div class="driver-meta">'+preview+'</div></div>';
     if(unread>0)h+='<div style="background:var(--danger);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">'+unread+'</div>';
     h+='</div>';
   });
@@ -3776,6 +4175,31 @@ function sendChat(){
   S.data.chats.push(item);
   fbSave("chats",item);
   inp.value="";
+  render();
+}
+
+function sendChatMedia(mediaObj){
+  if(!mediaObj || !S.chatConv) return;
+  var item={
+    id:Date.now(),
+    convId:"conv_"+S.chatConv,
+    de:"admin",
+    auteur:S.user.pseudo,
+    texte:"",
+    media:mediaObj,
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false,
+    vue:false
+  };
+  if(!S.data.chats)S.data.chats=[];
+  S.data.chats.push(item);
+  try{ fbSave("chats",item); }catch(e){
+    console.warn("Média trop gros pour Firebase",e);
+    save();
+  }
+  toast("✅ Média envoyé","success");
   render();
 }
 
