@@ -193,8 +193,8 @@ body.dark .alert-sub{color:#fcd34d}
 /* Mode chauffeur : cacher nav standard + menu burger */
 body.mode-chauffeur .nav,body.mode-chauffeur .menu-btn{display:none !important}
 body.mode-chauffeur .app{padding-bottom:30px}
-.ch-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
-.ch-tab{padding:12px 4px;border-radius:14px;background:transparent;font-size:22px;border:none;font-family:inherit;cursor:pointer;transition:all .2s}
+.ch-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px;margin-bottom:18px;box-shadow:var(--shadow-sm);overflow-x:auto}
+.ch-tab{padding:11px 2px;border-radius:12px;background:transparent;font-size:20px;border:none;font-family:inherit;cursor:pointer;transition:all .2s}
 .ch-tab.active{background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;transform:scale(1.05);box-shadow:0 4px 12px rgba(10,31,68,.25)}
 body.dark .ch-tab.active{background:linear-gradient(135deg,#1e3a8a,#3b82f6)}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 10px;border-radius:12px;color:var(--txt-3);transition:all .2s}
@@ -614,6 +614,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
       <button class="sidebar-item" onclick="goGeneric('souscomptes')">
         <div class="sidebar-item-icon">👥</div>
         <div class="sidebar-item-label">Sous-comptes</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('formations')" style="background:linear-gradient(135deg,rgba(29,78,216,.08),rgba(59,130,246,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff">🎓</div>
+        <div class="sidebar-item-label">Formations</div>
         <div class="sidebar-item-chevron">›</div>
       </button>
       <button class="sidebar-item" onclick="goGeneric('reglement')">
@@ -2011,11 +2016,12 @@ function renderChauffeurApp(){
   var html='<div class="content-inner">';
 
   // Tabs chauffeur (6 onglets maintenant)
-  html+='<div class="ch-tabs" style="grid-template-columns:repeat(6,1fr)">';
+  html+='<div class="ch-tabs" style="grid-template-columns:repeat(7,1fr)">';
   html+='<button class="ch-tab '+(S.chTab==="home"?"active":"")+'" onclick="goChTab(\'home\')">🏠</button>';
   html+='<button class="ch-tab '+(S.chTab==="vers"?"active":"")+'" onclick="goChTab(\'vers\')">💵</button>';
   html+='<button class="ch-tab '+(S.chTab==="chat"?"active":"")+'" onclick="goChTab(\'chat\')">💬</button>';
   html+='<button class="ch-tab '+(S.chTab==="entretien"?"active":"")+'" onclick="goChTab(\'entretien\')">🔧</button>';
+  html+='<button class="ch-tab '+(S.chTab==="formation"?"active":"")+'" onclick="goChTab(\'formation\')">🎓</button>';
   html+='<button class="ch-tab '+(S.chTab==="reglement"?"active":"")+'" onclick="goChTab(\'reglement\')">📜</button>';
   html+='<button class="ch-tab '+(S.chTab==="profil"?"active":"")+'" onclick="goChTab(\'profil\')">👤</button>';
   html+='</div>';
@@ -2025,6 +2031,7 @@ function renderChauffeurApp(){
   else if(S.chTab==="vers") html+=renderChVersements(c);
   else if(S.chTab==="chat") html+=renderChChat(c);
   else if(S.chTab==="entretien") html+=renderChEntretien(c);
+  else if(S.chTab==="formation") html+=renderChFormation(c);
   else if(S.chTab==="reglement") html+=renderChReglement(c);
   else if(S.chTab==="profil") html+=renderChProfil(c);
 
@@ -2933,6 +2940,967 @@ function chDeclarerPanne(type){
 
 /* ─── PROFIL CHAUFFEUR ─── */
 /* ─── RÈGLEMENT INTÉRIEUR (côté chauffeur) ─── */
+/* ═══════════════════════════════════════════════════════════════
+   MODULE FORMATION — Cours, vidéos, quiz, certificats
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Catalogue par défaut des formations ───
+function getFormationsCatalog(){
+  // Possibilité au gérant d'ajouter ses propres modules (stockés en localStorage)
+  var custom=[];
+  try{ custom=JSON.parse(localStorage.getItem("sal_formations_custom")||"[]"); }catch(e){}
+
+  var defaults=[
+    // ═══ SÉCURITÉ ROUTIÈRE ═══
+    {
+      id:"secu-001",
+      categorie:"securite",
+      titre:"Code de la route en Côte d'Ivoire",
+      duree:"15 min",
+      niveau:"Débutant",
+      vehicules:["saloni","cargo","voiture"],
+      icon:"🚦",
+      couleur:"#dc2626",
+      description:"Maîtrisez les règles de circulation essentielles : panneaux, priorités, vitesses.",
+      contenu:[
+        {type:"texte",titre:"Les panneaux indispensables",contenu:"En Côte d'Ivoire, le code de la route impose la connaissance de plusieurs catégories de panneaux :\n\n🛑 **Panneaux de danger** (triangulaires rouges) : signal de virage, traversée d'animaux, ralentisseur...\n\n🚫 **Panneaux d'interdiction** (ronds rouges) : sens interdit, stationnement interdit, dépassement interdit.\n\n✅ **Panneaux d'obligation** (ronds bleus) : direction obligatoire, contournement obligatoire.\n\n📍 **Panneaux de signalisation** (rectangulaires) : noms de communes, distances, indications de voie."},
+        {type:"video",titre:"Vidéo - Règles de base",url:"https://www.youtube.com/embed/jANZxzQCMnA"},
+        {type:"texte",titre:"Priorités",contenu:"⚠️ La règle d'or : **PRIORITÉ À DROITE** sauf indication contraire.\n\nÀ un carrefour sans panneau :\n• Le véhicule venant de la droite passe en premier\n• Vous devez ralentir et vérifier avant de vous engager\n\nAvec panneau STOP : arrêt complet obligatoire, jamais juste ralentir.\n\nAvec panneau CÉDEZ LE PASSAGE : ralentissez et laissez passer les véhicules prioritaires.\n\nÀ un rond-point : priorité à ceux qui sont déjà dans le rond-point."},
+        {type:"image",titre:"Panneaux principaux",url:"https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/France_road_sign_AB4.svg/200px-France_road_sign_AB4.svg.png",legende:"Panneau STOP - arrêt obligatoire"},
+        {type:"texte",titre:"Vitesses maximales en CI",contenu:"🏙️ **En ville** : 50 km/h max (sauf indication différente)\n🛣️ **Hors agglomération** : 90 km/h\n🛤️ **Autoroute** : 110 km/h\n🛺 **Tricycle/Saloni** : limité à 60 km/h en toutes circonstances\n\n⚠️ Excès de vitesse = amende + retrait de points + risque de retrait du permis."}
+      ],
+      quiz:[
+        {q:"Quelle est la vitesse maximale en ville ?",options:["30 km/h","50 km/h","70 km/h","90 km/h"],reponse:1},
+        {q:"À un carrefour sans panneau, qui a la priorité ?",options:["Le plus rapide","Le véhicule de droite","Le véhicule de gauche","Le plus gros véhicule"],reponse:1},
+        {q:"Un panneau STOP impose...",options:["Un ralentissement","Un arrêt complet","Une accélération","De klaxonner"],reponse:1},
+        {q:"Vitesse max d'un tricycle saloni ?",options:["40 km/h","60 km/h","80 km/h","100 km/h"],reponse:1},
+        {q:"Dans un rond-point, qui a la priorité ?",options:["Celui qui entre","Celui qui est dedans","Le plus gros","Aucune règle"],reponse:1}
+      ]
+    },
+
+    // ═══ TRICYCLE SALONI ═══
+    {
+      id:"saloni-001",
+      categorie:"saloni",
+      titre:"Conduite du tricycle saloni (taxi)",
+      duree:"20 min",
+      niveau:"Débutant",
+      vehicules:["saloni"],
+      icon:"🛺",
+      couleur:"#f97316",
+      description:"Apprenez à conduire et exploiter un saloni comme un professionnel.",
+      contenu:[
+        {type:"texte",titre:"Spécificités du saloni",contenu:"Le saloni (tricycle-taxi) a 3 roues : 1 à l'avant, 2 à l'arrière. C'est différent d'une moto :\n\n⚖️ **Centre de gravité plus haut** = attention aux virages serrés\n🛞 **Frein avant ET arrière** : utilisez les deux ensemble\n🔧 **Boîte manuelle** : maîtrisez bien l'embrayage\n👥 **Capacité** : 3 passagers maximum à l'arrière, jamais devant\n\n⚠️ Ne jamais surcharger : risque de basculer dans les virages."},
+        {type:"video",titre:"Démarrage et conduite du tricycle",url:"https://www.youtube.com/embed/eLfHi9P0FwM"},
+        {type:"texte",titre:"Démarrer en douceur",contenu:"📋 **Checklist avant démarrage** :\n\n1. Vérifier l'huile moteur (jauge)\n2. Vérifier le carburant\n3. Vérifier les pneus (pression et état)\n4. Tester les freins (avant + arrière)\n5. Vérifier les feux et clignotants\n6. Vérifier le rétroviseur\n\n🔑 **Démarrage** :\n• Insérer la clé, position contact\n• Mettre au point mort\n• Tirer le frein à main\n• Démarrer\n• Embrayer doucement en passant la 1ère\n• Lâcher progressivement l'embrayage en accélérant légèrement"},
+        {type:"texte",titre:"Gérer les passagers",contenu:"👥 **Maximum 3 passagers** à l'arrière (jamais 4 ou 5 même si on insiste)\n\n🚫 **Refusez** :\n• Passagers ivres ou drogués\n• Charges trop lourdes (sac de ciment, etc.)\n• Animaux non maîtrisés\n• Personnes qui tentent de monter à l'avant (sauf enfant accompagné)\n\n💰 **Tarification** :\n• Annoncez le prix AVANT le départ\n• Ne marchandez pas en cours de trajet\n• Demandez paiement à l'arrivée\n• Soyez clair et ferme mais poli\n\n⭐ **Service** :\n• Souriez, dites bonjour\n• Aidez les personnes âgées à monter/descendre\n• Conduisez prudemment, surtout avec enfants"}
+      ],
+      quiz:[
+        {q:"Combien de passagers max sur un saloni ?",options:["2","3","4","5"],reponse:1},
+        {q:"Combien de roues a un saloni ?",options:["2","3","4","6"],reponse:1},
+        {q:"Avant de démarrer, on vérifie...",options:["Rien","Juste le carburant","Huile, freins, pneus, feux","Juste les freins"],reponse:2},
+        {q:"On annonce le prix...",options:["À l'arrivée","Pendant le trajet","Avant le départ","Au commissariat"],reponse:2},
+        {q:"En virage serré, le saloni risque de...",options:["S'envoler","Basculer si surchargé","Sauter","Rien du tout"],reponse:1}
+      ]
+    },
+
+    // ═══ TRICYCLE CARGO ═══
+    {
+      id:"cargo-001",
+      categorie:"cargo",
+      titre:"Conduite du tricycle cargo (livraison)",
+      duree:"15 min",
+      niveau:"Débutant",
+      vehicules:["cargo"],
+      icon:"🛻",
+      couleur:"#0891b2",
+      description:"Maîtrisez le transport de marchandises avec un tricycle cargo.",
+      contenu:[
+        {type:"texte",titre:"Le tricycle cargo",contenu:"Le **tricycle cargo** est conçu pour transporter des marchandises (pas des passagers).\n\n📦 **Charge utile** : entre 300 kg et 800 kg selon le modèle\n📏 **Benne arrière** : pour stocker les marchandises\n🏗️ **Châssis renforcé** : plus solide qu'un saloni passager\n\n⚠️ Ne JAMAIS transporter de passagers dans la benne (interdit + dangereux)."},
+        {type:"video",titre:"Chargement sécurisé",url:"https://www.youtube.com/embed/dCqK1qg4Yfk"},
+        {type:"texte",titre:"Chargement sécurisé",contenu:"⚖️ **Règles de chargement** :\n\n1. **Répartir le poids** uniformément (gauche/droite)\n2. **Charges lourdes en bas**, légères au-dessus\n3. **Attacher** avec sangles ou cordes solides\n4. **Ne pas dépasser** la hauteur max (instabilité)\n5. **Couvrir** avec bâche si pluie ou poussière\n6. **Vérifier** que rien ne dépasse latéralement\n\n🚫 **À NE JAMAIS transporter** :\n• Produits inflammables (essence, gaz)\n• Explosifs ou pyrotechniques\n• Marchandises illégales\n• Animaux vivants non encagés"},
+        {type:"texte",titre:"Conduite en charge",contenu:"🐢 **Conduite plus lente** quand chargé :\n• Distance de freinage 2x plus longue\n• Virages plus dangereux\n• Anticipez plus loin\n\n🛣️ **Itinéraire** :\n• Évitez les routes en mauvais état avec charge lourde\n• Évitez les pentes raides en surcharge\n• Prévoyez les zones de chargement/déchargement\n\n💰 **Tarification cargo** :\n• Au volume OU au poids OU au trajet\n• Fixez le prix AVANT chargement\n• Demandez 30% d'acompte pour gros transports"}
+      ],
+      quiz:[
+        {q:"On peut transporter des passagers dans la benne ?",options:["Oui toujours","Non jamais","Oui si peu nombreux","Oui si bâche"],reponse:1},
+        {q:"Charge utile max d'un cargo ?",options:["100 kg","300-800 kg","2 tonnes","5 tonnes"],reponse:1},
+        {q:"Où mettre les charges les plus lourdes ?",options:["En haut","En bas","Sur les côtés","Devant"],reponse:1},
+        {q:"Distance de freinage en charge ?",options:["La même","Plus courte","2x plus longue","10x plus longue"],reponse:2}
+      ]
+    },
+
+    // ═══ VOITURE TAXI ═══
+    {
+      id:"voiture-001",
+      categorie:"voiture",
+      titre:"Conduite de taxi-voiture",
+      duree:"20 min",
+      niveau:"Intermédiaire",
+      vehicules:["voiture"],
+      icon:"🚖",
+      couleur:"#7c3aed",
+      description:"Devenez un chauffeur de taxi professionnel et rentable.",
+      contenu:[
+        {type:"texte",titre:"Les bases du taxi",contenu:"🚖 **Taxi compteur** vs **Taxi-course** (woro-woro)\n\n📋 **Documents obligatoires** :\n• Permis de conduire valide (B)\n• Carte grise du véhicule\n• Vignette à jour\n• Assurance taxi (spéciale, pas tourisme)\n• Visite technique tous les 6 mois\n• Licence de taxi si en ville\n\n💼 **Comportement professionnel** :\n• Tenue propre\n• Voiture propre (intérieur + extérieur chaque jour)\n• Politesse avec clients\n• Connaissance des rues d'Abidjan"},
+        {type:"video",titre:"Conduite défensive en taxi",url:"https://www.youtube.com/embed/lY3HD1q-jvU"},
+        {type:"texte",titre:"Économiser le carburant",contenu:"⛽ **Conseils pour économiser** :\n\n1. **Démarrer doucement** (pas brutalement)\n2. **Vitesse stable** (pas accélération/freinage)\n3. **Climatisation modérée** (ouvre fenêtre en ville)\n4. **Vérifier pression pneus** chaque semaine\n5. **Couper moteur** si arrêt > 1 minute\n6. **Vidange régulière** (tous les 5000 km)\n\n💰 **Économie** : 1 litre = environ 700 F en Côte d'Ivoire. Une bonne conduite peut t'économiser 5-10 litres/jour = 3 500 à 7 000 F/jour !"},
+        {type:"texte",titre:"Sécurité du chauffeur",contenu:"🛡️ **Protégez-vous** :\n\n• Évitez les courses la nuit dans zones dangereuses\n• Vérifiez les passagers AVANT de démarrer\n• Gardez peu de liquide en poche\n• Préférez le mobile money (Wave, Orange Money)\n• Notez la plaque de votre passager si louche\n• Ayez toujours un téléphone chargé\n• Programmez un numéro d'urgence sur appel rapide\n\n🚨 **Si agression** :\n• Donnez l'argent (votre vie d'abord)\n• Mémorisez les visages, vêtements\n• Appelez la police au 110 ou 111\n• Prévenez le gérant"}
+      ],
+      quiz:[
+        {q:"Documents obligatoires d'un taxi ?",options:["Permis seulement","Permis + carte grise","Permis + carte grise + assurance taxi + vignette + visite","Rien"],reponse:2},
+        {q:"Comment économiser le carburant ?",options:["Accélérer fort","Conduite stable","Conduire vite","Moteur tournant à l'arrêt"],reponse:1},
+        {q:"En cas d'agression, on...",options:["Se bat","Donne l'argent","Court","Klaxonne"],reponse:1},
+        {q:"Numéro de la police ?",options:["18","112","110 ou 111","911"],reponse:2}
+      ]
+    },
+
+    // ═══ MÉCANIQUE ═══
+    {
+      id:"meca-001",
+      categorie:"mecanique",
+      titre:"Mécanique de base",
+      duree:"25 min",
+      niveau:"Intermédiaire",
+      vehicules:["saloni","cargo","voiture"],
+      icon:"🔧",
+      couleur:"#d97706",
+      description:"Apprenez à diagnostiquer et faire les petits entretiens vous-même.",
+      contenu:[
+        {type:"texte",titre:"Les liquides à vérifier",contenu:"💧 **Niveaux à vérifier chaque semaine** :\n\n🛢️ **Huile moteur** : avec la jauge, à froid, sur terrain plat\n💧 **Liquide de refroidissement** : pas trop bas, sinon surchauffe\n🛑 **Liquide de frein** : niveau MAX recommandé\n💦 **Liquide lave-glace** (voitures)\n🔋 **Eau de la batterie** (selon modèle)\n\n⚠️ **Signes d'alerte** :\n• Tâche d'huile sous le véhicule = fuite\n• Liquide rouge = transmission\n• Liquide vert = refroidissement\n• Liquide noir = huile\n• Liquide marron = frein"},
+        {type:"video",titre:"Faire la vidange",url:"https://www.youtube.com/embed/0Wjy0Ynd2Mg"},
+        {type:"texte",titre:"La vidange",contenu:"🛢️ **Quand faire la vidange ?**\n\n🛺 **Saloni/Cargo** : tous les 1 500 à 2 000 km OU tous les 2 mois\n🚖 **Voiture** : tous les 5 000 km OU tous les 6 mois\n\n📋 **Ce qu'il faut** :\n• Huile neuve (consulter manuel)\n• Filtre à huile neuf\n• Clé à filtre\n• Bac de récupération\n• Chiffon\n\n🔧 **Étapes** :\n1. Moteur chaud (pas brûlant)\n2. Soulever le véhicule (cric)\n3. Ouvrir bouchon de vidange (sous le moteur)\n4. Laisser couler 10 min\n5. Remplacer le joint\n6. Visser le bouchon\n7. Changer filtre à huile\n8. Verser nouvelle huile par le haut\n9. Vérifier niveau avec la jauge\n10. Démarrer 30 sec, revérifier le niveau"},
+        {type:"texte",titre:"Les pannes courantes",contenu:"🔍 **Diagnostic rapide** :\n\n🔥 **Le moteur surchauffe** :\n• Manque de liquide de refroidissement\n• Ventilateur en panne\n• Thermostat bloqué\n→ Arrêtez immédiatement !\n\n🔋 **La batterie est faible** :\n• Vérifier les cosses (corrosion)\n• Tester avec un autre véhicule (câbles)\n• Si batterie ancienne (>3 ans), remplacer\n\n⚙️ **L'embrayage patine** :\n• Disque d'embrayage usé\n• À remplacer (atelier obligatoire)\n\n🛞 **Pneu crevé** :\n• Roue de secours OBLIGATOIRE\n• Cric + clé en croix\n• Apprendre à le faire seul !"},
+        {type:"texte",titre:"Quand appeler le mécanicien ?",contenu:"⚠️ **Appelez tout de suite si** :\n\n• Bruit étrange du moteur (claquement, sifflement)\n• Fumée du capot (blanche, bleue, noire)\n• Voyant rouge allumé\n• Freins qui font du bruit (grincement, sifflement)\n• Direction qui tire d'un côté\n• Vibrations anormales\n\n📞 **Important** : NE TENTEZ PAS de réparer ce que vous ne maîtrisez pas. Une mauvaise réparation peut coûter 10x plus cher !\n\n💡 **Astuce** : trouvez un mécanicien de confiance et restez fidèle. Il connaîtra votre véhicule et vous fera de meilleurs prix."}
+      ],
+      quiz:[
+        {q:"Quand faire la vidange d'un saloni ?",options:["Jamais","Tous les 1500-2000 km","Tous les 50 000 km","Une fois par an"],reponse:1},
+        {q:"Liquide rouge = ?",options:["Frein","Moteur","Transmission","Lave-glace"],reponse:2},
+        {q:"Si le moteur surchauffe, je...",options:["Continue","Arrête immédiatement","Accélère","Klaxonne"],reponse:1},
+        {q:"Quand appeler le mécanicien ?",options:["Quand on s'ennuie","En cas de bruit ou voyant","Jamais","Une fois par an"],reponse:1}
+      ]
+    },
+
+    // ═══ SERVICE CLIENT ═══
+    {
+      id:"client-001",
+      categorie:"client",
+      titre:"Service client & relations",
+      duree:"15 min",
+      niveau:"Débutant",
+      vehicules:["saloni","cargo","voiture"],
+      icon:"⭐",
+      couleur:"#16a34a",
+      description:"Devenez le chauffeur préféré de vos clients (et gagnez plus !).",
+      contenu:[
+        {type:"texte",titre:"L'accueil : la première impression",contenu:"⭐ **Les 7 secondes** : le client se fait une opinion en 7 secondes. Soyez impeccable !\n\n👋 **Comment accueillir** :\n• Souriez (oui, vraiment)\n• Saluez : « Bonjour madame/monsieur »\n• Demandez : « Où allez-vous ? »\n• Annoncez le prix CLAIREMENT\n• Aidez avec les bagages\n• Ouvrez la porte si possible\n\n💼 **Tenue** :\n• Propre et nette\n• Pas de t-shirt déchiré\n• Cheveux coiffés\n• Pas d'odeur (sueur, tabac fort)\n\n🚗 **Véhicule** :\n• Lavé chaque jour\n• Pas de saleté sur les sièges\n• Odeur agréable (désodorisant)"},
+        {type:"texte",titre:"Pendant le trajet",contenu:"🤐 **Discrétion** :\n• Ne forcez pas la conversation\n• Suivez ce que veut le client\n• Pas de musique forte sans demander\n• Pas de téléphone (sauf Bluetooth pro)\n• Respectez la confidentialité (clients politiques, business...)\n\n💬 **Bonne conversation** :\n• Météo, sport, actualité légère\n• PAS politique, religion, conflits\n• PAS de vie privée du client\n• Soyez positif, jamais plaintif\n\n🚦 **Conduite** :\n• Ni trop vite, ni trop lent\n• Évitez les nids-de-poule\n• Anticipez les freinages\n• Pas de virages secs"},
+        {type:"texte",titre:"Gérer les conflits",contenu:"😡 **Si le client est mécontent** :\n\n1. **Écoutez** sans interrompre\n2. **Excusez-vous** même si pas votre faute\n3. **Proposez une solution** (réduction, itinéraire différent...)\n4. **Restez calme**, jamais d'agressivité\n5. **Acceptez la critique** sans répondre\n\n💰 **Si le client refuse de payer** :\n• Restez calme\n• Demandez pourquoi\n• Négociez (50% mieux que 0%)\n• Si refus total : prendre photo + signaler à la police\n• JAMAIS de bagarre\n\n⭐ **Astuce** : un client mécontent qui devient satisfait devient votre MEILLEUR ambassadeur. Convertissez la critique en opportunité !"},
+        {type:"texte",titre:"Fidéliser sa clientèle",contenu:"💎 **Comment avoir des clients fidèles** :\n\n📱 **Donnez votre numéro** aux bons clients\n💡 **Soyez prévisible** : toujours pareil, toujours bien\n🎁 **Petits gestes** : eau fraîche, ventilateur, Wi-Fi (option premium)\n📅 **Servez régulièrement** : trajet domicile-bureau\n🏆 **Récompensez** : « Mr Diallo, comme c'est votre 10ème course, je vous fais le retour gratuit »\n\n💰 **Bénéfice** :\n• Un client fidèle = 50 courses/an minimum\n• Il vous recommande à 5 autres = 250 courses\n• 250 courses x 2000 F = 500 000 F/an = 1 client !\n\n👉 **Concentrez-vous sur 20-30 clients fidèles** plutôt que mille inconnus."}
+      ],
+      quiz:[
+        {q:"En combien de secondes le client se fait son opinion ?",options:["1","7","30","60"],reponse:1},
+        {q:"Si le client est mécontent, on...",options:["Crie plus fort","Écoute calmement","Le met dehors","L'ignore"],reponse:1},
+        {q:"Sujets de conversation à éviter ?",options:["Météo","Sport","Politique et religion","Actualité"],reponse:2},
+        {q:"Un client fidèle vaut combien de clients occasionnels ?",options:["Pareil","Beaucoup plus","Moins","Aucun"],reponse:1},
+        {q:"Si refus de paiement total, on...",options:["Se bat","Signale à la police, jamais bagarre","Le frappe","Vole le téléphone"],reponse:1}
+      ]
+    },
+
+    // ═══ PREMIERS SECOURS ═══
+    {
+      id:"secours-001",
+      categorie:"secours",
+      titre:"Premiers secours en cas d'accident",
+      duree:"20 min",
+      niveau:"Intermédiaire",
+      vehicules:["saloni","cargo","voiture"],
+      icon:"🚑",
+      couleur:"#0284c7",
+      description:"Que faire dans les premières minutes après un accident.",
+      contenu:[
+        {type:"texte",titre:"Les 3 réflexes immédiats",contenu:"🚨 **PROTÉGER - ALERTER - SECOURIR**\n\n1️⃣ **PROTÉGER** :\n• Allumez vos feux de détresse\n• Placez un triangle à 50m\n• Mettez votre gilet jaune\n• Évacuez les blessés HORS DE LA VOIE s'il y a risque de sur-accident\n• N'oubliez pas de vous protéger VOUS d'abord\n\n2️⃣ **ALERTER** :\n📞 **Pompiers** : 180\n📞 **Police** : 110 ou 111\n📞 **SAMU** : 185\n\nDonnez :\n• Votre nom\n• Le lieu précis (rue, commune, repère)\n• Type d'accident\n• Nombre de blessés et leur état\n• Si feu, fuite carburant, etc.\n\n3️⃣ **SECOURIR** :\n• Ne déplacez pas un blessé grave (sauf danger immédiat)\n• Parlez-lui, rassurez-le\n• Surveillez sa respiration\n• Si inconscient mais respire : Position Latérale de Sécurité"},
+        {type:"video",titre:"Position Latérale de Sécurité",url:"https://www.youtube.com/embed/wMr7VlqMfGI"},
+        {type:"texte",titre:"Hémorragie & blessures",contenu:"🩸 **Saignement abondant** :\n1. Pressez fortement sur la plaie avec un tissu propre\n2. Ne lâchez PAS la pression\n3. Si tissu imbibé : ajoutez un autre dessus (sans enlever)\n4. Surélevez le membre blessé si possible\n5. Appelez les secours\n\n🦴 **Fracture suspectée** :\n• Ne déplacez PAS le membre\n• Ne tentez PAS de \"remettre\" l'os\n• Immobilisez avec carton + tissu\n• Appliquez glace (à travers tissu) sur fracture fermée\n• Attendez les secours\n\n🔥 **Brûlure** :\n• Eau FROIDE pendant 10-20 minutes\n• NE PAS enlever vêtements collés\n• NE PAS percer les cloques\n• Couvrir avec tissu propre humide\n• Hôpital si étendue"},
+        {type:"texte",titre:"Réanimation cardiaque",contenu:"💔 **Personne inconsciente qui ne respire PAS** :\n\n📋 **RCP (Réanimation Cardio-Pulmonaire)** :\n\n1. Vérifiez la conscience (secouez les épaules)\n2. Appelez à l'aide\n3. Allongez sur le dos sur surface dure\n4. Mains au centre de la poitrine\n5. **30 compressions** rapides (rythme \"Stayin' Alive\")\n6. Inclinez la tête en arrière\n7. **2 insufflations** bouche-à-bouche\n8. Répétez 30/2 jusqu'à l'arrivée des secours\n\n⚠️ Ne s'arrête JAMAIS sauf si la personne reprend conscience.\n\n💡 **Important** : Mieux vaut faire une mauvaise RCP que rien du tout. Pas de RCP = mort certaine."},
+        {type:"texte",titre:"Trousse de secours minimum",contenu:"🧰 **Dans votre véhicule, ayez TOUJOURS** :\n\n• Triangle de signalisation\n• Gilet jaune (port obligatoire en CI)\n• Trousse de secours :\n  - Bandes\n  - Sparadrap\n  - Compresses stériles\n  - Désinfectant (Bétadine)\n  - Ciseaux\n  - Gants jetables\n  - Couverture de survie\n• Extincteur (recommandé)\n• Lampe torche\n• Bouteille d'eau\n\n💰 **Coût** : environ 15 000 FCFA pour le kit complet. Peut sauver une vie."}
+      ],
+      quiz:[
+        {q:"Numéro des pompiers en CI ?",options:["112","180","911","17"],reponse:1},
+        {q:"Premier réflexe en cas d'accident ?",options:["Filmer","Protéger","Fuir","Klaxonner"],reponse:1},
+        {q:"Hémorragie : que faire ?",options:["Pansement léger","Pression forte continue","Bandage serré au-dessus","Rien"],reponse:1},
+        {q:"Brûlure : on applique...",options:["Du beurre","De l'huile","De l'eau froide 10-20 min","De la glace direct"],reponse:2},
+        {q:"Combien de compressions en RCP ?",options:["10","30","100","2"],reponse:1}
+      ]
+    },
+
+    // ═══ DROIT IVOIRIEN ═══
+    {
+      id:"droit-001",
+      categorie:"droit",
+      titre:"Droit ivoirien - Vos droits et devoirs",
+      duree:"15 min",
+      niveau:"Avancé",
+      vehicules:["saloni","cargo","voiture"],
+      icon:"⚖️",
+      couleur:"#475569",
+      description:"Connaissez vos droits et obligations en tant que chauffeur.",
+      contenu:[
+        {type:"texte",titre:"Vos obligations légales",contenu:"📋 **En tant que chauffeur professionnel** :\n\n🪪 **Documents obligatoires sur vous** :\n• Permis de conduire (catégorie selon véhicule)\n• Pièce d'identité (CNI ou passeport)\n• Carte de transport public (pour saloni/cargo en zone urbaine)\n\n📄 **Documents du véhicule** :\n• Carte grise\n• Vignette à jour\n• Assurance (responsabilité civile minimum)\n• Visite technique à jour\n• Patente (pour activités commerciales)\n\n⚠️ **Sans ces documents** = amende + mise en fourrière possible\n\n👮 **Si contrôle de police** :\n• Restez poli\n• Présentez vos papiers calmement\n• Demandez la raison du contrôle\n• Refusez de payer un pot-de-vin\n• Notez le matricule de l'agent\n• Demandez un PV en bonne et due forme"},
+        {type:"texte",titre:"Vos droits en cas de contrôle",contenu:"⚖️ **Vos DROITS** lors d'un contrôle :\n\n✅ Connaître la **raison** du contrôle\n✅ Demander **l'identité** de l'agent (matricule)\n✅ Refuser une **fouille du véhicule** sans mandat\n✅ Recevoir un **PV écrit** en cas d'infraction\n✅ Contester un PV (sous 30 jours)\n✅ Ne JAMAIS payer cash à un agent (paiement officiel uniquement)\n\n❌ **Refusez** :\n• Pot-de-vin\n• Fouille abusive\n• Confiscation sans procédure\n• Agression verbale ou physique\n\n📞 **Si problème** :\n• Demandez d'aller au commissariat\n• Filmez (légal en CI)\n• Contactez votre gérant\n• Appelez un avocat si arrestation"},
+        {type:"texte",titre:"Accidents : qui est responsable ?",contenu:"🚗 **Responsabilité civile** :\n\n📋 **Constat amiable** = OBLIGATOIRE en cas d'accident\n• Remplir ensemble avec l'autre conducteur\n• Décrire fidèlement\n• Faire des croquis simples\n• Photographier les dégâts\n• Signer LES DEUX\n\n🔍 **Qui est responsable ?**\n• Le conducteur ayant commis l'infraction\n• Refus de priorité, vitesse, alcool... = responsable\n• Si stationnement : c'est celui en marche qui est responsable\n• Au feu rouge : celui qui passe au rouge\n\n💰 **Couverture** :\n• Assurance OBLIGATOIRE en CI\n• Sans assurance = vous payez TOUS les dégâts\n• Vérifiez votre attestation (responsabilité civile minimum)\n\n⏱️ **Délai** :\n• Déclaration à l'assurance sous 5 jours\n• Plainte si délit de fuite"},
+        {type:"texte",titre:"Litige avec un client",contenu:"⚖️ **Si conflit avec un passager** :\n\n💬 **Toujours essayer de** :\n1. Discuter calmement\n2. Trouver un compromis (50% mieux que rien)\n3. Avoir un témoin (passager, voisin)\n\n📞 **En cas d'agression** :\n• Police : 110/111\n• Pompiers : 180\n• Composez sans hésiter\n\n📜 **Si plainte** :\n• Ne signez RIEN sans lire\n• Demandez copie du PV\n• Vous avez droit à un avocat\n• En cas d'arrestation, prévenez immédiatement votre famille et votre employeur"}
+      ],
+      quiz:[
+        {q:"Documents obligatoires sur soi ?",options:["Permis seul","Permis + CNI","Permis + CNI + carte transport","Aucun"],reponse:2},
+        {q:"Lors d'un contrôle, on peut...",options:["Fuir","Payer en cash à l'agent","Refuser pot-de-vin","Frapper l'agent"],reponse:2},
+        {q:"Délai pour déclarer un accident à l'assurance ?",options:["1 jour","5 jours","30 jours","Jamais"],reponse:1},
+        {q:"En cas d'agression, on appelle ?",options:["Personne","La police 110/111","La famille","Le client"],reponse:1}
+      ]
+    },
+
+    // ═══ COMPTABILITÉ ═══
+    {
+      id:"compta-001",
+      categorie:"compta",
+      titre:"Gérer son argent quotidiennement",
+      duree:"15 min",
+      niveau:"Débutant",
+      vehicules:["saloni","cargo","voiture"],
+      icon:"💰",
+      couleur:"#059669",
+      description:"Apprenez à gérer vos revenus pour vraiment progresser financièrement.",
+      contenu:[
+        {type:"texte",titre:"Le principe des 3 enveloppes",contenu:"💰 **Divisez vos revenus quotidiens en 3 enveloppes** :\n\n📦 **Enveloppe 1 (60%) - VITAL** :\n• Versement au gérant\n• Carburant\n• Nourriture du jour\n• Transport personnel\n\n💼 **Enveloppe 2 (25%) - ÉPARGNE** :\n• Économies (banque, tontine, mobile money)\n• Investissement futur\n• Achat saloni à long terme\n• Maison, terrain\n\n🎁 **Enveloppe 3 (15%) - LOISIRS** :\n• Sortie famille\n• Cadeau\n• Soins\n• Plaisir\n\n💡 **Exemple** : si vous gagnez 10 000 F net/jour :\n• 6 000 F : besoins\n• 2 500 F : épargne (75 000 F/mois !)\n• 1 500 F : loisirs"},
+        {type:"texte",titre:"Pourquoi épargner ?",contenu:"🎯 **Épargner = SE LIBÉRER**\n\n💡 **Objectifs concrets** :\n\n🏍️ **Acheter votre saloni** (en 2-3 ans) :\n• Coût : 800 000 à 1 500 000 F\n• Épargne : 75 000 F/mois = 900 000 F/an\n• Possible en 1-2 ans !\n\n🏠 **Construire votre maison** :\n• Terrain à Abidjan banlieue : 500 000 F\n• Construction progressive (sur 5 ans)\n• Possible avec discipline\n\n👨‍👩‍👧 **Éduquer vos enfants** :\n• École : 50 000-200 000 F/an\n• Université : 500 000 F/an\n• L'éducation = meilleur investissement\n\n🚑 **Urgences santé** :\n• Maladie famille\n• Accident\n• Ayez TOUJOURS 100 000 F de côté MINIMUM"},
+        {type:"texte",titre:"Où mettre son argent ?",contenu:"💳 **Les options en Côte d'Ivoire** :\n\n📱 **Mobile Money** (Wave, Orange, MTN, Moov) :\n✅ Rapide, accessible 24/7\n✅ Pas de paperasse\n❌ Peu sécurisé pour grosse somme\n→ Bon pour somme courante (max 200 000 F)\n\n🏦 **Banque** (BICICI, NSIA, SGBCI...) :\n✅ Très sécurisé\n✅ Carte bancaire\n❌ Frais mensuels\n❌ Difficile à ouvrir si revenus irréguliers\n→ Bon pour épargne moyenne et longue\n\n👥 **Tontine** (système traditionnel) :\n✅ Pas de frais\n✅ Communauté de confiance\n❌ Risqué si mauvais président\n❌ Pas d'intérêts\n→ Bon pour discipline\n\n📈 **Investissement** (terrain, business) :\n✅ Patrimoine qui prend de la valeur\n❌ Long terme uniquement\n→ Quand vous avez 500 000+ d'épargne"},
+        {type:"texte",titre:"Erreurs à éviter",contenu:"🚫 **Les pièges courants** :\n\n💸 **Dépenser dès que reçu** :\n→ Solution : épargner AVANT de dépenser, pas après\n\n🍺 **Maquis quotidien** (5 000 F x 30 j = 150 000 F/mois !)\n→ Solution : 1-2 fois par semaine max\n\n📱 **Acheter trop de crédit téléphone**\n→ Solution : forfaits internet mensuels\n\n🎰 **Paris sportifs / loterie**\n→ Solution : 99% des parieurs perdent. ZÉRO pari.\n\n💝 **Prêter sans contrat**\n→ Solution : pas de prêt > 10 000 F sans écrit\n\n🛒 **Achats impulsifs**\n→ Solution : règle des 24h. Réfléchir 24h avant.\n\n📞 **Téléphone trop cher**\n→ Solution : un bon Android à 50 000 F suffit\n\n💎 **Or, bijoux non productifs**\n→ Mieux : investir dans terrain ou business"}
+      ],
+      quiz:[
+        {q:"Combien % épargner idéalement ?",options:["0%","10%","25%","50%"],reponse:2},
+        {q:"Où mettre 1 000 000 F d'épargne ?",options:["Sous le matelas","Mobile Money","Banque ou investissement","Maquis"],reponse:2},
+        {q:"Combien de fois maquis par semaine max ?",options:["Tous les jours","3-4 fois","1-2 fois","Jamais"],reponse:2},
+        {q:"Règle d'or pour achat important ?",options:["Acheter direct","Attendre 24h","Demander à 10 personnes","Tirer à pile ou face"],reponse:1}
+      ]
+    }
+  ];
+
+  return defaults.concat(custom);
+}
+
+// ─── Suivi de progression par chauffeur ───
+function getFormationProgress(chauffeurId){
+  try{
+    var all=JSON.parse(localStorage.getItem("sal_formations_progress")||"{}");
+    return all[chauffeurId]||{};
+  }catch(e){return {};}
+}
+function setFormationProgress(chauffeurId, moduleId, data){
+  try{
+    var all=JSON.parse(localStorage.getItem("sal_formations_progress")||"{}");
+    if(!all[chauffeurId]) all[chauffeurId]={};
+    all[chauffeurId][moduleId]=data;
+    localStorage.setItem("sal_formations_progress",JSON.stringify(all));
+
+    // Sauvegarder aussi sur Firebase si possible
+    try{
+      if(db){
+        db.collection("sal_formations").doc(String(chauffeurId)).set(all[chauffeurId]);
+      }
+    }catch(e){}
+  }catch(e){}
+}
+
+/* ─── RENDU CHAUFFEUR : Liste des formations ─── */
+function renderChFormation(c){
+  var catalog=getFormationsCatalog();
+  var progress=getFormationProgress(c.id);
+
+  // Filtrer selon le type de véhicule du chauffeur (pour l'instant, on affiche tout)
+  // var typeVeh=c.typeVehicule||"saloni";
+
+  var html='<div class="screen-title">🎓 Formation</div>';
+  html+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Apprenez à votre rythme et obtenez des certificats</div>';
+
+  // Statistiques de progression
+  var totalModules=catalog.length;
+  var modulesCompletes=Object.keys(progress).filter(function(k){return progress[k].complete;}).length;
+  var pctGlobal=Math.round(modulesCompletes/totalModules*100);
+
+  html+='<div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border-radius:18px;padding:18px;margin-bottom:18px">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  html+='<div><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;opacity:.8">Ma progression</div>';
+  html+='<div style="font-size:28px;font-weight:800;margin-top:2px">'+modulesCompletes+'/'+totalModules+'</div></div>';
+  html+='<div style="font-size:32px;font-weight:800;text-align:right">'+pctGlobal+'%</div>';
+  html+='</div>';
+  html+='<div style="background:rgba(255,255,255,.2);height:8px;border-radius:4px;overflow:hidden">';
+  html+='<div style="background:#fff;height:100%;width:'+pctGlobal+'%;border-radius:4px;transition:width .5s"></div></div>';
+  html+='</div>';
+
+  // Filtres
+  html+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px" class="filter-chips">';
+  var cats=[
+    {id:"all",label:"📚 Tout",col:"#475569"},
+    {id:"securite",label:"🚦 Sécurité",col:"#dc2626"},
+    {id:"saloni",label:"🛺 Saloni",col:"#f97316"},
+    {id:"cargo",label:"🛻 Cargo",col:"#0891b2"},
+    {id:"voiture",label:"🚖 Voiture",col:"#7c3aed"},
+    {id:"mecanique",label:"🔧 Mécanique",col:"#d97706"},
+    {id:"client",label:"⭐ Service",col:"#16a34a"},
+    {id:"secours",label:"🚑 Secours",col:"#0284c7"},
+    {id:"droit",label:"⚖️ Droit",col:"#475569"},
+    {id:"compta",label:"💰 Argent",col:"#059669"}
+  ];
+  var activeFilter=window._chFormFilter||"all";
+  cats.forEach(function(cat){
+    var active=activeFilter===cat.id;
+    html+='<button class="chip '+(active?"active":"")+'" onclick="chFilterFormation(\''+cat.id+'\')" style="white-space:nowrap;'+(active?"background:"+cat.col+";color:#fff;":"")+'">'+cat.label+'</button>';
+  });
+  html+='</div>';
+
+  // Liste des modules
+  var modules=activeFilter==="all"?catalog:catalog.filter(function(m){return m.categorie===activeFilter;});
+  if(modules.length===0){
+    html+='<div class="empty"><div class="empty-icon">📚</div><div class="empty-text">Aucun module dans cette catégorie.</div></div>';
+  } else {
+    modules.forEach(function(m){
+      var prog=progress[m.id]||{};
+      var statut="not_started";
+      if(prog.complete) statut="complete";
+      else if(prog.lessonsViewed && prog.lessonsViewed.length>0) statut="in_progress";
+
+      var statutLabel={
+        not_started:{txt:"Non démarré",col:"var(--txt-3)",bg:"var(--surface-2)"},
+        in_progress:{txt:"En cours",col:"#d97706",bg:"#fef3c7"},
+        complete:{txt:"✅ Complété",col:"var(--success)",bg:"var(--success-soft)"}
+      }[statut];
+
+      html+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+m.couleur+';border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm);cursor:pointer" onclick="chOpenFormation(\''+m.id+'\')">';
+      html+='<div style="display:flex;align-items:flex-start;gap:12px">';
+      html+='<div style="width:48px;height:48px;background:'+m.couleur+';color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">'+m.icon+'</div>';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="font-weight:800;font-size:14.5px;margin-bottom:2px">'+m.titre+'</div>';
+      html+='<div style="font-size:11.5px;color:var(--txt-2);margin-bottom:6px">⏱️ '+m.duree+' · '+m.niveau+'</div>';
+      html+='<div style="font-size:12px;color:var(--txt);line-height:1.4;margin-bottom:8px">'+m.description+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:6px"><span style="background:'+statutLabel.bg+';color:'+statutLabel.col+';padding:3px 8px;border-radius:8px;font-size:10.5px;font-weight:700">'+statutLabel.txt+'</span>';
+      if(prog.score!==undefined) html+='<span style="background:var(--info-soft);color:var(--info);padding:3px 8px;border-radius:8px;font-size:10.5px;font-weight:700">Score: '+prog.score+'%</span>';
+      if(prog.validationGerant) html+='<span style="background:var(--success-soft);color:var(--success);padding:3px 8px;border-radius:8px;font-size:10.5px;font-weight:700">✓ Validé Gérant</span>';
+      html+='</div>';
+      html+='</div></div></div>';
+    });
+  }
+
+  return html;
+}
+
+function chFilterFormation(cat){
+  window._chFormFilter=cat;
+  renderChauffeurApp();
+}
+
+/* ─── OUVRIR UN MODULE DE FORMATION ─── */
+window._currentFormation=null;
+window._currentLesson=0;
+
+function chOpenFormation(moduleId){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var catalog=getFormationsCatalog();
+  var module=catalog.find(function(m){return m.id===moduleId;});
+  if(!module){toast("Module introuvable","error");return;}
+
+  window._currentFormation=module;
+  window._currentLesson=0;
+  chRenderLesson();
+}
+
+function chRenderLesson(){
+  var module=window._currentFormation;
+  if(!module) return;
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var lesson=module.contenu[window._currentLesson];
+  if(!lesson){
+    // Fin des leçons, passer au quiz
+    chStartQuiz();
+    return;
+  }
+
+  var progress=getFormationProgress(c.id);
+  var modProg=progress[module.id]||{lessonsViewed:[]};
+
+  var body='';
+
+  // Progress bar leçons
+  var total=module.contenu.length;
+  var current=window._currentLesson+1;
+  var pct=Math.round((current/total)*100);
+  body+='<div style="margin-bottom:14px">';
+  body+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--txt-2);font-weight:700">Leçon '+current+'/'+total+'</span><span style="color:'+module.couleur+';font-weight:800">'+pct+'%</span></div>';
+  body+='<div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+module.couleur+';border-radius:3px;transition:width .3s"></div></div>';
+  body+='</div>';
+
+  // Titre
+  body+='<div style="background:'+module.couleur+';color:#fff;border-radius:14px;padding:14px;margin-bottom:14px;text-align:center">';
+  body+='<div style="font-size:11px;opacity:.85;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">'+module.icon+' '+module.titre+'</div>';
+  body+='<div style="font-size:16px;font-weight:800">'+lesson.titre+'</div>';
+  body+='</div>';
+
+  // Contenu selon type
+  if(lesson.type==="texte"){
+    body+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;font-size:13.5px;line-height:1.7;white-space:pre-wrap">';
+    body+=formatLessonText(lesson.contenu);
+    body+='</div>';
+  } else if(lesson.type==="video"){
+    body+='<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:14px;background:#000">';
+    body+='<iframe src="'+lesson.url+'" frameborder="0" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%"></iframe>';
+    body+='</div>';
+  } else if(lesson.type==="image"){
+    body+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center">';
+    body+='<img src="'+lesson.url+'" style="max-width:100%;border-radius:10px;margin-bottom:10px"/>';
+    if(lesson.legende) body+='<div style="font-size:12px;color:var(--txt-2);font-style:italic">'+lesson.legende+'</div>';
+    body+='</div>';
+  }
+
+  // Marquer leçon vue
+  if(!modProg.lessonsViewed) modProg.lessonsViewed=[];
+  if(modProg.lessonsViewed.indexOf(window._currentLesson)<0){
+    modProg.lessonsViewed.push(window._currentLesson);
+  }
+  setFormationProgress(c.id, module.id, modProg);
+
+  // Boutons navigation
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">';
+  if(window._currentLesson>0){
+    body+='<button class="btn-ghost" onclick="chPrevLesson()">← Précédent</button>';
+  } else {
+    body+='<div></div>';
+  }
+  if(window._currentLesson<module.contenu.length-1){
+    body+='<button class="btn-primary" style="background:'+module.couleur+'" onclick="chNextLesson()">Suivant →</button>';
+  } else {
+    body+='<button class="btn-primary" style="background:linear-gradient(135deg,#059669,#047857)" onclick="chStartQuiz()">🎯 Passer au quiz</button>';
+  }
+  body+='</div>';
+
+  body+='<button class="btn-ghost" style="margin-top:8px" onclick="closeModal()">Fermer (reprendre plus tard)</button>';
+
+  openModal("📖 "+lesson.titre, body);
+}
+
+function formatLessonText(txt){
+  if(!txt) return "";
+  // Convertir **gras** en HTML
+  return escapeHtml(txt)
+    .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
+    .replace(/\n/g,"<br>");
+}
+
+function chPrevLesson(){
+  if(window._currentLesson>0){
+    window._currentLesson--;
+    chRenderLesson();
+  }
+}
+
+function chNextLesson(){
+  var module=window._currentFormation;
+  if(!module) return;
+  if(window._currentLesson<module.contenu.length-1){
+    window._currentLesson++;
+    chRenderLesson();
+  } else {
+    chStartQuiz();
+  }
+}
+
+/* ─── QUIZ ─── */
+window._quizAnswers={};
+window._currentQuizQ=0;
+
+function chStartQuiz(){
+  var module=window._currentFormation;
+  if(!module || !module.quiz || module.quiz.length===0){
+    toast("Pas de quiz pour ce module","error");
+    return;
+  }
+  window._quizAnswers={};
+  window._currentQuizQ=0;
+  chRenderQuizQuestion();
+}
+
+function chRenderQuizQuestion(){
+  var module=window._currentFormation;
+  if(!module) return;
+  var q=module.quiz[window._currentQuizQ];
+  if(!q){chFinishQuiz();return;}
+
+  var body='';
+
+  // Progress
+  var total=module.quiz.length;
+  var current=window._currentQuizQ+1;
+  body+='<div style="margin-bottom:14px">';
+  body+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--txt-2);font-weight:700">Question '+current+'/'+total+'</span><span style="color:#059669;font-weight:800">🎯 Quiz</span></div>';
+  var pct=Math.round((current/total)*100);
+  body+='<div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#059669,#10b981);border-radius:3px"></div></div>';
+  body+='</div>';
+
+  // Question
+  body+='<div style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border-radius:14px;padding:18px;margin-bottom:14px">';
+  body+='<div style="font-size:11px;opacity:.85;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Question '+current+'</div>';
+  body+='<div style="font-size:16px;font-weight:800;line-height:1.4">'+escapeHtml(q.q)+'</div>';
+  body+='</div>';
+
+  // Options
+  q.options.forEach(function(opt, idx){
+    body+='<button class="quiz-opt" onclick="chSelectAnswer('+idx+')" style="display:block;width:100%;text-align:left;background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;font-size:14px;color:var(--txt);font-family:inherit;cursor:pointer;font-weight:600">';
+    body+='<span style="background:var(--surface-2);width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;margin-right:10px;font-size:12px">'+String.fromCharCode(65+idx)+'</span>';
+    body+=escapeHtml(opt);
+    body+='</button>';
+  });
+
+  openModal("🎯 Quiz - "+module.titre, body);
+}
+
+function chSelectAnswer(idx){
+  var module=window._currentFormation;
+  if(!module) return;
+  var q=module.quiz[window._currentQuizQ];
+  if(!q) return;
+
+  window._quizAnswers[window._currentQuizQ]=idx;
+  var correct=idx===q.reponse;
+
+  // Feedback visuel
+  var buttons=document.querySelectorAll(".quiz-opt");
+  buttons.forEach(function(btn,i){
+    btn.disabled=true;
+    if(i===q.reponse){
+      btn.style.background="var(--success-soft)";
+      btn.style.borderColor="var(--success)";
+      btn.style.color="var(--success)";
+    } else if(i===idx && !correct){
+      btn.style.background="var(--danger-soft)";
+      btn.style.borderColor="var(--danger)";
+      btn.style.color="var(--danger)";
+    } else {
+      btn.style.opacity="0.5";
+    }
+  });
+
+  toast(correct?"✅ Bonne réponse !":"❌ Mauvaise réponse","info");
+
+  setTimeout(function(){
+    window._currentQuizQ++;
+    if(window._currentQuizQ>=module.quiz.length){
+      chFinishQuiz();
+    } else {
+      chRenderQuizQuestion();
+    }
+  }, 1500);
+}
+
+function chFinishQuiz(){
+  var module=window._currentFormation;
+  if(!module) return;
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+
+  // Calculer score
+  var correct=0;
+  module.quiz.forEach(function(q,i){
+    if(window._quizAnswers[i]===q.reponse) correct++;
+  });
+  var score=Math.round(correct/module.quiz.length*100);
+  var success=score>=70;
+
+  // Enregistrer
+  var progress=getFormationProgress(c.id);
+  var modProg=progress[module.id]||{};
+  modProg.score=score;
+  modProg.dateQuiz=td();
+  modProg.heureQuiz=hr();
+  modProg.complete=success;
+  if(success){
+    modProg.dateComplete=td();
+  }
+  setFormationProgress(c.id, module.id, modProg);
+
+  // Notifier le gérant via chat
+  var msgNotif={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:"🎓 J'ai terminé la formation \""+module.titre+"\" avec un score de "+score+"%"+(success?" ✅":" (en dessous de 70%)"),
+    date:td(),heure:hr(),ts:Date.now(),lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msgNotif);
+  try{ fbSave("chats",msgNotif); }catch(e){}
+
+  // Afficher résultat
+  var body='';
+  body+='<div style="text-align:center;padding:20px">';
+  body+='<div style="font-size:64px;margin-bottom:10px">'+(success?"🎉":"😔")+'</div>';
+  body+='<div style="font-size:22px;font-weight:800;margin-bottom:8px;color:'+(success?"var(--success)":"var(--danger)")+'">'+(success?"Félicitations !":"Score insuffisant")+'</div>';
+  body+='<div style="font-size:48px;font-weight:800;margin:14px 0;color:'+module.couleur+'">'+score+'%</div>';
+  body+='<div style="font-size:13px;color:var(--txt-2)">'+correct+' bonnes réponses sur '+module.quiz.length+'</div>';
+  body+='<div style="font-size:13px;color:var(--txt-2);margin-top:14px;line-height:1.5">'+(success?"Le gérant peut maintenant valider votre formation.":"Vous devez avoir au moins 70%. Révisez le contenu et recommencez.")+'</div>';
+  body+='</div>';
+
+  if(success){
+    body+='<button class="btn-primary" style="background:linear-gradient(135deg,#059669,#047857)" onclick="chGenererCertificat(\''+module.id+'\')">📜 Voir mon certificat</button>';
+    body+='<button class="btn-ghost" style="margin-top:8px" onclick="closeModal();renderChauffeurApp()">Retour</button>';
+  } else {
+    body+='<button class="btn-primary" onclick="window._currentLesson=0;chRenderLesson()">📚 Revoir le contenu</button>';
+    body+='<button class="btn-ghost" style="margin-top:8px" onclick="closeModal();renderChauffeurApp()">Retour</button>';
+  }
+
+  openModal(success?"🎓 Formation réussie !":"😔 À retenter", body);
+  addIAJournal("formation","Formation suivie",c.nom+" — "+module.titre+" — "+score+"%");
+}
+
+function chGenererCertificat(moduleId){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var catalog=getFormationsCatalog();
+  var module=catalog.find(function(m){return m.id===moduleId;});
+  if(!module) return;
+  var progress=getFormationProgress(c.id);
+  var modProg=progress[moduleId]||{};
+
+  // Affichage du certificat
+  var body='';
+  body+='<div id="certificateView" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:8px double '+module.couleur+';border-radius:18px;padding:30px 20px;text-align:center;position:relative">';
+  body+='<div style="position:absolute;top:10px;right:10px;font-size:36px">📜</div>';
+  body+='<div style="position:absolute;top:10px;left:10px;font-size:36px">'+module.icon+'</div>';
+
+  body+='<div style="font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:3px;margin-bottom:14px">Certificat de formation</div>';
+
+  body+='<div style="font-size:20px;font-weight:800;color:#7c2d12;margin-bottom:6px">SALONI MANAGER</div>';
+  body+='<div style="font-size:11px;color:#92400e;margin-bottom:24px">Gestion de Flotte — Abidjan</div>';
+
+  body+='<div style="font-size:13px;color:#78350f;margin-bottom:10px">Délivré à</div>';
+  body+='<div style="font-size:24px;font-weight:800;color:#7c2d12;border-bottom:2px solid '+module.couleur+';padding-bottom:6px;margin-bottom:14px;display:inline-block">'+(c.nom||"Chauffeur")+'</div>';
+
+  body+='<div style="font-size:12px;color:#78350f;line-height:1.6;margin-bottom:14px">Pour avoir validé avec succès<br>la formation</div>';
+  body+='<div style="font-size:16px;font-weight:800;color:'+module.couleur+';margin-bottom:14px">"'+module.titre+'"</div>';
+
+  body+='<div style="font-size:11px;color:#92400e;margin-bottom:4px">avec un score de</div>';
+  body+='<div style="font-size:36px;font-weight:800;color:'+module.couleur+';margin-bottom:14px">'+(modProg.score||0)+'%</div>';
+
+  body+='<div style="font-size:11px;color:#78350f">Abidjan, le '+formatDateRelative(modProg.dateComplete||td())+'</div>';
+  body+='</div>';
+
+  body+='<button class="btn-primary" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)" onclick="chDownloadCertificat(\''+moduleId+'\')">⬇ Télécharger en PDF</button>';
+  body+='<button class="btn-ghost" style="margin-top:8px" onclick="closeModal();renderChauffeurApp()">Fermer</button>';
+
+  openModal("📜 Mon certificat", body);
+}
+
+function chDownloadCertificat(moduleId){
+  loadJsPDF(function(){
+    try{
+      _genererCertificatPDF(moduleId);
+    }catch(e){
+      toast("Erreur: "+e.message,"error");
+    }
+  });
+}
+
+function _genererCertificatPDF(moduleId){
+  var c=getChauffeurDuCompte();
+  if(!c) c=(S.data.chauffeurs||[]).find(function(ch){
+    var prog=getFormationProgress(ch.id);
+    return prog[moduleId];
+  });
+  if(!c) return;
+  var catalog=getFormationsCatalog();
+  var module=catalog.find(function(m){return m.id===moduleId;});
+  if(!module) return;
+  var progress=getFormationProgress(c.id);
+  var modProg=progress[moduleId]||{};
+
+  var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
+  var doc=new jsPDFClass({orientation:"landscape",unit:"mm",format:"a4"});
+  var W=297, H=210, ml=20;
+
+  // Couleurs depuis hex
+  function hexToRgb(hex){
+    var r=parseInt(hex.substr(1,2),16),g=parseInt(hex.substr(3,2),16),b=parseInt(hex.substr(5,2),16);
+    return [r,g,b];
+  }
+  var col=hexToRgb(module.couleur);
+
+  // Fond dégradé (simulé avec rectangles)
+  doc.setFillColor(254,243,199); // fef3c7
+  doc.rect(0,0,W,H,"F");
+
+  // Bordure double
+  doc.setDrawColor(col[0],col[1],col[2]);
+  doc.setLineWidth(2);
+  doc.rect(15,15,W-30,H-30);
+  doc.setLineWidth(0.5);
+  doc.rect(18,18,W-36,H-36);
+
+  // Coins décoratifs
+  doc.setFontSize(28);
+  doc.setTextColor(col[0],col[1],col[2]);
+  doc.text(module.icon, 28, 35);
+  doc.text("📜", W-32, 35);
+
+  // Header
+  doc.setFontSize(11);
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(146,64,14);
+  doc.text("CERTIFICAT DE FORMATION", W/2, 38, {align:"center"});
+
+  // Sous-titre
+  doc.setFontSize(20);
+  doc.setTextColor(124,45,18);
+  doc.text("SALONI MANAGER", W/2, 52, {align:"center"});
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica","normal");
+  doc.setTextColor(146,64,14);
+  doc.text("Gestion de Flotte de Tricycles-Taxis — Abidjan, Cote d'Ivoire", W/2, 60, {align:"center"});
+
+  // Ligne décorative
+  doc.setDrawColor(col[0],col[1],col[2]);
+  doc.setLineWidth(1);
+  doc.line(W/2-40, 68, W/2+40, 68);
+
+  // Texte principal
+  doc.setFontSize(12);
+  doc.setTextColor(120,53,15);
+  doc.text("Le present certificat est decerne a", W/2, 82, {align:"center"});
+
+  // Nom du chauffeur
+  doc.setFontSize(28);
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(124,45,18);
+  doc.text((c.nom||"Chauffeur").toUpperCase(), W/2, 100, {align:"center"});
+
+  // Ligne sous le nom
+  doc.setDrawColor(col[0],col[1],col[2]);
+  doc.setLineWidth(0.5);
+  doc.line(W/2-60, 104, W/2+60, 104);
+
+  // Pour avoir suivi
+  doc.setFontSize(11);
+  doc.setFont("helvetica","normal");
+  doc.setTextColor(120,53,15);
+  doc.text("pour avoir valide avec succes la formation", W/2, 118, {align:"center"});
+
+  // Titre formation
+  doc.setFontSize(16);
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(col[0],col[1],col[2]);
+  doc.text('"'+module.titre+'"', W/2, 132, {align:"center"});
+
+  // Score
+  doc.setFontSize(10);
+  doc.setFont("helvetica","normal");
+  doc.setTextColor(146,64,14);
+  doc.text("avec un score de", W/2, 146, {align:"center"});
+
+  doc.setFontSize(32);
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(col[0],col[1],col[2]);
+  doc.text((modProg.score||0)+"%", W/2, 162, {align:"center"});
+
+  // Date + signature
+  doc.setFontSize(9);
+  doc.setFont("helvetica","normal");
+  doc.setTextColor(120,53,15);
+  var dateStr=modProg.dateComplete?new Date(modProg.dateComplete).toLocaleDateString("fr-FR"):new Date().toLocaleDateString("fr-FR");
+  doc.text("Fait a Abidjan, le "+dateStr, ml+20, H-30);
+
+  // Signature gérant
+  doc.line(W-90, H-32, W-30, H-32);
+  doc.setFontSize(8);
+  doc.text("Signature du Gerant", W-80, H-26);
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setFont("helvetica","italic");
+  doc.setTextColor(180,150,80);
+  doc.text("Certificat genere par Saloni Manager — Module "+module.id, W/2, H-12, {align:"center"});
+
+  // Sauvegarder
+  var filename="Certificat_"+(c.nom||"chauffeur").replace(/\s+/g,"_")+"_"+module.id+".pdf";
+  doc.save(filename);
+  toast("✅ Certificat téléchargé","success");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CÔTÉ GÉRANT : Suivi des formations
+   ═══════════════════════════════════════════════════════════════ */
+function renderFormationGerant(){
+  var catalog=getFormationsCatalog();
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">🎓 Formations</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Suivez la progression de vos chauffeurs et validez leurs formations.</div>';
+
+  // Statistiques globales
+  var totalParcs=0, totalCompletes=0;
+  CH.forEach(function(c){
+    var prog=getFormationProgress(c.id);
+    totalParcs+=catalog.length;
+    totalCompletes+=Object.keys(prog).filter(function(k){return prog[k].complete;}).length;
+  });
+  var pctGlobal=totalParcs>0?Math.round(totalCompletes/totalParcs*100):0;
+
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b1">📚</div><div class="kpi-label">Modules</div><div class="kpi-val">'+catalog.length+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2">👥</div><div class="kpi-label">Chauffeurs</div><div class="kpi-val">'+CH.length+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b3">📈</div><div class="kpi-label">Taux global</div><div class="kpi-val">'+pctGlobal+'%</div><div class="kpi-trend">'+totalCompletes+' validées</div></div>';
+  h+='</div>';
+
+  // Liste des chauffeurs avec leur progression
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📊 Progression par chauffeur</div>';
+  if(CH.length===0){
+    h+='<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Aucun chauffeur actif</div></div>';
+  } else {
+    CH.forEach(function(c){
+      var prog=getFormationProgress(c.id);
+      var completes=Object.keys(prog).filter(function(k){return prog[k].complete;}).length;
+      var pct=Math.round(completes/catalog.length*100);
+      var enAttente=Object.keys(prog).filter(function(k){return prog[k].complete && !prog[k].validationGerant;}).length;
+
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer" onclick="ouvrirFormationChauffeur('+c.id+')">';
+      h+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
+      h+='<div style="width:44px;height:44px;background:'+avatarColor(c.id)+';color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800">'+initials(c.nom)+'</div>';
+      h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">'+c.nom+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--txt-2)">'+completes+'/'+catalog.length+' modules complétés</div></div>';
+      if(enAttente>0){
+        h+='<div style="background:var(--warning);color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800">'+enAttente+' à valider</div>';
+      }
+      h+='</div>';
+      h+='<div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1d4ed8,#3b82f6);border-radius:3px"></div></div>';
+      h+='<div style="font-size:11px;color:var(--txt-3);text-align:right;margin-top:4px">'+pct+'%</div>';
+      h+='</div>';
+    });
+  }
+
+  return h;
+}
+
+function ouvrirFormationChauffeur(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var catalog=getFormationsCatalog();
+  var progress=getFormationProgress(c.id);
+
+  var body='';
+  body+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:12px">';
+  body+='<div style="width:44px;height:44px;background:'+avatarColor(c.id)+';color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800">'+initials(c.nom)+'</div>';
+  body+='<div><div style="font-weight:800;font-size:14px">'+c.nom+'</div>';
+  body+='<div style="font-size:11.5px;color:var(--txt-2)">Suivi de formation</div></div></div>';
+
+  catalog.forEach(function(m){
+    var prog=progress[m.id]||{};
+    body+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+m.couleur+';border-radius:12px;padding:12px;margin-bottom:8px">';
+    body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+    body+='<div style="font-size:20px">'+m.icon+'</div>';
+    body+='<div style="flex:1;font-weight:700;font-size:13px">'+m.titre+'</div>';
+    body+='</div>';
+
+    if(prog.complete){
+      body+='<div style="font-size:11.5px;margin-bottom:8px">';
+      body+='<span style="background:var(--success-soft);color:var(--success);padding:2px 8px;border-radius:8px;font-weight:700;margin-right:6px">✓ Score: '+prog.score+'%</span>';
+      if(prog.validationGerant){
+        body+='<span style="background:var(--info-soft);color:var(--info);padding:2px 8px;border-radius:8px;font-weight:700">✓ Validé par vous</span>';
+      } else {
+        body+='<span style="background:var(--warning-soft);color:var(--warning);padding:2px 8px;border-radius:8px;font-weight:700">⏳ En attente</span>';
+      }
+      body+='</div>';
+
+      if(!prog.validationGerant){
+        body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+        body+='<button class="btn-primary" style="background:linear-gradient(135deg,#059669,#047857);padding:8px;font-size:12px" onclick="validerFormation('+c.id+',\''+m.id+'\')">✓ Valider</button>';
+        body+='<button class="btn-ghost" style="color:var(--danger);padding:8px;font-size:12px" onclick="rejeterFormation('+c.id+',\''+m.id+'\')">✗ Refaire</button>';
+        body+='</div>';
+      } else {
+        body+='<button class="btn-ghost" style="padding:8px;font-size:12px" onclick="_genererCertificatPDF(\''+m.id+'\')">📜 Voir le certificat</button>';
+      }
+    } else if(prog.lessonsViewed && prog.lessonsViewed.length>0){
+      body+='<div style="font-size:11.5px;color:var(--warning);font-weight:700">⏳ En cours ('+prog.lessonsViewed.length+'/'+m.contenu.length+' leçons)</div>';
+    } else {
+      body+='<div style="font-size:11.5px;color:var(--txt-3)">Non commencé</div>';
+    }
+
+    body+='</div>';
+  });
+
+  openModal("🎓 Formation - "+c.nom, body);
+}
+
+function validerFormation(chauffeurId, moduleId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  if(!confirm("Valider cette formation pour "+c.nom+" ?")) return;
+  var prog=getFormationProgress(chauffeurId);
+  if(!prog[moduleId]) prog[moduleId]={};
+  prog[moduleId].validationGerant=true;
+  prog[moduleId].dateValidationGerant=td();
+  prog[moduleId].validePar=S.user.pseudo;
+  setFormationProgress(chauffeurId, moduleId, prog[moduleId]);
+
+  // Notifier le chauffeur
+  var catalog=getFormationsCatalog();
+  var module=catalog.find(function(m){return m.id===moduleId;});
+  var msg={
+    id:Date.now(),
+    convId:"conv_"+chauffeurId,
+    de:"admin",
+    auteur:S.user.pseudo,
+    texte:"🎓 Félicitations ! Votre formation \""+(module?module.titre:moduleId)+"\" a été validée. Votre certificat est officiel !",
+    date:td(),heure:hr(),ts:Date.now(),lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  toast("✅ Formation validée","success");
+  ouvrirFormationChauffeur(chauffeurId);
+}
+
+function rejeterFormation(chauffeurId, moduleId){
+  if(!confirm("Demander à ce chauffeur de refaire la formation ?")) return;
+  var prog=getFormationProgress(chauffeurId);
+  if(!prog[moduleId]) return;
+  prog[moduleId].complete=false;
+  prog[moduleId].lessonsViewed=[];
+  prog[moduleId].score=0;
+  prog[moduleId].rejetePar=S.user.pseudo;
+  prog[moduleId].dateRejet=td();
+  setFormationProgress(chauffeurId, moduleId, prog[moduleId]);
+
+  // Notifier chauffeur
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(c){
+    var catalog=getFormationsCatalog();
+    var module=catalog.find(function(m){return m.id===moduleId;});
+    var msg={
+      id:Date.now(),
+      convId:"conv_"+chauffeurId,
+      de:"admin",
+      auteur:S.user.pseudo,
+      texte:"📚 Veuillez refaire la formation \""+(module?module.titre:moduleId)+"\" plus attentivement.",
+      date:td(),heure:hr(),ts:Date.now(),lu:false
+    };
+    if(!S.data.chats) S.data.chats=[];
+    S.data.chats.push(msg);
+    try{ fbSave("chats",msg); }catch(e){}
+  }
+
+  toast("Formation à refaire","info");
+  ouvrirFormationChauffeur(chauffeurId);
+}
+
 function renderChReglement(c){
   // Récupérer le règlement personnalisé du gérant, ou utiliser le défaut
   var regCustom="";
@@ -4591,6 +5559,7 @@ function renderGeneric(){
   else if(p==="rsi")html+=renderRSI();
   else if(p==="reglement")html+=renderReglement();
   else if(p==="souscomptes")html+=renderSousComptes();
+  else if(p==="formations")html+=renderFormationGerant();
   else if(p==="waveconfig")html+=renderWaveConfig();
   else if(p==="wavepreuves")html+=renderWavePreuves();
   else if(p==="journal")html+=renderJournal();
