@@ -2010,12 +2010,13 @@ function renderChauffeurApp(){
   if(!screen) return;
   var html='<div class="content-inner">';
 
-  // Tabs chauffeur
-  html+='<div class="ch-tabs">';
+  // Tabs chauffeur (6 onglets maintenant)
+  html+='<div class="ch-tabs" style="grid-template-columns:repeat(6,1fr)">';
   html+='<button class="ch-tab '+(S.chTab==="home"?"active":"")+'" onclick="goChTab(\'home\')">🏠</button>';
   html+='<button class="ch-tab '+(S.chTab==="vers"?"active":"")+'" onclick="goChTab(\'vers\')">💵</button>';
   html+='<button class="ch-tab '+(S.chTab==="chat"?"active":"")+'" onclick="goChTab(\'chat\')">💬</button>';
   html+='<button class="ch-tab '+(S.chTab==="entretien"?"active":"")+'" onclick="goChTab(\'entretien\')">🔧</button>';
+  html+='<button class="ch-tab '+(S.chTab==="reglement"?"active":"")+'" onclick="goChTab(\'reglement\')">📜</button>';
   html+='<button class="ch-tab '+(S.chTab==="profil"?"active":"")+'" onclick="goChTab(\'profil\')">👤</button>';
   html+='</div>';
 
@@ -2024,6 +2025,7 @@ function renderChauffeurApp(){
   else if(S.chTab==="vers") html+=renderChVersements(c);
   else if(S.chTab==="chat") html+=renderChChat(c);
   else if(S.chTab==="entretien") html+=renderChEntretien(c);
+  else if(S.chTab==="reglement") html+=renderChReglement(c);
   else if(S.chTab==="profil") html+=renderChProfil(c);
 
   html+='</div>';
@@ -2214,55 +2216,69 @@ function checkMediaDuration(file, maxSeconds, callback){
 
 // ─── Modal de capture média (caméra/galerie pour photo, etc.) ───
 function chatOpenMediaPicker(callback){
-  // callback(mediaObject) où mediaObject={type:"image"/"video"/"audio", data:base64, duration:seconds}
+  // callback(mediaObject)
   window._chatMediaCallback=callback;
   var body='';
   body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
 
-  // Photo
-  body+='<button onclick="chatPickPhoto()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
-  body+='<div style="font-size:32px;margin-bottom:6px">📷</div><div>Photo</div></button>';
+  // Photo (caméra)
+  body+='<button onclick="chatPickPhotoCamera()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">📷</div><div>Prendre photo</div></button>';
 
-  // Vidéo (max 10s)
-  body+='<button onclick="chatPickVideo()" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
-  body+='<div style="font-size:32px;margin-bottom:6px">🎥</div><div>Vidéo (10s max)</div></button>';
+  // Photo (galerie)
+  body+='<button onclick="chatPickPhotoGallery()" style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">🖼️</div><div>Galerie photos</div></button>';
+
+  // Vidéo (caméra)
+  body+='<button onclick="chatPickVideoCamera()" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">🎥</div><div>Filmer</div></button>';
+
+  // Vidéo (galerie)
+  body+='<button onclick="chatPickVideoGallery()" style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
+  body+='<div style="font-size:32px;margin-bottom:6px">📹</div><div>Vidéo galerie</div></button>';
 
   // Audio enregistré
   body+='<button onclick="chatStartAudioRecord()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
-  body+='<div style="font-size:32px;margin-bottom:6px">🎤</div><div>Audio (1min max)</div></button>';
+  body+='<div style="font-size:32px;margin-bottom:6px">🎤</div><div>Audio</div></button>';
 
   // Vue unique
   body+='<button onclick="chatPickVueUnique()" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">';
   body+='<div style="font-size:32px;margin-bottom:6px">👁</div><div>Vue unique</div></button>';
 
+  // Fichier (PDF, doc, etc.)
+  body+='<button onclick="chatPickFile()" style="background:linear-gradient(135deg,#64748b,#475569);color:#fff;border:none;border-radius:14px;padding:18px;font-weight:800;font-size:13px;font-family:inherit;cursor:pointer;grid-column:1/3">';
+  body+='<div style="font-size:32px;margin-bottom:6px">📄</div><div>Fichier (PDF, document...)</div></button>';
+
   body+='</div>';
 
   body+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:10px;font-size:11.5px;line-height:1.5">';
-  body+='💡 <strong>Vue unique</strong> : le destinataire ne peut voir le média qu\'<strong>une seule fois</strong>. Il disparaît après visualisation (comme sur WhatsApp).';
+  body+='💡 <strong>Vue unique</strong> : le destinataire ne peut voir le média qu\'<strong>une seule fois</strong>. Il disparaît automatiquement après visualisation (10 secondes max).';
   body+='</div>';
 
   // Inputs cachés
-  body+='<input type="file" id="chatMediaInputPhoto" accept="image/*" capture="environment" style="display:none" onchange="chatHandlePhoto(event,false)"/>';
-  body+='<input type="file" id="chatMediaInputVueUnique" accept="image/*" capture="environment" style="display:none" onchange="chatHandlePhoto(event,true)"/>';
-  body+='<input type="file" id="chatMediaInputVideo" accept="video/*" capture="environment" style="display:none" onchange="chatHandleVideo(event)"/>';
+  body+='<input type="file" id="chatInputPhotoCam" accept="image/*" capture="environment" style="display:none" onchange="chatHandlePhoto(event,false)"/>';
+  body+='<input type="file" id="chatInputPhotoGal" accept="image/*" style="display:none" onchange="chatHandlePhoto(event,false)"/>';
+  body+='<input type="file" id="chatInputVueUnique" accept="image/*" style="display:none" onchange="chatHandlePhoto(event,true)"/>';
+  body+='<input type="file" id="chatInputVideoCam" accept="video/*" capture="environment" style="display:none" onchange="chatHandleVideo(event)"/>';
+  body+='<input type="file" id="chatInputVideoGal" accept="video/*" style="display:none" onchange="chatHandleVideo(event)"/>';
+  body+='<input type="file" id="chatInputFile" accept="*/*" style="display:none" onchange="chatHandleFile(event)"/>';
 
   openModal("📎 Joindre un média", body);
 }
 
-function chatPickPhoto(){document.getElementById("chatMediaInputPhoto").click();}
-function chatPickVueUnique(){document.getElementById("chatMediaInputVueUnique").click();}
-function chatPickVideo(){document.getElementById("chatMediaInputVideo").click();}
+function chatPickPhotoCamera(){document.getElementById("chatInputPhotoCam").click();}
+function chatPickPhotoGallery(){document.getElementById("chatInputPhotoGal").click();}
+function chatPickVueUnique(){document.getElementById("chatInputVueUnique").click();}
+function chatPickVideoCamera(){document.getElementById("chatInputVideoCam").click();}
+function chatPickVideoGallery(){document.getElementById("chatInputVideoGal").click();}
+function chatPickFile(){document.getElementById("chatInputFile").click();}
 
 function chatHandlePhoto(e, vueUnique){
   var file=e.target.files[0];
   if(!file) return;
   toast("⏳ Compression...","info");
   compressImage(file, function(dataUrl){
-    if(!dataUrl){toast("Erreur","error");return;}
-    if(dataUrl.length>1024*1024){
-      toast("Image trop lourde après compression","error");
-      return;
-    }
+    if(!dataUrl){toast("Erreur compression","error");return;}
     closeModal();
     if(window._chatMediaCallback){
       window._chatMediaCallback({
@@ -2277,24 +2293,48 @@ function chatHandlePhoto(e, vueUnique){
 function chatHandleVideo(e){
   var file=e.target.files[0];
   if(!file) return;
-  if(file.size>3*1024*1024){
-    toast("⚠️ Vidéo trop lourde (max 3 MB). Filmez moins long.","error");
+  // Limite plus souple : 10 MB max
+  if(file.size>10*1024*1024){
+    toast("⚠️ Vidéo trop lourde (max 10 MB). Filmez plus court ou en qualité plus basse.","error");
     return;
   }
-  toast("⏳ Vérification...","info");
-  checkMediaDuration(file, 10, function(ok, err){
-    if(!ok){toast(err,"error");return;}
-    fileToBase64(file, function(dataUrl){
-      if(!dataUrl){toast("Erreur","error");return;}
-      closeModal();
-      if(window._chatMediaCallback){
-        window._chatMediaCallback({
-          type:"video",
-          data:dataUrl,
-          mimeType:file.type
-        });
-      }
-    });
+  toast("⏳ Préparation de la vidéo...","info");
+  // Pour les vidéos longues, on saute la vérif durée (pas tjs fiable sur iOS) et on accepte directement
+  fileToBase64(file, function(dataUrl){
+    if(!dataUrl){toast("Erreur lecture fichier","error");return;}
+    closeModal();
+    if(window._chatMediaCallback){
+      window._chatMediaCallback({
+        type:"video",
+        data:dataUrl,
+        mimeType:file.type,
+        fileName:file.name,
+        fileSize:file.size
+      });
+    }
+  });
+}
+
+function chatHandleFile(e){
+  var file=e.target.files[0];
+  if(!file) return;
+  if(file.size>5*1024*1024){
+    toast("⚠️ Fichier trop lourd (max 5 MB)","error");
+    return;
+  }
+  toast("⏳ Lecture du fichier...","info");
+  fileToBase64(file, function(dataUrl){
+    if(!dataUrl){toast("Erreur lecture","error");return;}
+    closeModal();
+    if(window._chatMediaCallback){
+      window._chatMediaCallback({
+        type:"file",
+        data:dataUrl,
+        mimeType:file.type,
+        fileName:file.name,
+        fileSize:file.size
+      });
+    }
   });
 }
 
@@ -2426,32 +2466,82 @@ function renderChatMedia(m, role){
       +'<div style="font-size:11px;margin-top:4px;opacity:.7">🎵 '+durStr+'</div>'
       +'</div>';
   }
+  if(media.type==="file"){
+    var fn=media.fileName||"fichier";
+    var fs=media.fileSize||0;
+    var sizeStr=fs>1024*1024?(fs/1024/1024).toFixed(1)+" MB":(fs/1024).toFixed(0)+" KB";
+    var icon="📄";
+    if(media.mimeType){
+      if(media.mimeType.indexOf("pdf")>=0) icon="📕";
+      else if(media.mimeType.indexOf("word")>=0||media.mimeType.indexOf("document")>=0) icon="📘";
+      else if(media.mimeType.indexOf("zip")>=0) icon="🗜️";
+      else if(media.mimeType.indexOf("excel")>=0||media.mimeType.indexOf("sheet")>=0) icon="📗";
+    }
+    return '<div onclick="chatDownloadFile(\''+m.id+'\')" style="background:rgba(0,0,0,.08);padding:10px 12px;border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer;min-width:200px">'
+      +'<div style="font-size:32px">'+icon+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(fn)+'</div>'
+      +'<div style="font-size:11px;opacity:.7;margin-top:2px">'+sizeStr+' · Toucher pour télécharger</div></div>'
+      +'</div>';
+  }
   return "";
 }
 
-// Vue unique : visualiser et supprimer
-function chatViewVueUnique(msgId){
-  var msg=(S.data.chats||[]).find(function(m){return m.id===msgId;});
+function chatDownloadFile(msgId){
+  var msg=(S.data.chats||[]).find(function(m){return String(m.id)===String(msgId);});
   if(!msg || !msg.media) return;
-  var body='<div style="text-align:center"><img src="'+msg.media.data+'" style="max-width:100%;max-height:60vh;border-radius:12px"/></div>';
-  body+='<div style="background:var(--warning-soft);color:var(--warning);padding:10px;border-radius:10px;font-size:12px;margin-top:14px">⚠️ Cette image va être supprimée à la fermeture.</div>';
-  body+='<button class="btn-ghost" style="margin-top:10px" onclick="chatConfirmVue('+msgId+')">✓ J\'ai bien vu, supprimer</button>';
-  openModal("👁 Vue unique", body);
+  var a=document.createElement("a");
+  a.href=msg.media.data;
+  a.download=msg.media.fileName||"fichier";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
-function chatConfirmVue(msgId){
-  var msg=(S.data.chats||[]).find(function(m){return m.id===msgId;});
-  if(!msg) return;
-  // Marquer comme vu et supprimer le contenu
+// Vue unique : visualiser et supprimer AUTOMATIQUEMENT dès l'affichage
+function chatViewVueUnique(msgId){
+  var msg=(S.data.chats||[]).find(function(m){return String(m.id)===String(msgId);});
+  if(!msg || !msg.media) return;
+
+  // Cloner l'image avant suppression
+  var imageData=msg.media.data;
+  var mediaType=msg.media.type;
+
+  // Auto-suppression IMMÉDIATE des données (l'image est en mémoire local seulement le temps de l'affichage)
   msg.vue=true;
-  msg.media={vueUnique:true, type:msg.media.type, deleted:true}; // garder type pour affichage, mais sans data
+  msg.vueDate=td();
+  msg.vueHeure=hr();
+  msg.media={vueUnique:true, type:mediaType, deleted:true}; // Plus de data dans les données
   try{ fbSave("chats",msg); }catch(e){}
   save();
-  closeModal();
-  toast("Image supprimée","success");
-  // Re-render chat
-  if(estChauffeur()) renderChauffeurApp();
-  else if(typeof render==="function") render();
+
+  // Afficher l'image en plein écran avec un timer de 10s puis fermeture forcée
+  var body='<div style="position:relative">';
+  if(mediaType==="image"){
+    body+='<img src="'+imageData+'" style="max-width:100%;max-height:65vh;border-radius:12px;display:block;margin:0 auto"/>';
+  } else if(mediaType==="video"){
+    body+='<video src="'+imageData+'" autoplay controls style="max-width:100%;max-height:65vh;border-radius:12px;display:block;margin:0 auto"></video>';
+  }
+  body+='<div id="vueUniqueTimer" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.7);color:#fff;padding:8px 12px;border-radius:20px;font-weight:800;font-size:14px;font-family:monospace">10s</div>';
+  body+='</div>';
+  body+='<div style="background:var(--danger-soft);color:var(--danger);padding:12px;border-radius:10px;margin-top:14px;text-align:center;font-size:12px;font-weight:700">⚠️ Vue unique — Image déjà supprimée, vous ne pourrez plus la voir</div>';
+
+  openModal("👁 Vue unique", body);
+
+  // Compte à rebours
+  var secondsLeft=10;
+  var timerEl=document.getElementById("vueUniqueTimer");
+  window._vueUniqueInterval=setInterval(function(){
+    secondsLeft--;
+    if(timerEl) timerEl.textContent=secondsLeft+"s";
+    if(secondsLeft<=0){
+      clearInterval(window._vueUniqueInterval);
+      window._vueUniqueInterval=null;
+      closeModal();
+      // Re-render chat
+      if(estChauffeur()) renderChauffeurApp();
+      else if(typeof render==="function") render();
+    }
+  },1000);
 }
 
 function chatViewFullImage(msgId){
@@ -2553,13 +2643,37 @@ function chSendMediaChauffeur(mediaObj){
   };
   if(!S.data.chats) S.data.chats=[];
   S.data.chats.push(item);
-  try{ fbSave("chats",item); }catch(e){
-    console.warn("Média trop gros pour Firebase, garde en local",e);
-    // Le média reste en local
-    save();
-  }
+
+  // Sauvegarde locale TOUJOURS en priorité
+  save();
   toast("✅ Média envoyé","success");
   renderChauffeurApp();
+
+  // Tenter Firebase seulement si < 900 KB (sinon doc trop gros)
+  var dataSize=mediaObj.data?mediaObj.data.length:0;
+  if(dataSize<900000){
+    try{ fbSave("chats",item); }catch(e){
+      console.warn("Firebase a refusé le média (taille):",e);
+    }
+  } else {
+    console.log("Média trop gros pour Firebase ("+Math.round(dataSize/1024)+" KB), gardé en local seulement");
+    // Sauvegarder une version sans data dans Firebase pour la trace
+    try{
+      var lite={
+        id:item.id,
+        convId:item.convId,
+        de:item.de,
+        auteur:item.auteur,
+        texte:"[Média volumineux non synchronisé]",
+        date:item.date,
+        heure:item.heure,
+        ts:item.ts,
+        lu:false,
+        mediaLite:{type:mediaObj.type,size:dataSize}
+      };
+      fbSave("chats",lite);
+    } catch(err){}
+  }
 }
 
 /* ─── PAIEMENT WAVE CÔTÉ CHAUFFEUR ─── */
@@ -2818,6 +2932,96 @@ function chDeclarerPanne(type){
 }
 
 /* ─── PROFIL CHAUFFEUR ─── */
+/* ─── RÈGLEMENT INTÉRIEUR (côté chauffeur) ─── */
+function renderChReglement(c){
+  // Récupérer le règlement personnalisé du gérant, ou utiliser le défaut
+  var regCustom="";
+  try{ regCustom=localStorage.getItem("sal_reglement_text")||""; }catch(e){}
+
+  var html='<div class="screen-title">📜 Règlement intérieur</div>';
+  html+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">À lire attentivement et à respecter</div>';
+
+  // Header bleu marine
+  html+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;border-radius:16px;padding:18px;margin-bottom:14px;text-align:center">';
+  html+='<div style="font-size:36px;margin-bottom:6px">⚖️</div>';
+  html+='<div style="font-weight:800;font-size:16px">Règles à respecter</div>';
+  html+='<div style="font-size:12px;opacity:.85;margin-top:4px">DIAKITE TRANSPORT — Saloni Manager</div>';
+  html+='</div>';
+
+  if(regCustom){
+    // Règlement personnalisé du gérant
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;font-size:13px;line-height:1.7;white-space:pre-wrap">'+escapeHtml(regCustom)+'</div>';
+  } else {
+    // Règlement par défaut (10 articles)
+    var articles=[
+      {n:"1",t:"VERSEMENTS",c:"Les versements sont dus selon la fréquence définie dans votre contrat (journalier ou hebdomadaire). Tout retard sans justificatif valable entraîne une sanction immédiate."},
+      {n:"2",t:"ENTRETIEN DU TRICYCLE",c:"Vous êtes responsable de l'entretien quotidien : propreté, vérification de l'huile, pression des pneus. Toute négligence ayant entraîné des dommages sera à votre charge."},
+      {n:"3",t:"DOCUMENTS OBLIGATOIRES",c:"Vous devez toujours avoir sur vous : permis de conduire valide, pièce d'identité, carte grise du saloni, vignette à jour. Tout contrôle sans documents valides vous expose à des sanctions."},
+      {n:"4",t:"SIGNALEMENT DES PANNES",c:"Toute panne, accident ou problème mécanique doit être signalé IMMÉDIATEMENT au gérant via l'application (onglet 🔧 Entretien). Ne tentez pas de réparer vous-même."},
+      {n:"5",t:"ZONES DE TRAVAIL",c:"Respectez la zone qui vous a été attribuée. Tout changement doit être validé par le gérant. Travailler hors zone sans autorisation est une faute."},
+      {n:"6",t:"INTERDICTIONS FORMELLES",c:"Il est strictement interdit de : prêter ou sous-louer le tricycle, l'utiliser à des fins personnelles non autorisées, transporter de la marchandise illégale, conduire sous influence d'alcool ou de drogues."},
+      {n:"7",t:"COMPORTEMENT AVEC LES CLIENTS",c:"Soyez toujours courtois et professionnel. Aucune insulte, agression ou manque de respect ne sera toléré. Vous représentez l'entreprise."},
+      {n:"8",t:"PRIMES DE PERFORMANCE",c:"Une prime mensuelle de 5 000 à 15 000 FCFA peut vous être attribuée si tous vos versements ont été effectués à temps et qu'aucune sanction n'a été enregistrée durant le mois."},
+      {n:"9",t:"SANCTIONS",c:"Tout manquement aux règles peut entraîner : avertissement, amende, suspension temporaire, ou résiliation immédiate du contrat selon la gravité."},
+      {n:"10",t:"FIN DE CONTRAT",c:"En cas de fin de contrat (à l'initiative de l'une ou l'autre partie), un constat du véhicule sera obligatoirement effectué. Le tricycle doit être restitué dans le même état qu'à la prise en charge, sauf usure normale."}
+    ];
+
+    articles.forEach(function(a,i){
+      var colors=["#dc2626","#ea580c","#d97706","#ca8a04","#65a30d","#16a34a","#0891b2","#0284c7","#2563eb","#7c3aed"];
+      var col=colors[i%colors.length];
+      html+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col+';border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm)">';
+      html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+      html+='<div style="width:32px;height:32px;background:'+col+';color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">'+a.n+'</div>';
+      html+='<div style="font-weight:800;font-size:14px;color:'+col+'">'+a.t+'</div></div>';
+      html+='<div style="font-size:13px;line-height:1.6;color:var(--txt)">'+a.c+'</div>';
+      html+='</div>';
+    });
+  }
+
+  // Acceptation
+  var dejaAccepte=c && c.reglementAccepte;
+  if(!dejaAccepte){
+    html+='<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #d97706;border-radius:14px;padding:14px;margin-top:14px">';
+    html+='<div style="font-weight:800;color:#92400e;margin-bottom:6px;font-size:14px">📋 Confirmation de lecture</div>';
+    html+='<div style="font-size:12.5px;color:#78350f;line-height:1.6;margin-bottom:10px">J\'ai lu et compris l\'intégralité du règlement intérieur. Je m\'engage à le respecter dans son intégralité.</div>';
+    html+='<button class="btn-primary" style="background:linear-gradient(135deg,#d97706,#b45309)" onclick="chAccepterReglement()">✓ J\'accepte le règlement</button>';
+    html+='</div>';
+  } else {
+    html+='<div style="background:var(--success-soft);color:var(--success);padding:12px;border-radius:12px;margin-top:14px;text-align:center;font-size:13px">';
+    html+='✅ <strong>Vous avez accepté ce règlement</strong>';
+    if(c.reglementDate) html+='<br><span style="font-size:11px;opacity:.85">le '+formatDateRelative(c.reglementDate)+'</span>';
+    html+='</div>';
+  }
+
+  return html;
+}
+
+function chAccepterReglement(){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  c.reglementAccepte=true;
+  c.reglementDate=td();
+  c.reglementHeure=hr();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  save();
+  toast("✅ Règlement accepté","success");
+
+  // Notifier le gérant
+  var msg={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user.pseudo,
+    texte:"📜 J'ai lu et accepté le règlement intérieur.",
+    date:td(),heure:hr(),ts:Date.now(),lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  renderChauffeurApp();
+}
+
 function renderChProfil(c){
   var html='<div class="screen-title">👤 Mon profil</div>';
 
@@ -3576,8 +3780,242 @@ function genererContratPDF(chauffeurId){
       _genererContratInner(c);
     }catch(e){
       toast("Erreur: "+e.message,"error");
+      console.error(e);
     }
   });
+}
+
+function _genererContratInner(c){
+  var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
+  var doc=new jsPDFClass({orientation:"portrait",unit:"mm",format:"a4"});
+  var W=210, ml=15, mr=15, pw=W-ml-mr;
+  var y=15;
+
+  // ── Données ──
+  var today=new Date();
+  var fin=new Date(today);
+  fin.setMonth(fin.getMonth()+6);
+  var fmt=function(d){return d.getDate().toString().padStart(2,"0")+"/"+(d.getMonth()+1).toString().padStart(2,"0")+"/"+d.getFullYear();};
+  var dateDebut=fmt(today), dateFin=fmt(fin);
+  var sal=(S.data.salonis||[]).find(function(s){return String(s.id)===String(c.saloniId||c.saloni);});
+  var nom=(c.nom||"").toUpperCase();
+  var isH=c.freqPaiement==="Hebdomadaire";
+  var objVal=isH?((c.objectifSemaine||0).toLocaleString("fr-FR")+" FCFA"):((c.objectifJour||0).toLocaleString("fr-FR")+" FCFA");
+  var objLabel=isH?"Hebdomadaire":"Journalier";
+  var salInfo=sal?("Saloni "+(sal.numero||sal.id)+(sal.modele?" — "+sal.modele:"")):(c.saloniId||"N/A");
+
+  // ── Helpers ──
+  function setFont(size,style,r,g,b){
+    doc.setFontSize(size);
+    doc.setFont("helvetica",style||"normal");
+    doc.setTextColor(r||0,g||0,b||0);
+  }
+  function fillRect(x,yy,w,h,r,g,b){doc.setFillColor(r,g,b);doc.rect(x,yy,w,h,"F");}
+  function hline(yy,r,g,b,thick){doc.setDrawColor(r||200,g||200,b||200);doc.setLineWidth(thick||0.3);doc.line(ml,yy,W-mr,yy);}
+  function sectionTitle(title,yy,r,g,b){
+    fillRect(ml,yy,pw,7,r||29,g||78,b||216);
+    setFont(9,"bold",255,255,255);
+    doc.text(title,ml+3,yy+4.8);
+    return yy+9;
+  }
+  function tableRow(label,val,yy,shade){
+    if(shade) fillRect(ml,yy,pw,5.5,245,247,250);
+    var safeLabel=String(label||"");
+    var safeVal=String(val||"—");
+    setFont(8,"bold",75,85,99); doc.text(safeLabel,ml+3,yy+3.8);
+    setFont(8,"normal",17,24,39); doc.text(safeVal,ml+50,yy+3.8);
+    hline(yy+5.5,229,231,235,0.2);
+    return yy+5.5;
+  }
+  function clauseBox(title,text,yy,r,g,b){
+    var lines=doc.splitTextToSize(String(text||""),pw-8);
+    var h=8+lines.length*4.5;
+    // Nouvelle page si pas assez d'espace
+    if(yy+h>275){doc.addPage();yy=15;}
+    fillRect(ml,yy,pw,h,r||239,g||246,b||255);
+    setFont(8,"bold",29,78,216); doc.text(title,ml+3,yy+5);
+    setFont(8,"normal",17,24,39);
+    lines.forEach(function(l,i){doc.text(l,ml+3,yy+9+i*4.5);});
+    hline(yy+h,229,231,235,0.2);
+    return yy+h+3;
+  }
+
+  // ── Identifier les signataires ──
+  var signataireBailleur="Le Gerant";
+  var titreBailleur="Gerant & Proprietaire";
+  var isAdmin=false;
+  var creePar=c.creePar||(S.user?S.user.pseudo:"gerant");
+  var creeParNiveau=c.creeParNiveau||(S.user?S.user.niveau:3);
+  var scCreateur=(S.data.sousComptes||[]).find(function(x){return x.pseudo===creePar;});
+  var nomCompletCreateur=String(scCreateur?(scCreateur.nom||scCreateur.pseudo||creePar):creePar)||"N/A";
+  if(creeParNiveau<3 && creeParNiveau>=2){
+    isAdmin=true;
+    signataireBailleur=nomCompletCreateur;
+    titreBailleur="Administrateur Garant";
+  }
+
+  // ══ HEADER ══
+  fillRect(0,0,W,30,29,78,216);
+  setFont(17,"bold",255,255,255);
+  doc.text("SALONI MANAGER",W/2,11,{align:"center"});
+  setFont(8,"normal",200,220,255);
+  doc.text("Gestion de Flotte de Tricycles-Taxis — Abidjan",W/2,17,{align:"center"});
+  doc.text("Cote d'Ivoire",W/2,22,{align:"center"});
+  fillRect(0,28,W,1,17,55,170);
+  y=36;
+
+  // ══ TITRE ══
+  setFont(13,"bold",17,24,39);
+  doc.text("CONTRAT DE LOCATION-EXPLOITATION DE TRICYCLE",W/2,y,{align:"center"});
+  y+=6;
+  setFont(9,"italic",107,114,128);
+  doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:"center"});
+  y+=5;
+  hline(y,29,78,216,0.6); y+=7;
+
+  // ══ ART 1: PARTIES ══
+  y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT",y);
+  // Bailleur
+  fillRect(ml,y,pw,5.5,239,246,255);
+  setFont(8.5,"bold",29,78,216); doc.text("BAILLEUR (Proprietaire)",ml+3,y+4); y+=5.5;
+  y=tableRow("Entreprise :","Gerant de fleet saloni",y,false);
+  y=tableRow("Represente par :",signataireBailleur+" — "+titreBailleur,y,true);
+  if(isAdmin){
+    y=tableRow("Agissant au nom de :","La Direction",y,false);
+  }
+  y=tableRow("Adresse :","Abidjan, Cote d'Ivoire",y,false);
+  y+=3;
+  // Locataire
+  fillRect(ml,y,pw,5.5,5,150,105);
+  setFont(8.5,"bold",255,255,255); doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4); y+=5.5;
+  y=tableRow("Nom & Prenom :",nom,y,false);
+  y=tableRow("Telephone :",c.tel||"N/A",y,true);
+  y=tableRow("Date de naissance :",c.dateNaissance?fmt(new Date(c.dateNaissance)):"N/A",y,false);
+  y=tableRow("Lieu de naissance :",c.lieuNaissance||"N/A",y,true);
+  y=tableRow("N° CNI :",c.numCNI||"N/A",y,false);
+  y=tableRow("Adresse :",c.adresse||"N/A",y,true);
+  y=tableRow("Contact d'urgence :",c.contactUrgence||"N/A",y,false);
+  y=tableRow("Permis (expir.) :",c.permisExp?fmt(new Date(c.permisExp)):"N/A",y,true);
+  y=tableRow("Saloni attribue :",salInfo,y,false);
+  y=tableRow("Zone d'exploitation :",c.zone||"N/A",y,true);
+  y+=5;
+
+  // ══ ART 2: OBJECTIFS ══
+  y=sectionTitle("ARTICLE 2 — OBJECTIFS ET VERSEMENTS",y,55,65,81);
+  y=tableRow("Frequence de versement :",objLabel,y,false);
+  y=tableRow("Montant objectif :",objVal,y,true);
+  y=tableRow("Modes de paiement :","Especes / Wave / Orange Money / MTN Money",y,false);
+  y+=5;
+
+  // ══ ART 3: DUREE ══
+  y=sectionTitle("ARTICLE 3 — DUREE DU CONTRAT",y);
+  fillRect(ml,y,pw,16,239,246,255);
+  setFont(8.5,"normal",17,24,39);
+  var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
+  var linesD=doc.splitTextToSize(texteduree,pw-8);
+  linesD.forEach(function(l){doc.text(l,ml+3,y+4.5); y+=4.5;});
+  setFont(8,"bold",220,38,38);
+  doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.",ml+3,y+3);
+  y+=9;
+
+  // ══ CLAUSES ══
+  y=clauseBox(
+    "ARTICLE 4 — RETRAIT DU TRICYCLE",
+    "En cas d'absence de versement pendant 2 jours consecutifs sans justificatif valable (panne, maladie, vidange) signale des le premier jour d'arret au gerant ou a un administrateur via l'application, le tricycle sera retire immediatement sans preavis.",
+    y,239,246,255);
+
+  y=clauseBox(
+    "ARTICLE 5 — PRIMES DE PERFORMANCE",
+    "Le locataire beneficie d'une prime mensuelle de 5.000 a 15.000 FCFA si tous les versements du mois ont ete effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree durant le mois concerne.",
+    y,240,253,244);
+
+  y=clauseBox(
+    "ARTICLE 6 — ENTRETIEN DU TRICYCLE",
+    "Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires aux intervalles requis. Les frais de reparation resultant d'une negligence d'entretien sont integralement a la charge du locataire.",
+    y,255,251,235);
+
+  y=clauseBox(
+    "ARTICLE 7 — INTERDICTIONS ET OBLIGATIONS",
+    "Il est formellement interdit : (1) d'abandonner le tricycle sans en informer le gerant ou un administrateur — tout abandon caracterise constituera un abandon de bien confie et fera l'objet de poursuites judiciaires ; (2) de laisser le tricycle aller en fourriere sans avertissement — les frais sont a la charge du locataire ; (3) de sous-louer ou preter le tricycle sans autorisation ecrite.",
+    y,254,242,242);
+
+  y=clauseBox(
+    "ARTICLE 8 — RESILIATION",
+    "Le contrat peut etre resilie de plein droit, sans preavis, en cas de : non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, ou fausse declaration lors de la signature.",
+    y,243,244,246);
+
+  // ══ ARTICLE 9 — CONSTAT DE RESTITUTION (NOUVEAU) ══
+  y=clauseBox(
+    "ARTICLE 9 — CONSTAT DE RESTITUTION DU VEHICULE",
+    "Si l'une des deux parties souhaite mettre fin au present contrat, anticipativement ou a son terme, un CONSTAT CONTRADICTOIRE du tricycle doit obligatoirement etre effectue en presence des deux parties (Bailleur et Locataire). Ce constat vise a : (1) verifier l'etat general du vehicule ; (2) detecter toute panne, deterioration, ou usure anormale ; (3) inventorier les accessoires et documents (carte grise, vignette, papiers du vehicule, casque le cas echeant). Le tricycle doit etre restitue au Bailleur DANS L'ETAT OU IL A ETE REMIS au debut du contrat, hors usure normale liee a l'usage. Toute degradation imputable au Locataire (negligence, accident sans declaration, modification non autorisee) sera prise en charge financierement par ce dernier, selon devis etabli par un garage agree. Un proces-verbal de constat sera signe par les deux parties a l'issue de la restitution.",
+    y,254,243,231);
+
+  // ══ SIGNATURES ══
+  if(y>200){doc.addPage(); y=15;} else {y+=4;}
+  hline(y,229,231,235,0.5); y+=6;
+  setFont(11,"bold",55,65,81);
+  doc.text("SIGNATURES",W/2,y,{align:"center"});
+  y+=5;
+  setFont(8,"normal",107,114,128);
+  doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:"center"});
+  y+=8;
+
+  // Deux colonnes
+  var c1=ml, c2=W/2+5, cw=(pw/2)-5;
+
+  // Header colonne bailleur
+  fillRect(c1,y,cw,6,29,78,216);
+  setFont(8,"bold",255,255,255);
+  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
+
+  // Header colonne locataire
+  fillRect(c2,y,cw,6,5,150,105);
+  setFont(8,"bold",255,255,255);
+  doc.text("LE LOCATAIRE / CHAUFFEUR",c2+3,y+4.2);
+  y+=8;
+
+  // Nom + titre - Bailleur
+  setFont(8.5,"bold",17,24,39);
+  doc.text(signataireBailleur,c1+3,y);
+  setFont(8,"normal",55,65,81);
+  doc.text(titreBailleur,c1+3,y+4);
+
+  // Nom + titre - Locataire
+  setFont(8.5,"bold",17,24,39);
+  doc.text(nom,c2+3,y);
+  setFont(8,"normal",55,65,81);
+  doc.text("Chauffeur",c2+3,y+4);
+
+  // Lignes signatures
+  doc.setDrawColor(55,65,81); doc.setLineWidth(0.3);
+  doc.line(c1,y+22,c1+cw-5,y+22);
+  doc.line(c2,y+22,c2+cw-5,y+22);
+  setFont(7,"normal",107,114,128);
+  doc.text("Signature + cachet",c1+3,y+26);
+  doc.text("Lu et approuve + Signature",c2+3,y+26);
+
+  // ══ Footer ══
+  setFont(7,"italic",150,150,150);
+  doc.text("Contrat genere automatiquement par Saloni Manager — "+dateDebut,W/2,290,{align:"center"});
+
+  // Sauvegarder
+  var filename="Contrat_"+(c.nom||"chauffeur").replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
+  doc.save(filename);
+
+  if(!c.contratFin){
+    c.contratFin=fin.toISOString().substring(0,10);
+    try{ fbSave("chauffeurs",c); }catch(e){}
+    save();
+  }
+  if(!c.creePar){
+    c.creePar=S.user.pseudo;
+    c.creeParNiveau=S.user.niveau;
+    try{ fbSave("chauffeurs",c); }catch(e){}
+    save();
+  }
+
+  toast("✅ Contrat généré et téléchargé","success");
+  if(typeof addIAJournal==="function") addIAJournal("contrat","Contrat PDF généré",c.nom);
 }
 
 function _genererContratInner(c){
@@ -3586,143 +4024,215 @@ function _genererContratInner(c){
   var W=210, ml=15, mr=15, pw=W-ml-mr;
   var y=15;
 
-  // Helpers
+  // ─── DONNÉES ───
   var today=new Date();
   var fin=new Date(today);
   fin.setMonth(fin.getMonth()+6);
   var fmt=function(d){return d.getDate().toString().padStart(2,"0")+"/"+(d.getMonth()+1).toString().padStart(2,"0")+"/"+d.getFullYear();};
   var dateDebut=fmt(today);
   var dateFin=fmt(fin);
-
   var sal=(S.data.salonis||[]).find(function(s){return String(s.id)===String(c.saloniId||c.saloni);});
-  var nom=(c.nom||"").toUpperCase();
+  var nom=c.nom||"N/A";
   var isH=c.freqPaiement==="Hebdomadaire";
   var objVal=isH?((c.objectifSemaine||0).toLocaleString("fr-FR")+" FCFA"):((c.objectifJour||0).toLocaleString("fr-FR")+" FCFA");
-  var objLabel=isH?"hebdomadaire":"journalier";
+  var objLabel=isH?"Hebdomadaire":"Journalier";
+  var salInfo=sal?(sal.modele||"Saloni")+" — N° "+(sal.numero||sal.id):(c.saloniId||"N/A");
 
+  // ─── HELPERS ───
   function setFont(size, style, r, g, b){
     doc.setFontSize(size);
     doc.setFont("helvetica", style||"normal");
     doc.setTextColor(r||0, g||0, b||0);
   }
-  function addText(txt, x, yy, opts){
-    opts=opts||{};
-    if(opts.size||opts.style||opts.color) setFont(opts.size||11, opts.style||"normal", opts.color?opts.color[0]:0, opts.color?opts.color[1]:0, opts.color?opts.color[2]:0);
-    if(opts.align==="center"){doc.text(txt, W/2, yy, {align:"center"});}
-    else if(opts.align==="right"){doc.text(txt, W-mr, yy, {align:"right"});}
-    else {doc.text(txt, x, yy);}
+  function fillRect(x, y, w, h, r, g, b){
+    doc.setFillColor(r, g, b);
+    doc.rect(x, y, w, h, "F");
   }
-  function addPara(txt, yy){
-    setFont(10,"normal",30,30,30);
-    var lines=doc.splitTextToSize(txt, pw);
-    doc.text(lines, ml, yy);
-    return yy + lines.length*5;
-  }
-  function hr(yy){
-    doc.setDrawColor(180,180,180);
-    doc.setLineWidth(0.2);
+  function hline(yy, r, g, b, w){
+    doc.setDrawColor(r||200, g||200, b||200);
+    doc.setLineWidth(w||0.3);
     doc.line(ml, yy, W-mr, yy);
   }
+  function sectionTitle(title, yy, r, g, b){
+    fillRect(ml, yy, pw, 7, r||29, g||78, b||216);
+    setFont(9, "bold", 255, 255, 255);
+    doc.text(title, ml+3, yy+4.8);
+    return yy+9;
+  }
+  function tableRow(label, val, yy, shade){
+    if(shade) fillRect(ml, yy, pw, 5.5, 245, 247, 250);
+    setFont(8, "bold", 75, 85, 99);
+    doc.text(String(label||""), ml+3, yy+3.8);
+    setFont(8, "normal", 17, 24, 39);
+    doc.text(String(val||"—"), ml+50, yy+3.8);
+    hline(yy+5.5, 229, 231, 235, 0.2);
+    return yy+5.5;
+  }
+  function clauseBox(title, text, yy, r, g, b){
+    var lines=doc.splitTextToSize(String(text||""), pw-8);
+    var h=8+lines.length*4.5;
+    if(yy+h>275){doc.addPage();yy=15;}
+    fillRect(ml, yy, pw, h, r||239, g||246, b||255);
+    setFont(8, "bold", 29, 78, 216);
+    doc.text(title, ml+3, yy+5);
+    setFont(8, "normal", 17, 24, 39);
+    lines.forEach(function(l, i){doc.text(l, ml+3, yy+9+i*4.5);});
+    hline(yy+h, 229, 231, 235, 0.2);
+    return yy+h+3;
+  }
 
-  // ─── EN-TÊTE ───
-  doc.setFillColor(10, 31, 68);
-  doc.rect(0, 0, W, 28, "F");
-  addText("CONTRAT DE LOCATION-EXPLOITATION", 0, 12, {size:14, style:"bold", color:[255,255,255], align:"center"});
-  addText("Tricycle taxi (Saloni)", 0, 20, {size:10, color:[200,220,255], align:"center"});
+  // ─── EN-TÊTE ENTREPRISE ───
+  fillRect(0, 0, W, 30, 29, 78, 216);
+  setFont(17, "bold", 255, 255, 255);
+  doc.text("DIAKITE TRANSPORT", W/2, 11, {align:"center"});
+  setFont(8, "normal", 200, 220, 255);
+  doc.text("Adjame St Michel, Lot 611, Abidjan", W/2, 17, {align:"center"});
+  doc.text("Gestion de flotte de tricycles-taxis (Salonis)", W/2, 22, {align:"center"});
+  fillRect(0, 28, W, 1, 17, 55, 170);
   y=36;
 
-  // ─── PARTIES ───
-  addText("ENTRE LES SOUSSIGNES :", ml, y, {size:11, style:"bold"});
+  // ─── TITRE ───
+  setFont(13, "bold", 17, 24, 39);
+  doc.text("CONTRAT DE LOCATION DE TRICYCLE (SALONI)", W/2, y, {align:"center"});
+  y+=6;
+  setFont(9, "italic", 107, 114, 128);
+  doc.text("Contrat a Duree Determinee — 6 mois", W/2, y, {align:"center"});
+  y+=5;
+  hline(y, 29, 78, 216, 0.6);
   y+=7;
-  y=addPara("D'une part, l'EXPLOITANT du parc de tricycles taxis (ci-apres designe le \"Bailleur\"), represente par son Gerant ; ", y);
-  y+=2;
-  y=addPara("Et d'autre part, M./Mme " + nom + ", ne(e) le " + (c.dateNaissance?fmt(new Date(c.dateNaissance)):"____") + " a " + (c.lieuNaissance||"____") + ", titulaire de la CNI N° " + (c.numCNI||"____") + ", residant a " + (c.adresse||"____") + ", joignable au " + (c.tel||"____") + " (ci-apres designe le \"Chauffeur\").", y);
-  y+=4;
 
-  // ─── ARTICLE 1 : OBJET ───
-  addText("ARTICLE 1 — OBJET DU CONTRAT", ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  y=addPara("Le Bailleur met a la disposition du Chauffeur un tricycle taxi (Saloni) " + (sal?"immatricule "+(sal.immat||sal.id):("N° "+(c.saloniId||"____"))) + " en vue de son exploitation commerciale dans la zone de " + (c.zone||"____") + ".", y);
+  // ─── ART 1 : PARTIES ───
+  y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT", y);
+  fillRect(ml, y, pw, 5.5, 239, 246, 255);
+  setFont(8.5, "bold", 29, 78, 216);
+  doc.text("BAILLEUR (Proprietaire)", ml+3, y+4);
+  y+=5.5;
+  y=tableRow("Entreprise :", "DIAKITE TRANSPORT", y, false);
+  y=tableRow("Representee par :", "DIAKITE Korotum Marceline — Gerante", y, true);
+  y=tableRow("Adresse :", "Adjame St Michel, Lot 611, Abidjan", y, false);
   y+=3;
 
-  // ─── ARTICLE 2 : DUREE ───
-  addText("ARTICLE 2 — DUREE", ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  y=addPara("Le present contrat est conclu pour une duree de SIX (6) MOIS, prenant effet le " + dateDebut + " et prenant fin le " + dateFin + ". Il pourra etre renouvele d'un commun accord entre les parties.", y);
-  y+=3;
+  fillRect(ml, y, pw, 5.5, 5, 150, 105);
+  setFont(8.5, "bold", 255, 255, 255);
+  doc.text("LOCATAIRE (Chauffeur)", ml+3, y+4);
+  y+=5.5;
+  y=tableRow("Nom & Prenom :", nom, y, false);
+  y=tableRow("Telephone :", c.tel||"N/A", y, true);
+  y=tableRow("Date de naissance :", c.dateNaissance?fmt(new Date(c.dateNaissance)):"N/A", y, false);
+  y=tableRow("Lieu de naissance :", c.lieuNaissance||"N/A", y, true);
+  y=tableRow("N° CNI / Passeport :", c.numCNI||"N/A", y, false);
+  y=tableRow("Adresse :", c.adresse||"N/A", y, true);
+  y=tableRow("Contact urgence :", c.contactUrgence||"N/A", y, false);
+  y=tableRow("Saloni attribue :", salInfo, y, true);
+  y=tableRow("Zone d'activite :", c.zone||"N/A", y, false);
+  y+=5;
 
-  // ─── ARTICLE 3 : VERSEMENT ───
-  addText("ARTICLE 3 — VERSEMENT " + objLabel.toUpperCase(), ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  y=addPara("Le Chauffeur s'engage a verser au Bailleur la somme de " + objVal + " " + objLabel + " (objectif " + (isH?"hebdomadaire":"quotidien") + "). Le versement doit etre effectue au plus tard a la fin de chaque " + (isH?"semaine":"journee") + ", en especes ou par mobile money (Wave, Orange Money, etc.).", y);
-  y+=3;
+  // ─── ART 2 : OBJECTIFS ───
+  y=sectionTitle("ARTICLE 2 — OBJECTIFS ET VERSEMENTS", y, 55, 65, 81);
+  y=tableRow("Frequence :", objLabel, y, false);
+  y=tableRow("Objectif :", objVal, y, true);
+  y=tableRow("Mode de paiement :", "Especes / Wave / Orange Money / MTN", y, false);
+  y+=5;
 
-  // ─── ARTICLE 4 : OBLIGATIONS CHAUFFEUR ───
-  addText("ARTICLE 4 — OBLIGATIONS DU CHAUFFEUR", ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  var obligs=[
-    "Conduire le saloni avec prudence et dans le respect du code de la route ivoirien ;",
-    "Maintenir le vehicule en bon etat de proprete et signaler toute panne ou incident immediatement ;",
-    "Effectuer les versements aux echeances convenues sans retard ;",
-    "Ne pas sous-louer ou preter le saloni a un tiers sans autorisation ecrite du Bailleur ;",
-    "Detenir un permis de conduire valide et a jour ;",
-    "Souscrire a une assurance personnelle complementaire si necessaire."
-  ];
-  obligs.forEach(function(o){
-    y=addPara("• " + o, y);
-  });
-  y+=3;
+  // ─── ART 3 : DURÉE ───
+  y=sectionTitle("ARTICLE 3 — DUREE DU CONTRAT", y);
+  fillRect(ml, y, pw, 16, 239, 246, 255);
+  setFont(8.5, "normal", 17, 24, 39);
+  var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
+  var linesD=doc.splitTextToSize(texteduree, pw-8);
+  linesD.forEach(function(l){doc.text(l, ml+3, y+4.5); y+=4.5;});
+  setFont(8, "bold", 220, 38, 38);
+  doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.", ml+3, y+3);
+  y+=9;
 
-  // ─── ARTICLE 5 : OBLIGATIONS BAILLEUR ───
-  addText("ARTICLE 5 — OBLIGATIONS DU BAILLEUR", ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  y=addPara("Le Bailleur s'engage a fournir un saloni en bon etat de marche, a jour de ses documents administratifs (carte grise, vignette, assurance), et a prendre en charge les entretiens majeurs (vidange, embrayage, freins).", y);
-  y+=3;
+  // ─── ART 4 ───
+  y=clauseBox(
+    "ARTICLE 4 — RETRAIT DU TRICYCLE",
+    "En cas d'absence de versement pendant 2 jours consecutifs sans justificatif valable (panne, maladie, vidange) signale des le premier jour d'arret au gerant ou a un administrateur via l'application, le tricycle sera retire immediatement sans preavis.",
+    y, 239, 246, 255);
 
-  // ─── NOUVELLE PAGE ───
-  if(y>240){doc.addPage();y=20;}
+  // ─── ART 5 ───
+  y=clauseBox(
+    "ARTICLE 5 — PRIMES DE PERFORMANCE",
+    "Le locataire beneficie d'une prime mensuelle de 5.000 a 15.000 FCFA si tous les versements du mois ont ete effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree durant le mois concerne.",
+    y, 240, 253, 244);
 
-  // ─── ARTICLE 6 : RESILIATION ───
-  addText("ARTICLE 6 — RESILIATION", ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  y=addPara("Le contrat peut etre resilie de plein droit, sans preavis, en cas de : non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, fausse declaration lors de la signature, ou violation grave du code de la route.", y);
-  y+=3;
+  // ─── ART 6 ───
+  y=clauseBox(
+    "ARTICLE 6 — ENTRETIEN DU TRICYCLE",
+    "Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires aux intervalles requis. Les frais de reparation resultant d'une negligence d'entretien sont integralement a la charge du locataire.",
+    y, 255, 251, 235);
 
-  // ─── ARTICLE 7 : LITIGES ───
-  addText("ARTICLE 7 — REGLEMENT DES LITIGES", ml, y, {size:11, style:"bold", color:[10,31,68]});
-  y+=6;
-  y=addPara("Tout litige relatif au present contrat sera regle a l'amiable. A defaut, les tribunaux competents d'Abidjan seront seuls competents.", y);
-  y+=8;
+  // ─── ART 7 ───
+  y=clauseBox(
+    "ARTICLE 7 — INTERDICTIONS ET OBLIGATIONS",
+    "Il est formellement interdit : (1) d'abandonner le tricycle sans en informer le gerant ou un administrateur — tout abandon caracterise constituera un abandon de bien confie et fera l'objet de poursuites judiciaires ; (2) de laisser le tricycle aller en fourriere sans avertissement — les frais sont a la charge du locataire ; (3) de sous-louer ou preter le tricycle sans autorisation ecrite.",
+    y, 254, 242, 242);
+
+  // ─── ART 8 ───
+  y=clauseBox(
+    "ARTICLE 8 — RESILIATION",
+    "Le contrat peut etre resilie de plein droit, sans preavis, en cas de : non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, ou fausse declaration lors de la signature.",
+    y, 243, 244, 246);
+
+  // ─── ART 9 : CONSTAT DE FIN DE CONTRAT (NOUVELLE CLAUSE) ───
+  y=clauseBox(
+    "ARTICLE 9 — CONSTAT DE FIN DE CONTRAT ET RESTITUTION",
+    "Si l'une des deux parties (Bailleur ou Locataire) decide de mettre fin au present contrat — que ce soit a l'echeance normale, par resiliation anticipee ou d'un commun accord — un CONSTAT CONTRADICTOIRE du tricycle sera OBLIGATOIREMENT effectue avant la restitution. Ce constat permettra de verifier l'etat general du vehicule, d'identifier les eventuelles pannes ou dommages, et d'evaluer l'usure des pieces. Le tricycle DOIT etre restitue dans le meme etat qu'au moment de sa prise en charge initiale, sauf usure normale due a un usage conforme. Toute deterioration anormale (rayures profondes, casses, pieces manquantes, panne due a la negligence) constatee sera CHIFFREE et IMPUTEE au Locataire, qui s'engage a en assumer le cout integral. Le constat sera signe par les deux parties et fera office de quittus liberatoire une fois les eventuelles reparations effectuees ou payees.",
+    y, 254, 240, 220);
+
+  // ─── ART 10 ───
+  y=clauseBox(
+    "ARTICLE 10 — REGLEMENT DES LITIGES",
+    "Tout litige relatif au present contrat sera regle a l'amiable. A defaut, les tribunaux competents d'Abidjan seront seuls competents.",
+    y, 245, 245, 250);
 
   // ─── SIGNATURES ───
-  hr(y);y+=8;
-  addText("Fait a Abidjan, le " + dateDebut, ml, y, {size:10, style:"italic"});
+  if(y>210){doc.addPage(); y=15;} else {y+=4;}
+  hline(y, 229, 231, 235, 0.5);
+  y+=6;
+  setFont(11, "bold", 55, 65, 81);
+  doc.text("SIGNATURES", W/2, y, {align:"center"});
+  y+=5;
+  setFont(8, "normal", 107, 114, 128);
+  doc.text("Fait a Abidjan, le "+dateDebut, W/2, y, {align:"center"});
   y+=14;
 
-  doc.setDrawColor(100,100,100);
+  doc.setDrawColor(100, 100, 100);
   doc.line(ml, y, ml+70, y);
   doc.line(W-mr-70, y, W-mr, y);
   y+=5;
-  addText("Le BAILLEUR (Gerant)", ml+5, y, {size:10, style:"bold"});
-  addText("Le CHAUFFEUR", W-mr-50, y, {size:10, style:"bold"});
-  y+=5;
-  addText("Signature et cachet", ml+5, y, {size:8, color:[120,120,120]});
-  addText("Signature precedee de \"Lu et approuve\"", W-mr-60, y, {size:8, color:[120,120,120]});
+  setFont(9, "bold", 17, 24, 39);
+  doc.text("Le BAILLEUR", ml+25, y);
+  doc.text("Le LOCATAIRE", W-mr-50, y);
+  y+=4;
+  setFont(7, "italic", 120, 120, 120);
+  doc.text("DIAKITE Korotum Marceline", ml+13, y);
+  doc.text("Signature precedee de \"Lu et approuve\"", W-mr-65, y);
+  y+=4;
+  setFont(7, "normal", 120, 120, 120);
+  doc.text("Gerante & Proprietaire", ml+25, y);
+  doc.text(nom, W-mr-25, y, {align:"left"});
 
   // ─── PIED DE PAGE ───
-  setFont(8,"italic",150,150,150);
-  doc.text("Contrat genere automatiquement par Saloni Manager — " + dateDebut, W/2, 290, {align:"center"});
+  setFont(7, "italic", 150, 150, 150);
+  var totalPages=doc.getNumberOfPages();
+  for(var p=1;p<=totalPages;p++){
+    doc.setPage(p);
+    doc.text("Contrat genere automatiquement par Saloni Manager — "+dateDebut+" — Page "+p+"/"+totalPages, W/2, 290, {align:"center"});
+  }
 
-  // Sauvegarder
+  // ─── SAUVEGARDE ───
   var filename="Contrat_"+(c.nom||"chauffeur").replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
   doc.save(filename);
 
-  // Marquer le contrat comme généré
   if(!c.contratFin){
     c.contratFin=fin.toISOString().substring(0,10);
-    try{ fbSave("chauffeurs",c); }catch(e){}
-    save();
   }
+  c.contratGenere=true;
+  c.contratDateGen=td();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  save();
 
   toast("✅ Contrat généré et téléchargé","success");
   addIAJournal("contrat","Contrat PDF généré",c.nom);
@@ -4195,12 +4705,21 @@ function sendChatMedia(mediaObj){
   };
   if(!S.data.chats)S.data.chats=[];
   S.data.chats.push(item);
-  try{ fbSave("chats",item); }catch(e){
-    console.warn("Média trop gros pour Firebase",e);
-    save();
-  }
+
+  // Sauvegarde locale toujours en priorité
+  save();
   toast("✅ Média envoyé","success");
   render();
+
+  // Firebase seulement si < 900 KB
+  var dataSize=mediaObj.data?mediaObj.data.length:0;
+  if(dataSize<900000){
+    try{ fbSave("chats",item); }catch(e){
+      console.warn("Firebase a refusé:",e);
+    }
+  } else {
+    console.log("Média trop gros ("+Math.round(dataSize/1024)+" KB), gardé local seulement");
+  }
 }
 
 function renderRapports(){
