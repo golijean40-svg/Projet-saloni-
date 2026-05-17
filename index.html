@@ -7,9 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Saloni"/>
 <meta name="theme-color" content="#0a1f44"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <title>Saloni v20</title>
-<link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Saloni Manager","short_name":"Saloni","description":"Gestion de flotte de tricycles-taxis","start_url":".","display":"standalone","background_color":"%23ffffff","theme_color":"%230a1f44","orientation":"portrait","icons":[{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"%230a1f44\"/><text x=\"96\" y=\"126\" font-size=\"110\" text-anchor=\"middle\">🛺</text></svg>","sizes":"192x192","type":"image/svg+xml"},{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"%230a1f44\"/><text x=\"256\" y=\"340\" font-size=\"300\" text-anchor=\"middle\">🛺</text></svg>","sizes":"512x512","type":"image/svg+xml"}]}'/>
+<link rel="apple-touch-icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="40" fill="%230a1f44"/><text x="90" y="120" font-size="100" text-anchor="middle">🛺</text></svg>'/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -616,6 +617,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <div class="sidebar-item-label">Sous-comptes</div>
         <div class="sidebar-item-chevron">›</div>
       </button>
+      <button class="sidebar-item" onclick="goGeneric('notifications')" style="background:linear-gradient(135deg,rgba(249,115,22,.08),rgba(234,88,12,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff">🔔</div>
+        <div class="sidebar-item-label">Notifications</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
       <button class="sidebar-item" onclick="goGeneric('formations')" style="background:linear-gradient(135deg,rgba(29,78,216,.08),rgba(59,130,246,.04))">
         <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff">🎓</div>
         <div class="sidebar-item-label">Formations</div>
@@ -875,6 +881,39 @@ function startSync(){
           if(x.chauffeurId&&!isNaN(x.chauffeurId))x.chauffeurId=parseInt(x.chauffeurId);
           return x;
         });
+
+        // ─── Détection des nouveaux messages pour notifications ───
+        if(col==="chats" && S.user && S.data[col] && S.data[col].length>0){
+          var existingIds={};
+          (S.data[col]||[]).forEach(function(m){existingIds[m.id]=true;});
+          arr.forEach(function(newMsg){
+            if(!existingIds[newMsg.id] && !newMsg.lu){
+              // Nouveau message arrivé
+              var iAmRecipient=false;
+              if(estChauffeur()){
+                var myCh=getChauffeurDuCompte();
+                iAmRecipient=myCh && newMsg.convId==="conv_"+myCh.id && newMsg.de==="admin";
+              } else {
+                iAmRecipient=newMsg.de==="chauffeur";
+              }
+              if(iAmRecipient){
+                var sender="";
+                if(newMsg.de==="chauffeur"){
+                  var cId=newMsg.convId.replace("conv_","");
+                  var sCh=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(cId);});
+                  sender=sCh?sCh.nom:"Chauffeur";
+                } else {
+                  sender="Gérant";
+                }
+                var msgPreview=newMsg.texte||(newMsg.media?(newMsg.media.type==="image"?"📷 Photo":(newMsg.media.type==="video"?"🎥 Vidéo":(newMsg.media.type==="audio"?"🎵 Audio":"📎 Média"))):"Nouveau message");
+                if(typeof notify==="function"){
+                  notify("💬 "+sender, msgPreview.substring(0,60), "message", {action:"chat",convId:newMsg.convId});
+                }
+              }
+            }
+          });
+        }
+
         if(arr.length>0)S.data[col]=arr;
         cnt++;
         if(cnt>=COLS.length){showSync("Synchronisé","ok");}
@@ -2935,6 +2974,11 @@ function chDeclarerPanne(type){
   try{ fbSave("chats",msgGerant); }catch(e){}
 
   toast("✅ Déclaration envoyée au gérant","success");
+  // Notification au gérant (et au chauffeur lui-même côté UX)
+  if(typeof notify==="function"){
+    var icons={panne:"🔧 Panne signalée",entretien:"🛠️ Entretien demandé",maladie:"🏥 Absence maladie"};
+    notify(icons[type]||"🚨 Déclaration", c.nom+(note?" — "+note.substring(0,40):""), "panne", {action:"chat",convId:"conv_"+c.id});
+  }
   renderChauffeurApp();
 }
 
@@ -4180,6 +4224,504 @@ function toggleTheme(){
 })();
 
 // ═══ TOAST ═══
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME DE NOTIFICATIONS — Push, in-app, sons, vibrations
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Config notifications par utilisateur ───
+function getNotifConfig(){
+  var def={
+    enabled:true,
+    versements:true,
+    messages:true,
+    sanctions:true,
+    pannes:true,
+    iaActions:true,
+    primes:true,
+    sons:true,
+    vibration:true,
+    pushNavigateur:true,
+    pushPermission:"default" // "default", "granted", "denied"
+  };
+  try{
+    var c=JSON.parse(localStorage.getItem("sal_notif_config")||"{}");
+    return Object.assign(def,c);
+  }catch(e){return def;}
+}
+function setNotifConfig(cfg){
+  try{ localStorage.setItem("sal_notif_config",JSON.stringify(cfg)); }catch(e){}
+}
+
+// ─── Demander la permission de notification ───
+function requestNotificationPermission(){
+  if(!("Notification" in window)){
+    toast("Ce navigateur ne supporte pas les notifications","error");
+    return Promise.reject("not-supported");
+  }
+  if(Notification.permission==="granted"){
+    var cfg=getNotifConfig();
+    cfg.pushPermission="granted";
+    setNotifConfig(cfg);
+    return Promise.resolve("granted");
+  }
+  if(Notification.permission==="denied"){
+    return Promise.reject("denied");
+  }
+  return Notification.requestPermission().then(function(perm){
+    var cfg=getNotifConfig();
+    cfg.pushPermission=perm;
+    setNotifConfig(cfg);
+    if(perm==="granted"){
+      toast("✅ Notifications activées","success");
+      // Notification de bienvenue
+      sendBrowserNotif("Saloni Manager","🎉 Notifications activées avec succès !","success");
+    } else {
+      toast("Notifications refusées","error");
+    }
+    return perm;
+  });
+}
+
+// ─── Envoyer une notification navigateur ───
+function sendBrowserNotif(title, body, type, data){
+  var cfg=getNotifConfig();
+  if(!cfg.enabled) return;
+  if(!("Notification" in window)) return;
+  if(Notification.permission!=="granted") return;
+
+  try{
+    var icons={
+      success:"✅",
+      error:"❌",
+      warning:"⚠️",
+      info:"ℹ️",
+      versement:"💰",
+      message:"💬",
+      sanction:"⚖️",
+      panne:"🔧",
+      ia:"🤖",
+      prime:"⭐"
+    };
+    var icon=icons[type]||"🛺";
+
+    var notif=new Notification(title,{
+      body:body,
+      icon:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#0a1f44"/><text x="50" y="62" font-size="50" text-anchor="middle">🛺</text></svg>'),
+      badge:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#f97316"/></svg>'),
+      tag:type||"saloni",
+      vibrate:cfg.vibration?[200,100,200]:0,
+      silent:!cfg.sons,
+      data:data||{}
+    });
+    notif.onclick=function(){
+      window.focus();
+      notif.close();
+      // Si data.action, on peut router
+      if(data && data.action){
+        try{
+          if(data.action==="chat" && data.convId){
+            S.chatConv=data.convId.replace("conv_","");
+            goGeneric("chat");
+          } else if(data.action==="navigate"){
+            goGeneric(data.page);
+          }
+        }catch(e){}
+      }
+    };
+    // Auto-close après 10s
+    setTimeout(function(){try{notif.close();}catch(e){}},10000);
+    return notif;
+  }catch(e){
+    console.warn("Notif failed:",e);
+  }
+}
+
+// ─── Vibrer (si supporté) ───
+function vibrate(pattern){
+  var cfg=getNotifConfig();
+  if(!cfg.vibration) return;
+  try{
+    if(navigator.vibrate) navigator.vibrate(pattern||[200,100,200]);
+  }catch(e){}
+}
+
+// ─── Jouer un son de notification ───
+function playNotifSound(type){
+  var cfg=getNotifConfig();
+  if(!cfg.sons) return;
+  try{
+    var freq=440;
+    var duration=200;
+    if(type==="versement"){freq=600;duration=300;}
+    else if(type==="message"){freq=440;duration=200;}
+    else if(type==="sanction"||type==="panne"){freq=300;duration=400;}
+    else if(type==="prime"){freq=800;duration=500;}
+
+    var ctx=new (window.AudioContext||window.webkitAudioContext)();
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value=freq;
+    osc.type="sine";
+    gain.gain.setValueAtTime(0.1,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+duration/1000);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+duration/1000);
+  }catch(e){}
+}
+
+// ─── Bannière in-app (nouvelle, plus visible que toast) ───
+function notifyBanner(title, body, type, data){
+  type=type||"info";
+  var cfg=getNotifConfig();
+  var colors={
+    success:{bg:"linear-gradient(135deg,#059669,#047857)",icon:"✅"},
+    error:{bg:"linear-gradient(135deg,#dc2626,#991b1b)",icon:"❌"},
+    warning:{bg:"linear-gradient(135deg,#d97706,#b45309)",icon:"⚠️"},
+    info:{bg:"linear-gradient(135deg,#0284c7,#0369a1)",icon:"ℹ️"},
+    versement:{bg:"linear-gradient(135deg,#059669,#047857)",icon:"💰"},
+    message:{bg:"linear-gradient(135deg,#7c3aed,#5b21b6)",icon:"💬"},
+    sanction:{bg:"linear-gradient(135deg,#dc2626,#991b1b)",icon:"⚖️"},
+    panne:{bg:"linear-gradient(135deg,#f97316,#ea580c)",icon:"🔧"},
+    ia:{bg:"linear-gradient(135deg,#7c3aed,#5b21b6)",icon:"🤖"},
+    prime:{bg:"linear-gradient(135deg,#eab308,#a16207)",icon:"⭐"}
+  };
+  var c=colors[type]||colors.info;
+
+  // Vibrer + son
+  if(cfg.vibration) vibrate([200,100,200]);
+  if(cfg.sons) playNotifSound(type);
+
+  // Bannière HTML
+  var banner=document.createElement("div");
+  banner.className="notif-banner";
+  banner.style.cssText="position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-150%);width:calc(100% - 20px);max-width:460px;background:"+c.bg+";color:#fff;padding:14px 16px;border-radius:0 0 18px 18px;z-index:10000;box-shadow:0 8px 24px rgba(0,0,0,.3);transition:transform .35s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;gap:12px;cursor:pointer";
+
+  banner.innerHTML='<div style="font-size:24px;flex-shrink:0">'+c.icon+'</div>'+
+    '<div style="flex:1;min-width:0">'+
+      '<div style="font-weight:800;font-size:14px;margin-bottom:2px">'+escapeHtml(title)+'</div>'+
+      '<div style="font-size:12px;opacity:.92;line-height:1.3">'+escapeHtml(body)+'</div>'+
+    '</div>'+
+    '<button onclick="event.stopPropagation();this.parentElement.style.transform=\'translateX(-50%) translateY(-150%)\';setTimeout(()=>this.parentElement.remove(),350)" style="background:rgba(0,0,0,.2);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;flex-shrink:0;font-family:inherit">×</button>';
+
+  if(data && data.action){
+    banner.onclick=function(){
+      try{
+        if(data.action==="chat" && data.convId){
+          S.chatConv=data.convId.replace("conv_","");
+          goGeneric("chat");
+        } else if(data.action==="navigate"){
+          goGeneric(data.page);
+        }
+      }catch(e){}
+      banner.style.transform="translateX(-50%) translateY(-150%)";
+      setTimeout(function(){banner.remove();},350);
+    };
+  }
+
+  document.body.appendChild(banner);
+  // Animation d'entrée
+  setTimeout(function(){
+    banner.style.transform="translateX(-50%) translateY(0)";
+  },10);
+  // Auto-fermeture après 6s
+  setTimeout(function(){
+    if(banner.parentElement){
+      banner.style.transform="translateX(-50%) translateY(-150%)";
+      setTimeout(function(){if(banner.parentElement) banner.remove();},350);
+    }
+  },6000);
+}
+
+// ─── Fonction principale qui envoie partout ───
+function notify(title, body, type, data){
+  var cfg=getNotifConfig();
+  if(!cfg.enabled) return;
+
+  // Filtrer selon le type
+  if(type==="versement" && !cfg.versements) return;
+  if(type==="message" && !cfg.messages) return;
+  if(type==="sanction" && !cfg.sanctions) return;
+  if(type==="panne" && !cfg.pannes) return;
+  if(type==="ia" && !cfg.iaActions) return;
+  if(type==="prime" && !cfg.primes) return;
+
+  // 1. Bannière in-app si l'app est visible
+  if(document.visibilityState==="visible"){
+    notifyBanner(title, body, type, data);
+  } else if(cfg.pushNavigateur && Notification.permission==="granted"){
+    // 2. Notification navigateur si pas visible
+    sendBrowserNotif(title, body, type, data);
+  } else {
+    // 3. Au moins une bannière silencieuse pour quand l'utilisateur reviendra
+    addPendingNotif({title:title,body:body,type:type,data:data});
+  }
+}
+
+// ─── Notifications en attente (vues au prochain affichage) ───
+function addPendingNotif(n){
+  try{
+    var arr=JSON.parse(localStorage.getItem("sal_pending_notifs")||"[]");
+    arr.push(Object.assign({ts:Date.now()},n));
+    localStorage.setItem("sal_pending_notifs",JSON.stringify(arr.slice(-50)));
+  }catch(e){}
+}
+function showPendingNotifs(){
+  try{
+    var arr=JSON.parse(localStorage.getItem("sal_pending_notifs")||"[]");
+    if(arr.length===0) return;
+    // Afficher juste les 3 dernières et nettoyer
+    arr.slice(-3).forEach(function(n,i){
+      setTimeout(function(){
+        notifyBanner(n.title, n.body, n.type, n.data);
+      },i*1500);
+    });
+    localStorage.removeItem("sal_pending_notifs");
+  }catch(e){}
+}
+
+// ─── Détecter quand l'app redevient visible ───
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible" && S.user){
+    showPendingNotifs();
+  }
+});
+
+// ─── Service Worker (pour PWA / push futur) ───
+function registerSW(){
+  if(!("serviceWorker" in navigator)) return;
+  // Inline service worker via Blob
+  var swCode=`
+    self.addEventListener("install",function(e){self.skipWaiting();});
+    self.addEventListener("activate",function(e){e.waitUntil(self.clients.claim());});
+    self.addEventListener("push",function(e){
+      var data=e.data?e.data.json():{title:"Saloni",body:"Nouvelle notification"};
+      e.waitUntil(self.registration.showNotification(data.title,{
+        body:data.body,
+        icon:data.icon||"/icon.png",
+        tag:data.tag||"saloni",
+        data:data.data||{}
+      }));
+    });
+    self.addEventListener("notificationclick",function(e){
+      e.notification.close();
+      e.waitUntil(clients.matchAll({type:"window"}).then(function(list){
+        for(var i=0;i<list.length;i++){if(list[i].url.indexOf(location.origin)>=0)return list[i].focus();}
+        if(clients.openWindow) return clients.openWindow("/");
+      }));
+    });
+  `;
+  try{
+    var blob=new Blob([swCode],{type:"application/javascript"});
+    var url=URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url).then(function(reg){
+      console.log("✅ Service Worker enregistré");
+    }).catch(function(e){
+      console.warn("SW failed:",e);
+    });
+  }catch(e){console.warn("SW blob failed",e);}
+}
+
+// ─── Détecter si on est en mode PWA installée ───
+function isPWAInstalled(){
+  return window.matchMedia("(display-mode: standalone)").matches ||
+         window.navigator.standalone===true ||
+         document.referrer.includes("android-app://");
+}
+
+// ─── Prompt d'installation PWA ───
+window._deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",function(e){
+  e.preventDefault();
+  window._deferredInstallPrompt=e;
+});
+
+function installPWA(){
+  // iPhone : il faut donner les instructions manuelles
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  if(isIOS){
+    var body='';
+    body+='<div style="text-align:center;padding:20px 0">';
+    body+='<div style="font-size:48px;margin-bottom:14px">📲</div>';
+    body+='<div style="font-weight:800;font-size:16px;margin-bottom:14px">Installer Saloni sur iPhone</div>';
+    body+='<div style="font-size:13px;color:var(--txt-2);line-height:1.7;text-align:left;background:var(--surface-2);padding:14px;border-radius:12px">';
+    body+='<div style="margin-bottom:10px"><strong>1.</strong> Touchez l\'icône <strong>Partager</strong> en bas de Safari <span style="font-size:18px;display:inline-block;vertical-align:middle">⎙</span></div>';
+    body+='<div style="margin-bottom:10px"><strong>2.</strong> Faites défiler et touchez <strong>"Sur l\'écran d\'accueil"</strong> <span style="font-size:16px">➕</span></div>';
+    body+='<div style="margin-bottom:10px"><strong>3.</strong> Touchez <strong>"Ajouter"</strong> en haut à droite</div>';
+    body+='<div><strong>4.</strong> ✅ L\'icône Saloni apparaît sur votre écran d\'accueil</div>';
+    body+='</div>';
+    body+='<div style="background:var(--info-soft);color:var(--info);padding:10px;border-radius:10px;margin-top:14px;font-size:11.5px;line-height:1.5">';
+    body+='💡 Une fois installée, vous pourrez recevoir des notifications même app fermée (iOS 16.4+).';
+    body+='</div>';
+    body+='</div>';
+    openModal("📲 Installer Saloni", body);
+    return;
+  }
+
+  // Android : utiliser le prompt natif
+  if(window._deferredInstallPrompt){
+    window._deferredInstallPrompt.prompt();
+    window._deferredInstallPrompt.userChoice.then(function(choice){
+      if(choice.outcome==="accepted"){
+        toast("✅ App installée","success");
+      }
+      window._deferredInstallPrompt=null;
+    });
+  } else {
+    // Fallback : instructions manuelles
+    var body='';
+    body+='<div style="text-align:center;padding:20px 0">';
+    body+='<div style="font-size:48px;margin-bottom:14px">📲</div>';
+    body+='<div style="font-weight:800;font-size:16px;margin-bottom:14px">Installer Saloni</div>';
+    body+='<div style="font-size:13px;color:var(--txt-2);line-height:1.7;text-align:left;background:var(--surface-2);padding:14px;border-radius:12px">';
+    body+='<div style="margin-bottom:10px"><strong>Chrome Android</strong> : Menu (⋮) → "Ajouter à l\'écran d\'accueil"</div>';
+    body+='<div><strong>Safari iPhone</strong> : Bouton Partager (⎙) → "Sur l\'écran d\'accueil"</div>';
+    body+='</div>';
+    body+='</div>';
+    openModal("📲 Installer Saloni", body);
+  }
+}
+
+// ─── Écran de gestion des notifications ───
+function renderNotifications(){
+  var cfg=getNotifConfig();
+  var isPWA=isPWAInstalled();
+  var canNotify=("Notification" in window);
+  var permission=canNotify?Notification.permission:"unsupported";
+
+  var h='<div class="screen-title">🔔 Notifications</div>';
+
+  // Carte d'état
+  var stateBg,stateIcon,stateTitle,stateDesc;
+  if(!canNotify){
+    stateBg="linear-gradient(135deg,#64748b,#475569)";
+    stateIcon="❌";
+    stateTitle="Non supporté";
+    stateDesc="Ce navigateur ne supporte pas les notifications";
+  } else if(permission==="granted"){
+    stateBg="linear-gradient(135deg,#059669,#047857)";
+    stateIcon="✅";
+    stateTitle="Notifications actives";
+    stateDesc="Vous recevrez les notifications même quand l'app est en arrière-plan";
+  } else if(permission==="denied"){
+    stateBg="linear-gradient(135deg,#dc2626,#991b1b)";
+    stateIcon="🚫";
+    stateTitle="Notifications bloquées";
+    stateDesc="Vous avez refusé les notifications. Activez-les dans les paramètres du navigateur";
+  } else {
+    stateBg="linear-gradient(135deg,#d97706,#b45309)";
+    stateIcon="⚠️";
+    stateTitle="Permission non demandée";
+    stateDesc="Activez les notifications pour rester informé";
+  }
+
+  h+='<div style="background:'+stateBg+';color:#fff;border-radius:18px;padding:18px;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:14px"><div style="font-size:36px">'+stateIcon+'</div>';
+  h+='<div style="flex:1"><div style="font-weight:800;font-size:16px">'+stateTitle+'</div>';
+  h+='<div style="font-size:12px;opacity:.9;margin-top:2px;line-height:1.4">'+stateDesc+'</div></div></div>';
+  if(canNotify && permission!=="granted" && permission!=="denied"){
+    h+='<button onclick="requestNotificationPermission()" style="background:#fff;color:#0a1f44;border:none;border-radius:12px;padding:12px;width:100%;margin-top:12px;font-weight:800;font-family:inherit;cursor:pointer">🔔 Activer les notifications</button>';
+  }
+  h+='</div>';
+
+  // PWA installation
+  if(!isPWA){
+    h+='<div style="background:linear-gradient(135deg,rgba(124,58,237,.1),rgba(91,33,182,.05));border:2px solid #7c3aed;border-radius:14px;padding:16px;margin-bottom:14px">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="font-size:28px">📲</div>';
+    h+='<div><div style="font-weight:800;font-size:14px;color:#7c3aed">Installer l\'app</div>';
+    h+='<div style="font-size:11.5px;color:var(--txt-2)">Pour de vraies notifications push (app fermée)</div></div></div>';
+    h+='<button class="btn-primary" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);margin-top:8px" onclick="installPWA()">📲 Installer sur l\'écran d\'accueil</button>';
+    h+='</div>';
+  } else {
+    h+='<div style="background:var(--success-soft);color:var(--success);border-radius:12px;padding:12px;margin-bottom:14px;font-size:12.5px;line-height:1.5;text-align:center;font-weight:700">✅ App installée sur votre écran d\'accueil</div>';
+  }
+
+  // Master switch
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">⚙️ Paramètres</div>';
+
+  h+='<div onclick="toggleNotifSetting(\'enabled\')" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer">';
+  h+='<div style="font-size:24px">🔔</div>';
+  h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">Activer les notifications</div>';
+  h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px">Désactive tout d\'un coup</div></div>';
+  h+=renderNotifToggle(cfg.enabled);
+  h+='</div>';
+
+  if(cfg.enabled){
+    // Types
+    h+='<div style="margin-top:14px;font-size:12px;color:var(--txt-2);text-transform:uppercase;font-weight:700;margin-bottom:8px;letter-spacing:1px">📨 Types d\'événements</div>';
+
+    var types=[
+      {k:"versements",icon:"💰",t:"Nouveaux versements",d:"Quand un chauffeur paie"},
+      {k:"messages",icon:"💬",t:"Messages chat",d:"Nouveaux messages reçus"},
+      {k:"sanctions",icon:"⚖️",t:"Sanctions",d:"Sanctions appliquées par l'IA"},
+      {k:"pannes",icon:"🔧",t:"Pannes & entretiens",d:"Signalements des chauffeurs"},
+      {k:"iaActions",icon:"🤖",t:"Actions de l'IA",d:"Actions automatiques"},
+      {k:"primes",icon:"⭐",t:"Primes",d:"Primes attribuées"}
+    ];
+    types.forEach(function(t){
+      h+='<div onclick="toggleNotifSetting(\''+t.k+'\')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer">';
+      h+='<div style="font-size:20px">'+t.icon+'</div>';
+      h+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+t.t+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt-2);margin-top:1px">'+t.d+'</div></div>';
+      h+=renderNotifToggle(cfg[t.k]);
+      h+='</div>';
+    });
+
+    // Comportement
+    h+='<div style="margin-top:14px;font-size:12px;color:var(--txt-2);text-transform:uppercase;font-weight:700;margin-bottom:8px;letter-spacing:1px">🎵 Comportement</div>';
+    var behavior=[
+      {k:"sons",icon:"🔊",t:"Sons",d:"Bip sonore à chaque notification"},
+      {k:"vibration",icon:"📳",t:"Vibration",d:"Vibrer le téléphone"},
+      {k:"pushNavigateur",icon:"🌐",t:"Push navigateur",d:"Notifications quand l'app n'est pas ouverte"}
+    ];
+    behavior.forEach(function(t){
+      h+='<div onclick="toggleNotifSetting(\''+t.k+'\')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer">';
+      h+='<div style="font-size:20px">'+t.icon+'</div>';
+      h+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+t.t+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt-2);margin-top:1px">'+t.d+'</div></div>';
+      h+=renderNotifToggle(cfg[t.k]);
+      h+='</div>';
+    });
+  }
+
+  // Tester
+  h+='<div style="margin-top:18px"><button class="btn-ghost" onclick="testNotification()">🧪 Tester une notification</button></div>';
+
+  // Infos sur les limites
+  h+='<div style="background:var(--info-soft);color:var(--info);border-radius:12px;padding:12px;margin-top:14px;font-size:11.5px;line-height:1.6">';
+  h+='ℹ️ <strong>Bon à savoir</strong> :<br>';
+  h+='• <strong>App ouverte</strong> : bannière colorée en haut (toujours)<br>';
+  h+='• <strong>App en arrière-plan</strong> : notification système (si permission accordée)<br>';
+  h+='• <strong>App fermée</strong> : nécessite l\'installation PWA + iOS 16.4+ ou Android';
+  h+='</div>';
+
+  return h;
+}
+
+function renderNotifToggle(active){
+  return '<div style="width:48px;height:28px;background:'+(active?"var(--success)":"var(--border)")+';border-radius:14px;position:relative;transition:all .2s;flex-shrink:0">'+
+    '<div style="width:22px;height:22px;background:#fff;border-radius:50%;position:absolute;top:3px;left:'+(active?"23":"3")+'px;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.2)"></div>'+
+    '</div>';
+}
+
+function toggleNotifSetting(key){
+  var cfg=getNotifConfig();
+  cfg[key]=!cfg[key];
+  setNotifConfig(cfg);
+  // Si on active "pushNavigateur" et permission pas encore donnée, la demander
+  if(key==="pushNavigateur" && cfg[key] && cfg.pushPermission!=="granted"){
+    requestNotificationPermission();
+  }
+  // Refresh
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderNotifications()+'</div>';
+}
+
+function testNotification(){
+  notify("🧪 Test de notification","Si vous voyez ceci, tout fonctionne !","success",{action:"test"});
+}
+
 function toast(msg,type){
   var t=document.getElementById("toast");
   t.textContent=msg;
@@ -4461,7 +5003,8 @@ function saveVersement(){
   closeModal();
   toast("Versement de "+fc(m)+" enregistré","success");
   render();
-  // ─── Trigger IA temps réel ───
+  // ─── Notification + Trigger IA ───
+  if(c) notify("💰 Versement reçu", c.nom+" — "+fc(m), "versement", {action:"navigate",page:"vers"});
   setTimeout(function(){
     try{ iaCheckEvents(); }catch(e){}
   },500);
@@ -5560,6 +6103,7 @@ function renderGeneric(){
   else if(p==="reglement")html+=renderReglement();
   else if(p==="souscomptes")html+=renderSousComptes();
   else if(p==="formations")html+=renderFormationGerant();
+  else if(p==="notifications")html+=renderNotifications();
   else if(p==="waveconfig")html+=renderWaveConfig();
   else if(p==="wavepreuves")html+=renderWavePreuves();
   else if(p==="journal")html+=renderJournal();
@@ -6682,6 +7226,8 @@ function iaRunAutomations(){
             detail:"2 jours sans versement"
           });
           addIAJournal("sanction","Sanction automatique appliquée",c.nom+" — 2j sans versement");
+          // Notification
+          if(typeof notify==="function") notify("⚖️ Sanction automatique", c.nom+" — 2 jours sans versement", "sanction", {action:"navigate",page:"sanctions"});
 
           // ─── ENVOI WHATSAPP AUTO ───
           if(c.tel){
@@ -6735,6 +7281,8 @@ function iaRunAutomations(){
             detail:"5 000 F — 4 semaines parfaites"
           });
           addIAJournal("prime","Prime automatique attribuée",c.nom+" — 5 000 F");
+          // Notification
+          if(typeof notify==="function") notify("⭐ Prime accordée", c.nom+" — 5 000 F (4 semaines parfaites)", "prime", {action:"navigate",page:"primes"});
         }
       }
     });
@@ -8430,6 +8978,9 @@ function renderApropos(){
    INIT — Vérifier session sauvegardée
    ═══════════════════════════════════════════════════════════ */
 (function init(){
+  // Démarrer service worker pour PWA et push
+  try{ registerSW(); }catch(e){}
+
   try{
     var session=JSON.parse(localStorage.getItem("sal_session")||"null");
     if(session&&session.pseudo&&(Date.now()-session.ts)<24*60*60*1000){
@@ -8440,6 +8991,8 @@ function renderApropos(){
         S.user=c;
         showApp();
         setTimeout(initFirebase,300);
+        // Afficher les notifications en attente
+        setTimeout(showPendingNotifs,1500);
       }
     }
   }catch(e){}
