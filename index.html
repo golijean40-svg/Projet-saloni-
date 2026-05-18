@@ -881,6 +881,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <div class="sidebar-item-label">Sous-comptes</div>
         <div class="sidebar-item-chevron">›</div>
       </button>
+      <button class="sidebar-item" onclick="goGeneric('autopilot')" style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(91,33,182,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">🤖</div>
+        <div class="sidebar-item-label">Autopilot IA</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
       <button class="sidebar-item" onclick="goGeneric('gps')" style="background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.04))">
         <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">📍</div>
         <div class="sidebar-item-label">Suivi GPS</div>
@@ -1183,11 +1188,39 @@ function startSync(){
           });
         }
 
-        if(arr.length>0)S.data[col]=arr;
+        // ─── Fusion intelligente : ne pas écraser les ajouts locaux récents ───
+        if(arr.length>0){
+          var localData=S.data[col]||[];
+          var serverIds={};
+          arr.forEach(function(item){serverIds[item.id]=true;});
+
+          // Garder les items locaux récents (< 10s) qui ne sont pas encore sur le serveur
+          var recentLocal=localData.filter(function(item){
+            if(!item.id) return false;
+            if(serverIds[item.id]) return false; // déjà sur serveur
+            // Item local très récent (ID timestamp dans les 10 dernières secondes)
+            var itemTs=parseInt(item.id)||0;
+            return (Date.now()-itemTs)<10000;
+          });
+
+          // Fusionner serveur + locaux récents
+          S.data[col]=arr.concat(recentLocal);
+        } else if(arr.length===0 && S.data[col] && S.data[col].length>0){
+          // Cas spécial : serveur vide mais on a des données locales
+          // Ne PAS écraser pour éviter perte de données
+        } else {
+          S.data[col]=arr;
+        }
         cnt++;
         if(cnt>=COLS.length){showSync("Synchronisé","ok");}
         save();
-        if(S.user)render();
+        // Throttle le render pour éviter le clignotement
+        if(S.user){
+          if(window._renderTimeout) clearTimeout(window._renderTimeout);
+          window._renderTimeout=setTimeout(function(){
+            if(S.user && typeof render==="function") render();
+          },500);
+        }
       },function(err){showSync("Erreur sync","");});
       unsubs.push(u);
     }catch(e){}
@@ -2266,27 +2299,40 @@ function showApp(){
   document.getElementById("sbName").textContent=S.user.pseudo.charAt(0).toUpperCase()+S.user.pseudo.slice(1);
   document.getElementById("sbRole").textContent=S.user.role+" · Niveau "+S.user.niveau;
   render();
-  // ─── Démarrer le bot IA autonome ───
+  // ─── Démarrer le bot IA autonome (avec délai pour ne pas perturber) ───
   setTimeout(function(){
     try{
-      var actions=iaRunAutomations();
-      if(actions && actions.length>0){
-        toast("🤖 IA: "+actions.length+" action(s) auto","success");
+      var cfg=(typeof getIAConfig==="function")?getIAConfig():{autopilotEnabled:true};
+      // Ne lancer iaRunAutomations au boot QUE si pas déjà lancé aujourd'hui
+      var lastRun=localStorage.getItem("sal_ia_lastRun");
+      var t=td();
+      if(cfg.autopilotEnabled && lastRun!==t){
+        var actions=iaRunAutomations();
+        localStorage.setItem("sal_ia_lastRun",t);
+        if(actions && actions.length>0){
+          toast("🤖 IA: "+actions.length+" action(s) auto","success");
+        }
       }
       // Vérifier événements temps réel
       try{ iaCheckEvents(); }catch(e){}
-      // Proposer envoi WhatsApp pour sanctions
+      // Proposer envoi WhatsApp pour sanctions (silencieux si rien)
       setTimeout(function(){
         try{ iaProcessPendingWA(); }catch(e){}
       },1500);
     }catch(e){console.warn("IA auto failed",e);}
-  },2000);
-  // Re-check toutes les 30 minutes pour les automatisations
+  },3000); // 3s au lieu de 2s pour laisser le rendu se stabiliser
+  // Re-check selon mode autopilot (éco: 12h, normal: 6h, performance: 30min)
   if(!window._iaInterval){
+    var freq=(typeof iaGetFrequence==="function")?iaGetFrequence():30*60*1000;
     window._iaInterval=setInterval(function(){
+      var cfg=getIAConfig();
+      if(!cfg.autopilotEnabled) return;
+      if(!iaCheckQuota()) return;
       try{ iaRunAutomations(); }catch(e){}
       try{ iaProcessPendingWA(); }catch(e){}
-    },30*60*1000);
+      // Rapports automatiques selon configuration
+      try{ iaCheckAutoRapports(); }catch(e){}
+    },freq);
   }
   // Re-check événements temps réel toutes les 2 minutes
   if(!window._iaEventInterval){
@@ -5789,13 +5835,18 @@ function saveVersement(){
   if(!S.data.versements)S.data.versements=[];
   S.data.versements.push(item);
   var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(cid);})[0];
-  if(c){c.solde=(c.solde||0)+m;fbSave("chauffeurs",c);}
-  fbSave("versements",item);
+  if(c){c.solde=(c.solde||0)+m;}
+  save();
   closeModal();
   toast("Versement de "+fc(m)+" enregistré","success");
-  render();
+  render(); // Affichage immédiat avant Firebase
+  // Annuler le throttle Firebase pour ne pas re-render derrière
+  if(window._renderTimeout) clearTimeout(window._renderTimeout);
+  // Firebase en arrière-plan
+  if(c) try{fbSave("chauffeurs",c);}catch(e){}
+  try{fbSave("versements",item);}catch(e){}
   // ─── Notification + Trigger IA ───
-  if(c) notify("💰 Versement reçu", c.nom+" — "+fc(m), "versement", {action:"navigate",page:"vers"});
+  if(c && typeof notify==="function") notify("💰 Versement reçu", c.nom+" — "+fc(m), "versement", {action:"navigate",page:"vers"});
   setTimeout(function(){
     try{ iaCheckEvents(); }catch(e){}
   },500);
@@ -5945,8 +5996,9 @@ function saveChauffeur(id){
     var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(id);})[0];
     if(!c){toast("Chauffeur introuvable","error");return;}
     Object.keys(data).forEach(function(k){c[k]=data[k];});
-    try{ fbSave("chauffeurs",c); }catch(e){}
+    save();
     toast("✅ Chauffeur modifié","success");
+    try{ fbSave("chauffeurs",c); }catch(e){}
   } else {
     data.id=Date.now();
     data.solde=0;
@@ -5955,11 +6007,14 @@ function saveChauffeur(id){
     data.docs={};
     if(!S.data.chauffeurs) S.data.chauffeurs=[];
     S.data.chauffeurs.push(data);
-    try{ fbSave("chauffeurs",data); }catch(e){}
+    save();
     toast("✅ Chauffeur ajouté","success");
+    try{ fbSave("chauffeurs",data); }catch(e){}
   }
   closeModal();
   render();
+  // Annuler le throttle Firebase pour ne pas re-render derrière
+  if(window._renderTimeout) clearTimeout(window._renderTimeout);
 }
 
 function confirmDeleteChauffeur(id){
@@ -6895,6 +6950,7 @@ function renderGeneric(){
   else if(p==="souscomptes")html+=renderSousComptes();
   else if(p==="formations")html+=renderFormationGerant();
   else if(p==="notifications")html+=renderNotifications();
+  else if(p==="autopilot")html+=renderAutopilot();
   else if(p==="gps")html+=renderGPS();
   else if(p==="gpsChauffeur")html+=renderGPSChauffeur(S.gpsChauffeurId);
   else if(p==="waveconfig")html+=renderWaveConfig();
@@ -7373,6 +7429,18 @@ function renderSousComptes(){
   // Bouton ajouter
   h+='<button class="btn-primary" style="margin:14px 0" onclick="openSousCompteModal()">+ Créer un sous-compte</button>';
 
+  // ─── Migration rapide : activer "versements" pour tous les admins existants ───
+  var adminsListSansVers=sc.filter(function(c){return c.niveau===2 && !(c.permissions && c.permissions.versements);});
+  if(adminsListSansVers.length>0){
+    h+='<div style="background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(5,150,105,.05));border:2px solid var(--success);border-radius:14px;padding:14px;margin-bottom:14px">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+    h+='<div style="font-size:24px">💰</div>';
+    h+='<div style="flex:1"><div style="font-weight:800;font-size:13.5px;color:var(--success)">Permettre aux admins d\'enregistrer les versements</div>';
+    h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px">'+adminsListSansVers.length+' admin(s) n\'ont pas encore cette permission</div></div></div>';
+    h+='<button class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669);margin:0" onclick="activerVersementsTousAdmins()">✓ Activer pour tous les admins</button>';
+    h+='</div>';
+  }
+
   // Liste
   h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">Comptes existants</div>';
   if(sc.length===0){
@@ -7425,20 +7493,25 @@ function openSousCompteModal(existing){
 
   // Permissions pour niveau 2 (Admin/Collaborateur)
   body+='<div id="scPermsBox" style="margin-top:14px;padding:12px;background:var(--surface-2);border-radius:12px">';
-  body+='<div style="font-weight:700;font-size:13px;margin-bottom:10px">🔐 Permissions</div>';
+  body+='<div style="font-weight:700;font-size:13px;margin-bottom:6px">🔐 Permissions</div>';
+  body+='<div style="font-size:11px;color:var(--txt-2);margin-bottom:10px">Cochez ce que cet admin peut faire</div>';
   var perms=c.permissions||{};
+  // ─── Par défaut pour un nouveau admin, pré-cocher versements + chat ───
+  if(!isEdit && Object.keys(perms).length===0){
+    perms={versements:true, chat:true};
+  }
   var permsList=[
-    {k:"versements", l:"Enregistrer des versements"},
-    {k:"chauffeurs", l:"Gérer les chauffeurs"},
-    {k:"flotte", l:"Gérer la flotte"},
-    {k:"depenses", l:"Enregistrer des dépenses"},
-    {k:"rapports", l:"Voir les rapports"},
-    {k:"chat", l:"Utiliser le chat"}
+    {k:"versements", l:"💰 Enregistrer des versements", recommande:true},
+    {k:"chauffeurs", l:"👥 Gérer les chauffeurs"},
+    {k:"flotte", l:"🚗 Gérer la flotte"},
+    {k:"depenses", l:"💸 Enregistrer des dépenses"},
+    {k:"rapports", l:"📊 Voir les rapports"},
+    {k:"chat", l:"💬 Utiliser le chat", recommande:true}
   ];
   permsList.forEach(function(p){
     body+='<label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;cursor:pointer">';
     body+='<input type="checkbox" id="scPerm_'+p.k+'" '+(perms[p.k]?"checked":"")+' style="width:18px;height:18px;cursor:pointer"/>';
-    body+='<span>'+p.l+'</span></label>';
+    body+='<span>'+p.l+(p.recommande?' <span style="background:var(--success-soft);color:var(--success);padding:1px 6px;border-radius:6px;font-size:9px;font-weight:800;margin-left:4px">RECOMMANDÉ</span>':'')+'</span></label>';
   });
   body+='</div>';
 
@@ -7549,6 +7622,30 @@ function delSousCompte(pseudo){
   save();
   toast("Sous-compte supprimé","success");
   if(typeof render==="function") render();
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
+}
+
+function activerVersementsTousAdmins(){
+  var sc=S.data.sousComptes||[];
+  var modifies=0;
+  sc.forEach(function(c){
+    if(c.niveau===2){
+      if(!c.permissions) c.permissions={};
+      if(!c.permissions.versements){
+        c.permissions.versements=true;
+        modifies++;
+      }
+      // Activer aussi le chat par défaut (utile pour la collaboration)
+      if(!c.permissions.chat){
+        c.permissions.chat=true;
+      }
+      // Sync Firebase
+      try{ if(db) db.collection("sal_sousComptes").doc(c.pseudo).set(c); }catch(e){}
+    }
+  });
+  save();
+  toast("✅ "+modifies+" admin(s) peuvent maintenant enregistrer des versements","success");
   var content=document.getElementById("content-generic");
   if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
 }
@@ -7934,16 +8031,47 @@ function addIAJournal(type, msg, detail){
 // Config IA (activation des automatisations)
 function getIAConfig(){
   var def={
-    autoRelance:true,        // Relance WA auto si non-paiement
-    autoSanction:true,       // Sanction auto si 2j non-paiement
-    autoPrime:true,          // Prime auto si objectif atteint 4 semaines
-    autoAlerteDocs:true,     // Alerte docs expirent <30j
-    autoAnalyse:true,        // Conseils business quotidiens
-    heureCheck:"20:00"       // Heure du check quotidien
+    autoRelance:true,
+    autoSanction:true,
+    autoPrime:true,
+    autoAlerteDocs:true,
+    autoAnalyse:true,
+    heureCheck:"20:00",
+    // ═══ AUTOPILOT ═══
+    autopilotMode:"eco",          // "eco" | "normal" | "performance"
+    autopilotEnabled:true,
+    // Détection fraude
+    fraudeDetection:true,
+    fraudeSensibilite:"moyenne",   // "basse" | "moyenne" | "haute"
+    // Analyses prédictives
+    predictionsActives:true,
+    predictionsRisqueDepart:true,
+    // Rapports auto
+    rapportQuotidien:true,
+    rapportHebdo:true,
+    rapportMensuel:true,
+    // Chat auto chauffeurs
+    autoReponseChauffeur:false,    // Par défaut OFF (risqué)
+    autoReponseFAQ:true,           // Réponses FAQ uniquement OK
+    // Quota & cache
+    quotaJournalier:1500,          // F CFA max par jour
+    cacheActif:true,
+    // Stats
+    appelsJour:0,
+    coutEstimeJour:0,
+    dernierResetQuota:""
   };
   try{
     var c=JSON.parse(localStorage.getItem("sal_ia_config")||"{}");
-    return Object.assign(def,c);
+    var merged=Object.assign(def,c);
+    // Reset quota si nouveau jour
+    if(merged.dernierResetQuota!==td()){
+      merged.appelsJour=0;
+      merged.coutEstimeJour=0;
+      merged.dernierResetQuota=td();
+      try{ localStorage.setItem("sal_ia_config",JSON.stringify(merged)); }catch(e){}
+    }
+    return merged;
   }catch(e){ return def; }
 }
 function setIAConfig(k,v){
@@ -7952,7 +8080,676 @@ function setIAConfig(k,v){
   try{ localStorage.setItem("sal_ia_config",JSON.stringify(c)); }catch(e){}
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   AUTOPILOT IA - Capacités avancées
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Vérifier le quota avant tout appel API coûteux ───
+function iaCheckQuota(){
+  var cfg=getIAConfig();
+  if(cfg.coutEstimeJour>=cfg.quotaJournalier){
+    if(typeof notify==="function"){
+      notify("🚫 Quota IA dépassé", "Augmentez le quota dans les Paramètres IA","warning");
+    }
+    return false;
+  }
+  // Alerte à 80%
+  if(cfg.coutEstimeJour>=cfg.quotaJournalier*0.8 && !window._quotaAlerted){
+    window._quotaAlerted=true;
+    if(typeof notify==="function"){
+      notify("⚠️ Quota IA 80%","Vous approchez de la limite quotidienne","warning");
+    }
+  }
+  return true;
+}
+
+// ─── Enregistrer un appel IA (mode éco mode/cache) ───
+function iaLogCall(typeAppel, coutEstime){
+  var cfg=getIAConfig();
+  cfg.appelsJour=(cfg.appelsJour||0)+1;
+  cfg.coutEstimeJour=(cfg.coutEstimeJour||0)+(coutEstime||30); // ~30F par appel par défaut
+  try{ localStorage.setItem("sal_ia_config",JSON.stringify(cfg)); }catch(e){}
+}
+
+// ─── Fréquence des automatisations selon mode ───
+function iaGetFrequence(){
+  var cfg=getIAConfig();
+  if(cfg.autopilotMode==="eco") return 12*60*60*1000;      // 2x/jour
+  if(cfg.autopilotMode==="normal") return 6*60*60*1000;    // 4x/jour
+  if(cfg.autopilotMode==="performance") return 30*60*1000; // toutes les 30min
+  return 12*60*60*1000;
+}
+
+// ─── Cache intelligent pour éviter re-analyses ───
+function iaCacheGet(key){
+  try{
+    var cache=JSON.parse(localStorage.getItem("sal_ia_cache")||"{}");
+    var entry=cache[key];
+    if(!entry) return null;
+    // Cache valide 6h
+    if(Date.now()-entry.ts>6*3600*1000) return null;
+    return entry.data;
+  }catch(e){return null;}
+}
+function iaCacheSet(key, data){
+  try{
+    var cache=JSON.parse(localStorage.getItem("sal_ia_cache")||"{}");
+    cache[key]={data:data,ts:Date.now()};
+    // Limiter taille cache
+    var keys=Object.keys(cache);
+    if(keys.length>50){
+      // Supprimer les plus anciens
+      keys.sort(function(a,b){return cache[a].ts-cache[b].ts;});
+      for(var i=0;i<keys.length-50;i++) delete cache[keys[i]];
+    }
+    localStorage.setItem("sal_ia_cache",JSON.stringify(cache));
+  }catch(e){}
+}
+
+/* ═══ DÉTECTION DE FRAUDE ═══ */
+function iaDetectFraude(){
+  var cfg=getIAConfig();
+  if(!cfg.fraudeDetection) return [];
+
+  var fraudes=[];
+  var VE=(S.data.versements||[]).map(normVers);
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  CH.forEach(function(c){
+    var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+    if(versCh.length<5) return; // Pas assez de données
+
+    // ─── 1. Montants identiques répétitifs ───
+    var montants={};
+    versCh.slice(-20).forEach(function(v){
+      montants[v.montant]=(montants[v.montant]||0)+1;
+    });
+    var maxRepeat=0,maxMontant=0;
+    Object.keys(montants).forEach(function(m){
+      if(montants[m]>maxRepeat){
+        maxRepeat=montants[m];
+        maxMontant=parseInt(m);
+      }
+    });
+    if(maxRepeat>=15 && versCh.slice(-20).length>=18){
+      // 15+ versements identiques sur les 20 derniers = très suspect
+      fraudes.push({
+        chauffeur:c,
+        type:"montants_identiques",
+        severite:"haute",
+        titre:"💰 Montants suspects",
+        description:c.nom+" verse "+maxMontant+" F exactement "+maxRepeat+" fois sur les 20 derniers versements. Soit il a un revenu très stable, soit il déclare un montant fixe quoi qu'il gagne réellement.",
+        recommandation:"Vérifier ses recettes réelles via tracker GPS ou inspection ponctuelle."
+      });
+    }
+
+    // ─── 2. Versements toujours en dessous de l'objectif ───
+    var obj=c.objectifJour||0;
+    if(obj>0){
+      var derniers=versCh.slice(-14);
+      var sousObj=derniers.filter(function(v){return v.montant<obj*0.95;}).length;
+      if(sousObj>=12 && derniers.length>=14){
+        fraudes.push({
+          chauffeur:c,
+          type:"sous_objectif_systematique",
+          severite:"moyenne",
+          titre:"📉 Toujours sous l'objectif",
+          description:c.nom+" est en dessous de son objectif ("+fc(obj)+") "+sousObj+" jours sur 14. Cela peut indiquer un objectif trop élevé OU une déclaration minorée.",
+          recommandation:"Discuter avec le chauffeur ou ajuster l'objectif."
+        });
+      }
+    }
+
+    // ─── 3. Versements jamais le weekend ou jours louches ───
+    var joursParSemaine={dim:0,lun:0,mar:0,mer:0,jeu:0,ven:0,sam:0};
+    var nomsJours=["dim","lun","mar","mer","jeu","ven","sam"];
+    versCh.slice(-30).forEach(function(v){
+      var jour=new Date(v.date).getDay();
+      joursParSemaine[nomsJours[jour]]++;
+    });
+    if(joursParSemaine.sam===0 && joursParSemaine.dim===0 && versCh.length>=20){
+      fraudes.push({
+        chauffeur:c,
+        type:"jamais_weekend",
+        severite:"basse",
+        titre:"📅 Jamais le weekend",
+        description:c.nom+" ne verse JAMAIS le samedi/dimanche depuis 30 versements. Soit il ne travaille pas (à confirmer), soit ses gains weekend ne sont pas déclarés.",
+        recommandation:"Demander où passe l'argent du weekend."
+      });
+    }
+
+    // ─── 4. Pic anormal récent ───
+    if(versCh.length>=10){
+      var moy10=versCh.slice(-10).reduce(function(s,v){return s+v.montant;},0)/10;
+      var moy30Avant=versCh.slice(-40,-10);
+      if(moy30Avant.length>=15){
+        var moyAvant=moy30Avant.reduce(function(s,v){return s+v.montant;},0)/moy30Avant.length;
+        if(moy10<moyAvant*0.6){
+          fraudes.push({
+            chauffeur:c,
+            type:"baisse_anormale",
+            severite:"haute",
+            titre:"📉 Baisse soudaine -"+Math.round((1-moy10/moyAvant)*100)+"%",
+            description:c.nom+" verse en moyenne "+fc(Math.round(moy10))+" F depuis 10 jours, contre "+fc(Math.round(moyAvant))+" F avant. Baisse anormale.",
+            recommandation:"Causes possibles : maladie, démotivation, intention de partir, fraude. À investiguer."
+          });
+        }
+      }
+    }
+
+    // ─── 5. Trop de pannes signalées ───
+    var msgChat=(S.data.chats||[]).filter(function(m){return m.convId==="conv_"+c.id && m.de==="chauffeur";});
+    var pannes=msgChat.filter(function(m){
+      return m.texte && (m.texte.toLowerCase().indexOf("panne")>=0 || m.texte.toLowerCase().indexOf("crevé")>=0);
+    }).length;
+    if(pannes>=5){
+      fraudes.push({
+        chauffeur:c,
+        type:"trop_pannes",
+        severite:"moyenne",
+        titre:"🔧 Pannes répétées ("+pannes+")",
+        description:c.nom+" a signalé "+pannes+" pannes ou problèmes. Soit malchanceux, soit utilise les pannes comme excuse.",
+        recommandation:"Examiner physiquement le véhicule pour vérifier."
+      });
+    }
+  });
+
+  return fraudes;
+}
+
+/* ═══ PRÉDICTIONS : Risque de départ ═══ */
+function iaPredireRisqueDepart(){
+  var cfg=getIAConfig();
+  if(!cfg.predictionsRisqueDepart) return [];
+
+  var risques=[];
+  var VE=(S.data.versements||[]).map(normVers);
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut==="actif";});
+  var t=td();
+
+  CH.forEach(function(c){
+    var score=0;
+    var signaux=[];
+
+    // Signal 1 : Versements en baisse continue
+    var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+    if(versCh.length>=10){
+      var m5=versCh.slice(-5).reduce(function(s,v){return s+v.montant;},0)/5;
+      var m15=versCh.slice(-20,-5).reduce(function(s,v){return s+v.montant;},0)/Math.max(versCh.slice(-20,-5).length,1);
+      if(m5<m15*0.7){
+        score+=30;
+        signaux.push("Versements en chute (-"+Math.round((1-m5/m15)*100)+"%)");
+      } else if(m5<m15*0.85){
+        score+=15;
+        signaux.push("Versements en légère baisse");
+      }
+    }
+
+    // Signal 2 : Communication réduite
+    var msgRecent=(S.data.chats||[]).filter(function(m){
+      return m.convId==="conv_"+c.id && m.de==="chauffeur" &&
+        (Date.now()-(m.ts||0))<14*24*3600*1000;
+    });
+    if(msgRecent.length===0 && versCh.length>5){
+      score+=20;
+      signaux.push("Aucun message depuis 14j");
+    }
+
+    // Signal 3 : Absences répétées récentes
+    var derniersJ=[];
+    for(var i=0;i<14;i++){
+      var d=new Date();
+      d.setDate(d.getDate()-i);
+      derniersJ.push(fmtISO(d));
+    }
+    var absences=derniersJ.filter(function(d){
+      return !versCh.find(function(v){return normDate(v.date)===d;});
+    }).length;
+    if(absences>=7){
+      score+=25;
+      signaux.push(absences+" jours sans verser sur 14");
+    }
+
+    // Signal 4 : Pannes / maladies fréquentes
+    var declarations=(S.data.chats||[]).filter(function(m){
+      return m.convId==="conv_"+c.id && m.de==="chauffeur" && m.texte &&
+        (m.texte.toLowerCase().indexOf("panne")>=0 || m.texte.toLowerCase().indexOf("malade")>=0) &&
+        (Date.now()-(m.ts||0))<30*24*3600*1000;
+    }).length;
+    if(declarations>=3){
+      score+=15;
+      signaux.push(declarations+" pannes/maladies ce mois");
+    }
+
+    // Signal 5 : Pas formation faite alors qu'ancien
+    if(typeof getFormationProgress==="function"){
+      var prog=getFormationProgress(c.id);
+      var complete=Object.keys(prog).filter(function(k){return prog[k].complete;}).length;
+      var ancien=c.dateAjout && (Date.now()-new Date(c.dateAjout).getTime())>60*24*3600*1000;
+      if(ancien && complete===0){
+        score+=10;
+        signaux.push("Aucune formation faite (chauffeur ancien)");
+      }
+    }
+
+    if(score>=40){
+      risques.push({
+        chauffeur:c,
+        score:score,
+        signaux:signaux,
+        niveau:score>=70?"haut":(score>=50?"moyen":"faible"),
+        recommandation:score>=70?
+          "Risque de départ IMMINENT. Parler avec le chauffeur cette semaine. Identifier le problème (financier, motivation, conflit).":
+          (score>=50?"Vigilance. Faire un point d'équipe rapide.":"Surveillance simple. Encourager.")
+      });
+    }
+  });
+
+  return risques.sort(function(a,b){return b.score-a.score;});
+}
+
+/* ═══ ANALYSE FINANCIÈRE RÉELLE ═══ */
+function iaAnalyseFinanciere(){
+  var VE=(S.data.versements||[]).map(normVers);
+  var DEP=S.data.depenses||[];
+  var CH=S.data.chauffeurs||[];
+  var t=td();
+  var mois=getMois();
+  var sem=getSem();
+
+  // CA brut
+  var caMois=VE.filter(function(v){return mois.indexOf(normDate(v.date))>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var caSem=VE.filter(function(v){return sem.indexOf(normDate(v.date))>=0;}).reduce(function(s,v){return s+v.montant;},0);
+
+  // Dépenses
+  var depMois=DEP.filter(function(d){return mois.indexOf(normDate(d.date))>=0;}).reduce(function(s,d){return s+(d.montant||0);},0);
+
+  // Bénéfice net réel
+  var beneficeMois=caMois-depMois;
+  var margeMois=caMois>0?Math.round(beneficeMois/caMois*100):0;
+
+  // Comparaison mois précédent
+  var d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1);
+  var moisPrec=[];
+  while(d.getDate()<=28){
+    moisPrec.push(fmtISO(d));
+    d.setDate(d.getDate()+1);
+  }
+  var caMoisPrec=VE.filter(function(v){return moisPrec.indexOf(normDate(v.date))>=0;}).reduce(function(s,v){return s+v.montant;},0);
+  var depMoisPrec=DEP.filter(function(dd){return moisPrec.indexOf(normDate(dd.date))>=0;}).reduce(function(s,dd){return s+(dd.montant||0);},0);
+  var beneficePrec=caMoisPrec-depMoisPrec;
+
+  // CA par chauffeur (top/flop)
+  var caParCh={};
+  CH.forEach(function(c){
+    caParCh[c.id]={ch:c,total:0};
+  });
+  VE.filter(function(v){return mois.indexOf(normDate(v.date))>=0;}).forEach(function(v){
+    if(caParCh[v.chauffeurId]) caParCh[v.chauffeurId].total+=v.montant;
+  });
+  var listeCh=Object.values(caParCh).sort(function(a,b){return b.total-a.total;});
+
+  // Coût par jour (charges fixes estimées)
+  var coutFixeJour=Math.round(depMois/(new Date().getDate()));
+
+  // Projection
+  var joursMois=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+  var joursPasses=new Date().getDate();
+  var projectionCA=Math.round(caMois/joursPasses*joursMois);
+  var projectionDep=Math.round(depMois/joursPasses*joursMois);
+  var projectionBenefice=projectionCA-projectionDep;
+
+  return {
+    caMois:caMois,
+    caSem:caSem,
+    depMois:depMois,
+    beneficeMois:beneficeMois,
+    margeMois:margeMois,
+    caMoisPrec:caMoisPrec,
+    beneficePrec:beneficePrec,
+    evolution:caMoisPrec>0?Math.round((caMois-caMoisPrec)/caMoisPrec*100):0,
+    coutFixeJour:coutFixeJour,
+    topChauffeur:listeCh[0],
+    flopChauffeur:listeCh[listeCh.length-1],
+    projectionCA:projectionCA,
+    projectionBenefice:projectionBenefice,
+    nombreVersements:VE.filter(function(v){return mois.indexOf(normDate(v.date))>=0;}).length
+  };
+}
+
+/* ═══ GÉNÉRATEUR DE RAPPORTS AUTO ═══ */
+function iaGenererRapport(type){
+  // type: "quotidien" | "hebdo" | "mensuel"
+  var analyse=iaAnalyseFinanciere();
+  var fraudes=iaDetectFraude();
+  var risques=iaPredireRisqueDepart();
+  var t=td();
+
+  var rapport={
+    type:type,
+    date:t,
+    titre:"",
+    sections:[]
+  };
+
+  if(type==="quotidien"){
+    rapport.titre="📊 Rapport quotidien du "+formatDateRelative(t);
+    var VE=(S.data.versements||[]).map(normVers);
+    var versJour=VE.filter(function(v){return normDate(v.date)===t;});
+    var caJour=versJour.reduce(function(s,v){return s+v.montant;},0);
+
+    rapport.sections.push({
+      titre:"💰 Aujourd'hui en chiffres",
+      contenu:[
+        {label:"Versements",val:versJour.length+" transactions"},
+        {label:"Caisse",val:fc(caJour)},
+        {label:"Top performer",val:analyse.topChauffeur?analyse.topChauffeur.ch.nom+" ("+fc(analyse.topChauffeur.total)+")":"—"}
+      ]
+    });
+  } else if(type==="hebdo"){
+    rapport.titre="📈 Rapport hebdomadaire";
+    rapport.sections.push({
+      titre:"💼 Cette semaine",
+      contenu:[
+        {label:"CA semaine",val:fc(analyse.caSem)},
+        {label:"CA mois cumulé",val:fc(analyse.caMois)},
+        {label:"Projection mois",val:fc(analyse.projectionCA)}
+      ]
+    });
+  } else if(type==="mensuel"){
+    rapport.titre="📊 Rapport mensuel complet";
+    rapport.sections.push({
+      titre:"💼 Vue d'ensemble",
+      contenu:[
+        {label:"CA brut",val:fc(analyse.caMois)},
+        {label:"Dépenses",val:fc(analyse.depMois)},
+        {label:"💎 Bénéfice net",val:fc(analyse.beneficeMois)+" ("+analyse.margeMois+"% marge)"},
+        {label:"vs mois précédent",val:(analyse.evolution>=0?"+":"")+analyse.evolution+"%"}
+      ]
+    });
+    rapport.sections.push({
+      titre:"🏆 Top / Flop",
+      contenu:[
+        {label:"🥇 Top",val:analyse.topChauffeur?analyse.topChauffeur.ch.nom+" — "+fc(analyse.topChauffeur.total):"—"},
+        {label:"🚨 À surveiller",val:analyse.flopChauffeur?analyse.flopChauffeur.ch.nom+" — "+fc(analyse.flopChauffeur.total):"—"}
+      ]
+    });
+  }
+
+  // Sections communes
+  if(fraudes.length>0){
+    rapport.sections.push({
+      titre:"🚨 Détection de fraude ("+fraudes.length+")",
+      alertes:fraudes.map(function(f){
+        return {
+          titre:f.titre+" — "+f.chauffeur.nom,
+          texte:f.description,
+          niveau:f.severite,
+          reco:f.recommandation
+        };
+      })
+    });
+  }
+
+  if(risques.length>0){
+    rapport.sections.push({
+      titre:"⚠️ Risques de départ ("+risques.length+")",
+      alertes:risques.map(function(r){
+        return {
+          titre:r.chauffeur.nom+" — Score: "+r.score+"/100",
+          texte:"Signaux: "+r.signaux.join(", "),
+          niveau:r.niveau==="haut"?"haute":"moyenne",
+          reco:r.recommandation
+        };
+      })
+    });
+  }
+
+  return rapport;
+}
+
+/* ═══ ÉCRAN AUTOPILOT ═══ */
+function renderAutopilot(){
+  var cfg=getIAConfig();
+  var fraudes=iaDetectFraude();
+  var risques=iaPredireRisqueDepart();
+  var analyse=iaAnalyseFinanciere();
+  var quotaPct=Math.round((cfg.coutEstimeJour/cfg.quotaJournalier)*100);
+
+  var h='<div class="screen-title">🤖 Autopilot IA</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Surveillance, détection et analyses automatiques.</div>';
+
+  // ── Statut ──
+  var modeBadges={
+    eco:{bg:"linear-gradient(135deg,#10b981,#059669)",ic:"🔋",label:"Mode Éco"},
+    normal:{bg:"linear-gradient(135deg,#3b82f6,#1e40af)",ic:"⚡",label:"Mode Normal"},
+    performance:{bg:"linear-gradient(135deg,#f97316,#ea580c)",ic:"🚀",label:"Performance"}
+  };
+  var mode=modeBadges[cfg.autopilotMode]||modeBadges.eco;
+  h+='<div style="background:'+mode.bg+';color:#fff;border-radius:18px;padding:16px;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between"><div>';
+  h+='<div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Statut</div>';
+  h+='<div style="font-size:18px;font-weight:800;margin-top:4px">'+mode.ic+' '+mode.label+'</div>';
+  h+='</div><div style="font-size:36px">'+(cfg.autopilotEnabled?"✓":"○")+'</div></div>';
+  h+='<div style="font-size:11.5px;opacity:.9;margin-top:8px">'+(cfg.autopilotEnabled?"L\'IA surveille en continu":"Autopilot désactivé")+'</div>';
+  h+='</div>';
+
+  // ── Quota ──
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  h+='<div style="font-weight:700;font-size:13px">💸 Quota journalier</div>';
+  h+='<div style="font-size:12px;color:'+(quotaPct>80?"var(--danger)":quotaPct>50?"var(--warning)":"var(--success)")+';font-weight:800">'+cfg.coutEstimeJour+' / '+cfg.quotaJournalier+' F</div>';
+  h+='</div>';
+  h+='<div style="height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.min(quotaPct,100)+'%;background:'+(quotaPct>80?"linear-gradient(90deg,#dc2626,#991b1b)":quotaPct>50?"linear-gradient(90deg,#f97316,#ea580c)":"linear-gradient(90deg,#10b981,#059669)")+'"></div></div>';
+  h+='<div style="font-size:11px;color:var(--txt-2);margin-top:6px">'+cfg.appelsJour+' appels aujourd\'hui · Reset à minuit</div>';
+  h+='</div>';
+
+  // ── KPI ──
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b1">🚨</div><div class="kpi-label">Fraudes</div><div class="kpi-val">'+fraudes.length+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2">⚠️</div><div class="kpi-label">Risques</div><div class="kpi-val">'+risques.length+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b3">💎</div><div class="kpi-label">Bénéfice mois</div><div class="kpi-val">'+fcShort(analyse.beneficeMois)+'</div><div class="kpi-trend">'+analyse.margeMois+'% marge</div></div>';
+  h+='</div>';
+
+  // ── Fraudes détectées ──
+  if(fraudes.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">🚨 Détections de fraude ('+fraudes.length+')</div>';
+    fraudes.forEach(function(f){
+      var sevColors={haute:{bg:"linear-gradient(135deg,#dc2626,#991b1b)",col:"var(--danger)"},moyenne:{bg:"linear-gradient(135deg,#f97316,#ea580c)",col:"var(--warning)"},basse:{bg:"linear-gradient(135deg,#64748b,#475569)",col:"var(--txt-2)"}};
+      var sev=sevColors[f.severite]||sevColors.basse;
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+sev.col+';border-radius:12px;padding:12px;margin-bottom:8px">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:6px">';
+      h+='<div style="font-weight:800;font-size:13.5px;flex:1">'+f.titre+'</div>';
+      h+='<span style="background:'+sev.col+';color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;text-transform:uppercase">'+f.severite+'</span>';
+      h+='</div>';
+      h+='<div style="font-size:12.5px;line-height:1.5;margin-bottom:6px;color:var(--txt)">'+escapeHtml(f.description)+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--info);font-weight:700;background:var(--info-soft);padding:6px 10px;border-radius:8px">💡 '+escapeHtml(f.recommandation)+'</div>';
+      h+='</div>';
+    });
+  }
+
+  // ── Risques départ ──
+  if(risques.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">⚠️ Risques de départ ('+risques.length+')</div>';
+    risques.forEach(function(r){
+      var nivColors={haut:{col:"var(--danger)",bg:"linear-gradient(135deg,#dc2626,#991b1b)"},moyen:{col:"var(--warning)",bg:"linear-gradient(135deg,#f97316,#ea580c)"},faible:{col:"#64748b",bg:"linear-gradient(135deg,#64748b,#475569)"}};
+      var nv=nivColors[r.niveau]||nivColors.faible;
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+nv.col+';border-radius:12px;padding:12px;margin-bottom:8px">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:6px">';
+      h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">'+r.chauffeur.nom+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--txt-2)">Score risque : '+r.score+'/100</div></div>';
+      h+='<span style="background:'+nv.col+';color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;text-transform:uppercase">'+r.niveau+'</span>';
+      h+='</div>';
+      h+='<div style="font-size:12px;color:var(--txt-2);margin-bottom:6px">📍 '+r.signaux.join(" · ")+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--info);font-weight:700;background:var(--info-soft);padding:6px 10px;border-radius:8px">💡 '+escapeHtml(r.recommandation)+'</div>';
+      h+='</div>';
+    });
+  }
+
+  // ── Bouton rapports ──
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📊 Rapports automatiques</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">';
+  h+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="afficherRapport(\'quotidien\')">📅<br>Jour</button>';
+  h+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="afficherRapport(\'hebdo\')">📈<br>Semaine</button>';
+  h+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="afficherRapport(\'mensuel\')">📊<br>Mois</button>';
+  h+='</div>';
+
+  // ── Paramètres ──
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">⚙️ Mode autopilot</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">';
+  ["eco","normal","performance"].forEach(function(m){
+    var info=modeBadges[m];
+    var actif=cfg.autopilotMode===m;
+    h+='<button onclick="setAutopilotMode(\''+m+'\')" style="padding:14px 6px;border-radius:14px;border:2px solid '+(actif?"transparent":"var(--border)")+';background:'+(actif?info.bg:"var(--surface)")+';color:'+(actif?"#fff":"var(--txt)")+';font-weight:800;font-size:11px;font-family:inherit;cursor:pointer">'+info.ic+'<br>'+info.label.replace("Mode ","")+'</button>';
+  });
+  h+='</div>';
+
+  // Toggles capacités
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">🛠️ Capacités IA</div>';
+  var caps=[
+    {k:"fraudeDetection",icon:"🚨",t:"Détection de fraude",d:"Analyse comportements suspects"},
+    {k:"predictionsRisqueDepart",icon:"⚠️",t:"Prédiction risque départ",d:"Identifie chauffeurs à risque"},
+    {k:"rapportQuotidien",icon:"📅",t:"Rapport quotidien",d:"Bilan à 20h chaque jour"},
+    {k:"rapportHebdo",icon:"📈",t:"Rapport hebdo",d:"Dimanche soir"},
+    {k:"rapportMensuel",icon:"📊",t:"Rapport mensuel",d:"1er du mois"},
+    {k:"autoReponseFAQ",icon:"💬",t:"Réponses FAQ chauffeurs",d:"Questions simples uniquement"},
+    {k:"autoReponseChauffeur",icon:"🤖",t:"Chat auto complet",d:"⚠️ Risqué - désactivé par défaut"}
+  ];
+  caps.forEach(function(c){
+    h+='<div onclick="toggleAutopilotCap(\''+c.k+'\')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer">';
+    h+='<div style="font-size:20px">'+c.icon+'</div>';
+    h+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+c.t+'</div><div style="font-size:11px;color:var(--txt-2);margin-top:1px">'+c.d+'</div></div>';
+    h+='<div style="width:48px;height:28px;background:'+(cfg[c.k]?"var(--success)":"var(--border)")+';border-radius:14px;position:relative;flex-shrink:0">';
+    h+='<div style="width:22px;height:22px;background:#fff;border-radius:50%;position:absolute;top:3px;left:'+(cfg[c.k]?"23":"3")+'px;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.2)"></div></div>';
+    h+='</div>';
+  });
+
+  // Quota config
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">💰 Budget</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">';
+  h+='<div class="field"><label>Quota journalier (F CFA)</label>';
+  h+='<input id="quotaInput" type="number" value="'+cfg.quotaJournalier+'" onchange="setQuota(this.value)"/></div>';
+  h+='<div style="font-size:11px;color:var(--txt-2);margin-top:4px">Recommandé : 500-1500 F (Éco), 1500-3000 F (Normal), 3000+ F (Performance)</div>';
+  h+='</div>';
+
+  return h;
+}
+
+function setAutopilotMode(mode){
+  setIAConfig("autopilotMode",mode);
+  toast("Mode "+mode+" activé","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderAutopilot()+'</div>';
+}
+
+function toggleAutopilotCap(key){
+  var cfg=getIAConfig();
+  setIAConfig(key,!cfg[key]);
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderAutopilot()+'</div>';
+}
+
+function setQuota(v){
+  setIAConfig("quotaJournalier",parseInt(v)||1500);
+  toast("Quota mis à jour","success");
+}
+
+function afficherRapport(type){
+  var rapport=iaGenererRapport(type);
+  var body='';
+  body+='<div style="text-align:center;margin-bottom:14px">';
+  body+='<div style="font-size:13px;color:var(--txt-2)">'+formatDateRelative(rapport.date)+'</div>';
+  body+='</div>';
+  rapport.sections.forEach(function(s){
+    body+='<div style="background:var(--surface-2);border-radius:12px;padding:12px;margin-bottom:10px">';
+    body+='<div style="font-weight:800;font-size:14px;margin-bottom:8px">'+s.titre+'</div>';
+    if(s.contenu){
+      s.contenu.forEach(function(item){
+        body+='<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--border)">';
+        body+='<span style="color:var(--txt-2)">'+item.label+'</span>';
+        body+='<span style="font-weight:700;color:var(--txt)">'+item.val+'</span>';
+        body+='</div>';
+      });
+    }
+    if(s.alertes){
+      s.alertes.forEach(function(a){
+        body+='<div style="background:var(--surface);border-left:3px solid '+(a.niveau==="haute"?"var(--danger)":"var(--warning)")+';border-radius:8px;padding:10px;margin:6px 0">';
+        body+='<div style="font-weight:700;font-size:12.5px;margin-bottom:4px">'+a.titre+'</div>';
+        body+='<div style="font-size:11.5px;color:var(--txt-2);line-height:1.5">'+escapeHtml(a.texte)+'</div>';
+        body+='<div style="font-size:11px;color:var(--info);margin-top:6px">💡 '+escapeHtml(a.reco)+'</div>';
+        body+='</div>';
+      });
+    }
+    body+='</div>';
+  });
+
+  // Bouton WhatsApp partage
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);margin-top:10px" onclick="partagerRapportWA()">💬 Partager par WhatsApp</button>';
+
+  window._currentRapport=rapport;
+  openModal(rapport.titre, body);
+}
+
+function partagerRapportWA(){
+  var r=window._currentRapport;
+  if(!r) return;
+  var txt=r.titre+"\n\n";
+  r.sections.forEach(function(s){
+    txt+="*"+s.titre+"*\n";
+    if(s.contenu){
+      s.contenu.forEach(function(i){txt+="• "+i.label+" : "+i.val+"\n";});
+    }
+    if(s.alertes){
+      s.alertes.forEach(function(a){txt+="⚠️ "+a.titre+"\n"+a.texte+"\n";});
+    }
+    txt+="\n";
+  });
+  txt+="— Saloni Manager 🛺";
+  window.open("https://wa.me/?text="+encodeURIComponent(txt),"_blank");
+}
+
 /* ─── BOT AUTONOME : exécute les checks ─── */
+function iaCheckAutoRapports(){
+  var cfg=getIAConfig();
+  if(!cfg.autopilotEnabled) return;
+  var now=new Date();
+  var h=now.getHours();
+  var day=now.getDay(); // 0=dim
+  var dateMois=now.getDate();
+  var t=td();
+
+  // Marqueurs pour ne pas envoyer 2x
+  var marqueurs=JSON.parse(localStorage.getItem("sal_rapports_marqueurs")||"{}");
+
+  // Rapport quotidien à 20h
+  if(cfg.rapportQuotidien && h===20 && marqueurs["quotidien_"+t]!==true){
+    var r=iaGenererRapport("quotidien");
+    if(typeof notify==="function"){
+      notify("📅 Rapport quotidien","Bilan du jour disponible","ia",{action:"navigate",page:"autopilot"});
+    }
+    marqueurs["quotidien_"+t]=true;
+    localStorage.setItem("sal_rapports_marqueurs",JSON.stringify(marqueurs));
+  }
+
+  // Rapport hebdo le dimanche à 19h
+  if(cfg.rapportHebdo && day===0 && h===19 && marqueurs["hebdo_"+t]!==true){
+    if(typeof notify==="function"){
+      notify("📈 Rapport hebdomadaire","Bilan de la semaine disponible","ia",{action:"navigate",page:"autopilot"});
+    }
+    marqueurs["hebdo_"+t]=true;
+    localStorage.setItem("sal_rapports_marqueurs",JSON.stringify(marqueurs));
+  }
+
+  // Rapport mensuel le 1er à 9h
+  if(cfg.rapportMensuel && dateMois===1 && h===9 && marqueurs["mensuel_"+t]!==true){
+    if(typeof notify==="function"){
+      notify("📊 Rapport mensuel","Bilan du mois précédent disponible","ia",{action:"navigate",page:"autopilot"});
+    }
+    marqueurs["mensuel_"+t]=true;
+    localStorage.setItem("sal_rapports_marqueurs",JSON.stringify(marqueurs));
+  }
+}
+
 function iaRunAutomations(){
   var config=getIAConfig();
   var actions=[];
