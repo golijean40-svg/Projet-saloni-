@@ -956,8 +956,8 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
 // ═══ CONSTANTES ═══
 var COMPTES_BASE=[
   {pseudo:"gerant",mdp:"Cedric10@",role:"Gerant",niveau:3},
-  {pseudo:"admin",mdp:"admin123",role:"Admin",niveau:2},
-  {pseudo:"abidjan",mdp:"saloni123",role:"Abidjan",niveau:1}
+  {pseudo:"admin",mdp:"admin123",role:"Admin",niveau:2,permissions:{versements:true,chauffeurs:true,flotte:true,depenses:true,rapports:true,chat:true}},
+  {pseudo:"abidjan",mdp:"saloni123",role:"Abidjan",niveau:1,permissions:{versements:true,chat:true}}
 ];
 var ZONES=["Abobo","Yopougon","Bingerville","Cocody","Koumassi","Adjame","Plateau","Marcory","Port-Bouet"];
 var MODES=["Especes","Wave","Orange Money","MTN Money","Virement"];
@@ -1254,6 +1254,20 @@ function login(){
   function tryLogin(){
     var c=tousComptes().filter(function(x){return x.pseudo===p&&x.mdp===m;})[0];
     if(c){
+      // ─── Migration auto : appliquer permissions par défaut si manquantes ───
+      if(c.niveau>=1 && c.niveau<3 && !estChauffeurCompte(c)){
+        if(!c.permissions || typeof c.permissions!=="object" || Object.keys(c.permissions).length===0){
+          c.permissions=getDefaultPerms(c.niveau);
+          // Sauvegarder si c'est un sous-compte
+          if(c.dateCreation){
+            try{
+              if(db) db.collection("sal_sousComptes").doc(c.pseudo).set(c);
+              S.data.sousComptes=(S.data.sousComptes||[]).map(function(x){return x.pseudo===c.pseudo?c:x;});
+              save();
+            }catch(e){}
+          }
+        }
+      }
       S.user=c;
       localStorage.setItem("sal_session",JSON.stringify({pseudo:c.pseudo,ts:Date.now()}));
       load();
@@ -1337,15 +1351,74 @@ function estChauffeur(){
   if(!S.user) return false;
   return S.user.niveau===0 || S.user.typeCompte==="chauffeur";
 }
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME DE PERMISSIONS — ROBUSTE ET FONCTIONNEL
+   ═══════════════════════════════════════════════════════════════
+
+   3 NIVEAUX D'ACCÈS :
+   • Niveau 3 (Gérant)    → TOUT (administrateur principal)
+   • Niveau 2 (Admin)     → Permissions granulaires (configurables)
+   • Niveau 1 (Operateur) → Permissions limitées (versements + chat par défaut)
+   • Niveau 0 (Chauffeur) → Aucune perm gestion, accès chat + son profil
+
+   PERMISSIONS DISPONIBLES :
+   • versements  → enregistrer/voir versements
+   • chauffeurs  → ajouter/modifier chauffeurs
+   • flotte      → gérer les salonis
+   • depenses    → enregistrer dépenses
+   • rapports    → voir les rapports & analyses
+   • chat        → utiliser le chat
+   • sousComptes → créer/modifier sous-comptes (gérant uniquement)
+   • parametres  → modifier les paramètres système (gérant uniquement)
+   ═══════════════════════════════════════════════════════════════ */
+
+// Permissions par défaut selon le niveau
+function getDefaultPerms(niveau){
+  if(niveau>=3){
+    // Gérant : TOUT
+    return {versements:true,chauffeurs:true,flotte:true,depenses:true,rapports:true,chat:true,sousComptes:true,parametres:true};
+  }
+  if(niveau===2){
+    // Admin : actions opérationnelles (sans toucher au système)
+    return {versements:true,chauffeurs:true,flotte:true,depenses:true,rapports:true,chat:true,sousComptes:false,parametres:false};
+  }
+  if(niveau===1){
+    // Opérateur : actions de base
+    return {versements:true,chauffeurs:false,flotte:false,depenses:false,rapports:true,chat:true,sousComptes:false,parametres:false};
+  }
+  // Chauffeur (niveau 0) : seulement chat + son profil
+  return {versements:false,chauffeurs:false,flotte:false,depenses:false,rapports:false,chat:true,sousComptes:false,parametres:false};
+}
+
+// Vérifie si un compte (sans utiliser S.user) est de type chauffeur
+function estChauffeurCompte(c){
+  if(!c) return false;
+  return c.niveau===0 || c.typeCompte==="chauffeur";
+}
+
 function hasPerm(p){
   if(!S.user) return false;
-  if(S.user.niveau>=3) return true; // Gérant = tout
-  if(estChauffeur()) return false; // Chauffeur = aucune perm gestion
-  if(S.user.niveau>=2){
-    // Admin/Collaborateur : perms granulaires
-    if(S.user.permissions) return S.user.permissions[p]===true;
-    return false;
+
+  // Niveau 3 (Gérant) → TOUT
+  if(S.user.niveau>=3) return true;
+
+  // Chauffeur → seulement chat
+  if(estChauffeur()){
+    return p==="chat";
   }
+
+  // Admin/Opérateur (niveau 1-2)
+  if(S.user.niveau>=1){
+    // Si permissions explicites définies, les utiliser
+    if(S.user.permissions && typeof S.user.permissions==="object"){
+      // Permission explicitement true ou false
+      if(p in S.user.permissions) return S.user.permissions[p]===true;
+    }
+    // Sinon, utiliser les permissions par défaut du niveau
+    var defaults=getDefaultPerms(S.user.niveau);
+    return defaults[p]===true;
+  }
+
   return false;
 }
 function getChauffeurDuCompte(){
@@ -7450,20 +7523,39 @@ function renderSousComptes(){
       var rolColor=c.niveau===2?"var(--info)":(c.niveau===0?"var(--success)":"var(--txt-2)");
       var rolBg=c.niveau===2?"var(--info-soft)":(c.niveau===0?"var(--success-soft)":"var(--surface-2)");
       h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;box-shadow:var(--shadow-sm)">';
-      h+='<div style="display:flex;align-items:center;gap:12px">';
+      h+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:'+(c.niveau===2?"10":"0")+'px">';
       h+='<div style="width:44px;height:44px;border-radius:14px;background:'+rolBg+';color:'+rolColor+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">'+(c.pseudo||"?").substring(0,2).toUpperCase()+'</div>';
       h+='<div style="flex:1;min-width:0">';
       h+='<div style="font-weight:800;font-size:14.5px">'+(c.pseudo||"—")+'</div>';
       h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px"><span style="background:'+rolBg+';color:'+rolColor+';padding:2px 8px;border-radius:8px;font-weight:700;font-size:10px">'+(c.role||"—")+'</span>';
       if(c.nom) h+=' · '+c.nom;
-      h+='</div>';
-      if(c.permissions){
-        var permsList=Object.keys(c.permissions).filter(function(k){return c.permissions[k];});
-        if(permsList.length>0) h+='<div style="font-size:10.5px;color:var(--txt-3);margin-top:4px">🔓 '+permsList.join(", ")+'</div>';
-      }
-      h+='</div>';
-      h+='<button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;margin:0" onclick="event.stopPropagation();delSousCompte(\''+(c.pseudo||"")+'\')">🗑</button>';
       h+='</div></div>';
+      h+='<div style="display:flex;gap:6px">';
+      h+='<button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;margin:0" onclick="event.stopPropagation();openSousCompteModal('+JSON.stringify(c).replace(/"/g,"&quot;")+')" title="Modifier">✏️</button>';
+      h+='<button class="btn-ghost" style="width:auto;padding:8px 10px;font-size:12px;margin:0;color:var(--danger)" onclick="event.stopPropagation();delSousCompte(\''+(c.pseudo||"")+'\')" title="Supprimer">🗑</button>';
+      h+='</div>';
+      h+='</div>';
+
+      // Permissions visuelles (uniquement pour admin niveau 2)
+      if(c.niveau===2){
+        var perms=c.permissions||{};
+        var permsInfo=[
+          {k:"versements",ic:"💰",l:"Versements"},
+          {k:"chauffeurs",ic:"👥",l:"Chauffeurs"},
+          {k:"flotte",ic:"🚗",l:"Flotte"},
+          {k:"depenses",ic:"💸",l:"Dépenses"},
+          {k:"rapports",ic:"📊",l:"Rapports"},
+          {k:"chat",ic:"💬",l:"Chat"}
+        ];
+        h+='<div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:8px;border-top:1px solid var(--border)">';
+        permsInfo.forEach(function(p){
+          var active=perms[p.k]===true;
+          h+='<span style="background:'+(active?"var(--success-soft)":"var(--surface-2)")+';color:'+(active?"var(--success)":"var(--txt-3)")+';padding:3px 8px;border-radius:8px;font-size:10.5px;font-weight:700;opacity:'+(active?"1":"0.5")+'">'+(active?"✓":"○")+' '+p.ic+' '+p.l+'</span>';
+        });
+        h+='</div>';
+      }
+
+      h+='</div>';
     });
   }
 
@@ -7631,21 +7723,27 @@ function activerVersementsTousAdmins(){
   var modifies=0;
   sc.forEach(function(c){
     if(c.niveau===2){
-      if(!c.permissions) c.permissions={};
-      if(!c.permissions.versements){
-        c.permissions.versements=true;
+      // Si pas de permissions ou objet vide, appliquer les défauts complets
+      if(!c.permissions || typeof c.permissions!=="object" || Object.keys(c.permissions).length===0){
+        c.permissions=getDefaultPerms(2);
         modifies++;
-      }
-      // Activer aussi le chat par défaut (utile pour la collaboration)
-      if(!c.permissions.chat){
+      } else if(!c.permissions.versements){
+        // Sinon, juste activer versements + chat
+        c.permissions.versements=true;
         c.permissions.chat=true;
+        modifies++;
       }
       // Sync Firebase
       try{ if(db) db.collection("sal_sousComptes").doc(c.pseudo).set(c); }catch(e){}
     }
   });
+  // Mettre à jour aussi S.user si l'utilisateur actuel est un admin modifié
+  if(S.user && S.user.niveau===2){
+    var found=sc.find(function(x){return x.pseudo===S.user.pseudo;});
+    if(found) S.user.permissions=found.permissions;
+  }
   save();
-  toast("✅ "+modifies+" admin(s) peuvent maintenant enregistrer des versements","success");
+  toast("✅ "+modifies+" admin(s) mis à jour. Reconnexion recommandée.","success");
   var content=document.getElementById("content-generic");
   if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
 }
@@ -10582,6 +10680,12 @@ function renderApropos(){
       load();
       var c=tousComptes().filter(function(x){return x.pseudo===session.pseudo;})[0];
       if(c){
+        // Migration auto : permissions par défaut si manquantes
+        if(c.niveau>=1 && c.niveau<3 && !estChauffeurCompte(c)){
+          if(!c.permissions || typeof c.permissions!=="object" || Object.keys(c.permissions).length===0){
+            c.permissions=getDefaultPerms(c.niveau);
+          }
+        }
         S.user=c;
       }
     }
