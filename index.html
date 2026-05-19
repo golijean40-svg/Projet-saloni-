@@ -1114,6 +1114,8 @@ function showSync(text,color){
   if(color==="ok")setTimeout(function(){el.classList.remove("show");},2000);
 }
 function initFirebase(){
+  // Initialiser le tracking des suppressions récentes
+  if(!window._recentDeletions) window._recentDeletions={};
   if(db||!S.user)return;
   showSync("Connexion...");
   var s1=document.createElement("script");
@@ -1189,25 +1191,41 @@ function startSync(){
         }
 
         // ─── Fusion intelligente : ne pas écraser les ajouts locaux récents ───
+        // Sous-comptes utilisent "pseudo" comme clé, les autres utilisent "id"
+        var keyField=(col==="sousComptes")?"pseudo":"id";
+
         if(arr.length>0){
           var localData=S.data[col]||[];
-          var serverIds={};
-          arr.forEach(function(item){serverIds[item.id]=true;});
+          var serverKeys={};
+          arr.forEach(function(item){
+            var k=item[keyField];
+            if(k!==undefined && k!==null) serverKeys[k]=true;
+          });
 
           // Garder les items locaux récents (< 10s) qui ne sont pas encore sur le serveur
           var recentLocal=localData.filter(function(item){
-            if(!item.id) return false;
-            if(serverIds[item.id]) return false; // déjà sur serveur
-            // Item local très récent (ID timestamp dans les 10 dernières secondes)
-            var itemTs=parseInt(item.id)||0;
-            return (Date.now()-itemTs)<10000;
+            var k=item[keyField];
+            if(k===undefined || k===null) return false;
+            if(serverKeys[k]) return false; // déjà sur serveur
+            // Pour les items avec id timestamp, vérifier la fraîcheur
+            if(keyField==="id"){
+              var itemTs=parseInt(item.id)||0;
+              return (Date.now()-itemTs)<10000;
+            }
+            // Pour sous-comptes : garder si récemment créé (dateCreation aujourd'hui)
+            return item.dateCreation===td() && !window._recentDeletions[col+"_"+k];
           });
 
-          // Fusionner serveur + locaux récents
           S.data[col]=arr.concat(recentLocal);
         } else if(arr.length===0 && S.data[col] && S.data[col].length>0){
           // Cas spécial : serveur vide mais on a des données locales
-          // Ne PAS écraser pour éviter perte de données
+          // Vérifier si c'est une suppression récente
+          var hasRecentDeletion=Object.keys(window._recentDeletions||{}).some(function(k){return k.indexOf(col+"_")===0;});
+          if(hasRecentDeletion){
+            // L'utilisateur vient de supprimer - accepter le vide
+            S.data[col]=[];
+          }
+          // Sinon ne pas écraser (sécurité)
         } else {
           S.data[col]=arr;
         }
@@ -6078,6 +6096,15 @@ function saveChauffeur(id){
     data.dette=0;
     data.dateAjout=td();
     data.docs={};
+    // ─── Tracer le créateur du compte (pour le contrat) ───
+    if(S.user){
+      data.creePar=S.user.pseudo;
+      data.creeParNiveau=S.user.niveau;
+      // Si admin créateur, stocker aussi son nom complet pour traçabilité
+      if(S.user.niveau<3 && S.user.nom){
+        data.creeParNom=S.user.nom;
+      }
+    }
     if(!S.data.chauffeurs) S.data.chauffeurs=[];
     S.data.chauffeurs.push(data);
     save();
@@ -6094,11 +6121,19 @@ function confirmDeleteChauffeur(id){
   var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(id);});
   if(!c) return;
   if(!confirm("Supprimer définitivement « "+c.nom+" » ?\n\nCette action est irréversible.\nSes versements seront conservés mais le chauffeur disparaîtra.")) return;
+
+  // Marquer la suppression
+  if(!window._recentDeletions) window._recentDeletions={};
+  window._recentDeletions["chauffeurs_"+id]=Date.now();
+  setTimeout(function(){
+    if(window._recentDeletions) delete window._recentDeletions["chauffeurs_"+id];
+  },30000);
+
   S.data.chauffeurs=S.data.chauffeurs.filter(function(x){return String(x.id)!==String(id);});
-  try{
-    if(db) db.collection("sal_chauffeurs").doc(String(id)).delete();
-  }catch(e){}
   save();
+  try{
+    if(db) db.collection("sal_chauffeurs").doc(String(id)).delete().catch(function(e){console.warn("Del FB error:",e);});
+  }catch(e){}
   toast("Chauffeur supprimé","success");
   closeModal();
   render();
@@ -6271,17 +6306,34 @@ function _genererContratInner(c){
   }
 
   // ── Identifier les signataires ──
-  var signataireBailleur="Le Gerant";
-  var titreBailleur="Gerant & Proprietaire";
-  var isAdmin=false;
+  // Le contrat a TOUJOURS 2 ou 3 signataires :
+  // - Le BAILLEUR/GÉRANT (toujours, c'est le propriétaire de la fleet)
+  // - L'ADMIN GARANT (si le chauffeur a été créé par un admin/collaborateur)
+  // - Le CHAUFFEUR (toujours, c'est le locataire)
+  var nomGerant="Le Gerant";
+  var titreGerant="Proprietaire & Bailleur";
+  var hasAdminGarant=false;
+  var nomAdmin="";
+  var titreAdmin="Administrateur Garant";
+
   var creePar=c.creePar||(S.user?S.user.pseudo:"gerant");
   var creeParNiveau=c.creeParNiveau||(S.user?S.user.niveau:3);
-  var scCreateur=(S.data.sousComptes||[]).find(function(x){return x.pseudo===creePar;});
-  var nomCompletCreateur=String(scCreateur?(scCreateur.nom||scCreateur.pseudo||creePar):creePar)||"N/A";
-  if(creeParNiveau<3 && creeParNiveau>=2){
-    isAdmin=true;
-    signataireBailleur=nomCompletCreateur;
-    titreBailleur="Administrateur Garant";
+
+  // Si le chauffeur a été créé par un admin (pas le gérant), on ajoute l'admin comme 3e signataire
+  if(creeParNiveau<3 && creeParNiveau>=1){
+    hasAdminGarant=true;
+    // Priorité 1 : nom stocké au moment de la création
+    if(c.creeParNom){
+      nomAdmin=String(c.creeParNom);
+    } else {
+      // Priorité 2 : chercher dans sous-comptes
+      var scCreateur=(S.data.sousComptes||[]).find(function(x){return x.pseudo===creePar;});
+      if(scCreateur){
+        nomAdmin=String(scCreateur.nom||scCreateur.pseudo||creePar);
+      } else {
+        nomAdmin=String(creePar);
+      }
+    }
   }
 
   // ══ HEADER ══
@@ -6305,17 +6357,27 @@ function _genererContratInner(c){
 
   // ══ ART 1: PARTIES ══
   y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT",y);
-  // Bailleur
+
+  // Bailleur (toujours présent)
   fillRect(ml,y,pw,5.5,239,246,255);
-  setFont(8.5,"bold",29,78,216); doc.text("BAILLEUR (Proprietaire)",ml+3,y+4); y+=5.5;
+  setFont(8.5,"bold",29,78,216); doc.text("BAILLEUR (Proprietaire de la Flotte)",ml+3,y+4); y+=5.5;
   y=tableRow("Entreprise :","Gerant de fleet saloni",y,false);
-  y=tableRow("Represente par :",signataireBailleur+" — "+titreBailleur,y,true);
-  if(isAdmin){
-    y=tableRow("Agissant au nom de :","La Direction",y,false);
-  }
+  y=tableRow("Represente par :",nomGerant+" — "+titreGerant,y,true);
   y=tableRow("Adresse :","Abidjan, Cote d'Ivoire",y,false);
   y+=3;
-  // Locataire
+
+  // Administrateur Garant (uniquement si un admin a créé ce chauffeur)
+  if(hasAdminGarant){
+    fillRect(ml,y,pw,5.5,124,58,237);
+    setFont(8.5,"bold",255,255,255); doc.text("ADMINISTRATEUR GARANT",ml+3,y+4); y+=5.5;
+    y=tableRow("Nom & Prenom :",nomAdmin,y,false);
+    y=tableRow("Fonction :",titreAdmin,y,true);
+    y=tableRow("Pseudo :",creePar,y,false);
+    y=tableRow("Role :","Garant du contrat et de la conformite du Locataire",y,true);
+    y+=3;
+  }
+
+  // Locataire (toujours présent)
   fillRect(ml,y,pw,5.5,5,150,105);
   setFont(8.5,"bold",255,255,255); doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4); y+=5.5;
   y=tableRow("Nom & Prenom :",nom,y,false);
@@ -6390,39 +6452,73 @@ function _genererContratInner(c){
   doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:"center"});
   y+=8;
 
-  // Deux colonnes
-  var c1=ml, c2=W/2+5, cw=(pw/2)-5;
+  if(hasAdminGarant){
+    // ═══ 3 COLONNES : Bailleur + Admin Garant + Chauffeur ═══
+    var cw3=(pw-10)/3; // largeur de chaque colonne
+    var c1x=ml, c2x=ml+cw3+5, c3x=ml+2*(cw3+5);
 
-  // Header colonne bailleur
-  fillRect(c1,y,cw,6,29,78,216);
-  setFont(8,"bold",255,255,255);
-  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
+    // Headers colonnes
+    fillRect(c1x,y,cw3,6,29,78,216);
+    setFont(7.5,"bold",255,255,255);
+    doc.text("LE BAILLEUR",c1x+3,y+4.2);
 
-  // Header colonne locataire
-  fillRect(c2,y,cw,6,5,150,105);
-  setFont(8,"bold",255,255,255);
-  doc.text("LE LOCATAIRE / CHAUFFEUR",c2+3,y+4.2);
-  y+=8;
+    fillRect(c2x,y,cw3,6,124,58,237);
+    setFont(7.5,"bold",255,255,255);
+    doc.text("ADMIN GARANT",c2x+3,y+4.2);
 
-  // Nom + titre - Bailleur
-  setFont(8.5,"bold",17,24,39);
-  doc.text(signataireBailleur,c1+3,y);
-  setFont(8,"normal",55,65,81);
-  doc.text(titreBailleur,c1+3,y+4);
+    fillRect(c3x,y,cw3,6,5,150,105);
+    setFont(7.5,"bold",255,255,255);
+    doc.text("LE LOCATAIRE",c3x+3,y+4.2);
+    y+=8;
 
-  // Nom + titre - Locataire
-  setFont(8.5,"bold",17,24,39);
-  doc.text(nom,c2+3,y);
-  setFont(8,"normal",55,65,81);
-  doc.text("Chauffeur",c2+3,y+4);
+    // Noms + titres
+    setFont(8,"bold",17,24,39);
+    doc.text(nomGerant,c1x+3,y);
+    doc.text(nomAdmin,c2x+3,y);
+    doc.text(nom,c3x+3,y);
 
-  // Lignes signatures
-  doc.setDrawColor(55,65,81); doc.setLineWidth(0.3);
-  doc.line(c1,y+22,c1+cw-5,y+22);
-  doc.line(c2,y+22,c2+cw-5,y+22);
-  setFont(7,"normal",107,114,128);
-  doc.text("Signature + cachet",c1+3,y+26);
-  doc.text("Lu et approuve + Signature",c2+3,y+26);
+    setFont(7.5,"normal",55,65,81);
+    doc.text(titreGerant,c1x+3,y+4);
+    doc.text(titreAdmin,c2x+3,y+4);
+    doc.text("Chauffeur",c3x+3,y+4);
+
+    // Lignes signatures
+    doc.setDrawColor(55,65,81); doc.setLineWidth(0.3);
+    doc.line(c1x,y+22,c1x+cw3-2,y+22);
+    doc.line(c2x,y+22,c2x+cw3-2,y+22);
+    doc.line(c3x,y+22,c3x+cw3-2,y+22);
+
+    setFont(6.5,"normal",107,114,128);
+    doc.text("Signature + cachet",c1x+3,y+26);
+    doc.text("Signature",c2x+3,y+26);
+    doc.text("Lu et approuve + Sign.",c3x+3,y+26);
+  } else {
+    // ═══ 2 COLONNES classiques : Bailleur + Chauffeur ═══
+    var c1=ml, c2=W/2+5, cw=(pw/2)-5;
+
+    fillRect(c1,y,cw,6,29,78,216);
+    setFont(8,"bold",255,255,255);
+    doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
+
+    fillRect(c2,y,cw,6,5,150,105);
+    setFont(8,"bold",255,255,255);
+    doc.text("LE LOCATAIRE / CHAUFFEUR",c2+3,y+4.2);
+    y+=8;
+
+    setFont(8.5,"bold",17,24,39);
+    doc.text(nomGerant,c1+3,y);
+    doc.text(nom,c2+3,y);
+    setFont(8,"normal",55,65,81);
+    doc.text(titreGerant,c1+3,y+4);
+    doc.text("Chauffeur",c2+3,y+4);
+
+    doc.setDrawColor(55,65,81); doc.setLineWidth(0.3);
+    doc.line(c1,y+22,c1+cw-5,y+22);
+    doc.line(c2,y+22,c2+cw-5,y+22);
+    setFont(7,"normal",107,114,128);
+    doc.text("Signature + cachet",c1+3,y+26);
+    doc.text("Lu et approuve + Signature",c2+3,y+26);
+  }
 
   // ══ Footer ══
   setFont(7,"italic",150,150,150);
@@ -7707,11 +7803,30 @@ function saveSousCompte(isEdit){
 function delSousCompte(pseudo){
   if(!pseudo) return;
   if(!confirm("Supprimer le sous-compte « "+pseudo+" » ?\n\nCette action est irréversible.")) return;
+
+  // Marquer la suppression pour empêcher la re-création via Firebase
+  if(!window._recentDeletions) window._recentDeletions={};
+  window._recentDeletions["sousComptes_"+pseudo]=Date.now();
+  // Nettoyer après 30 secondes
+  setTimeout(function(){
+    if(window._recentDeletions) delete window._recentDeletions["sousComptes_"+pseudo];
+  },30000);
+
+  // Supprimer localement
   S.data.sousComptes=(S.data.sousComptes||[]).filter(function(c){return c.pseudo!==pseudo;});
-  try {
-    if(db) db.collection("sal_sousComptes").doc(pseudo).delete();
-  } catch(e){}
   save();
+
+  // Supprimer sur Firebase
+  try {
+    if(db) {
+      db.collection("sal_sousComptes").doc(pseudo).delete().then(function(){
+        console.log("✅ Sous-compte supprimé sur Firebase:",pseudo);
+      }).catch(function(e){
+        console.warn("Erreur suppression Firebase:",e);
+      });
+    }
+  } catch(e){console.warn("Erreur catch:",e);}
+
   toast("Sous-compte supprimé","success");
   if(typeof render==="function") render();
   var content=document.getElementById("content-generic");
