@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Saloni"/>
 <meta name="theme-color" content="#0a1f44"/>
 <meta name="mobile-web-app-capable" content="yes"/>
-<title>Saloni v20</title>
+<title>Saloni v20.1</title>
 <link rel="manifest" href='data:application/manifest+json,{"name":"Saloni Manager","short_name":"Saloni","description":"Gestion de flotte de tricycles-taxis","start_url":".","display":"standalone","background_color":"%23ffffff","theme_color":"%230a1f44","orientation":"portrait","icons":[{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"%230a1f44\"/><text x=\"96\" y=\"126\" font-size=\"110\" text-anchor=\"middle\">🛺</text></svg>","sizes":"192x192","type":"image/svg+xml"},{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"%230a1f44\"/><text x=\"256\" y=\"340\" font-size=\"300\" text-anchor=\"middle\">🛺</text></svg>","sizes":"512x512","type":"image/svg+xml"}]}'/>
 <link rel="apple-touch-icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="40" fill="%230a1f44"/><text x="90" y="120" font-size="100" text-anchor="middle">🛺</text></svg>'/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1116,6 +1116,17 @@ function showSync(text,color){
 function initFirebase(){
   // Initialiser le tracking des suppressions récentes
   if(!window._recentDeletions) window._recentDeletions={};
+  // Charger les suppressions persistées (survivent au rechargement)
+  try{
+    var saved=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+    var now=Date.now();
+    // Garder seulement les suppressions de moins de 1 heure
+    Object.keys(saved).forEach(function(k){
+      if(now-saved[k]<60*60*1000){
+        window._recentDeletions[k]=saved[k];
+      }
+    });
+  }catch(e){}
   if(db||!S.user)return;
   showSync("Connexion...");
   var s1=document.createElement("script");
@@ -1194,6 +1205,24 @@ function startSync(){
         // Sous-comptes utilisent "pseudo" comme clé, les autres utilisent "id"
         var keyField=(col==="sousComptes")?"pseudo":"id";
 
+        // ─── PROTECTION : filtrer les éléments récemment supprimés ───
+        // Si on a supprimé un item dans les 60 dernières secondes, on l'ignore du serveur
+        if(window._recentDeletions){
+          arr=arr.filter(function(item){
+            var k=item[keyField];
+            if(k===undefined || k===null) return true;
+            var delKey=col+"_"+k;
+            if(window._recentDeletions[delKey]){
+              // Re-supprimer côté Firebase au cas où la propagation a échoué
+              try{
+                if(db) db.collection("sal_"+col).doc(String(k)).delete();
+              }catch(e){}
+              return false;
+            }
+            return true;
+          });
+        }
+
         if(arr.length>0){
           var localData=S.data[col]||[];
           var serverKeys={};
@@ -1207,27 +1236,21 @@ function startSync(){
             var k=item[keyField];
             if(k===undefined || k===null) return false;
             if(serverKeys[k]) return false; // déjà sur serveur
+            // Vérifier que l'item n'est pas dans la liste des suppressions
+            if(window._recentDeletions && window._recentDeletions[col+"_"+k]) return false;
             // Pour les items avec id timestamp, vérifier la fraîcheur
             if(keyField==="id"){
               var itemTs=parseInt(item.id)||0;
               return (Date.now()-itemTs)<10000;
             }
             // Pour sous-comptes : garder si récemment créé (dateCreation aujourd'hui)
-            return item.dateCreation===td() && !window._recentDeletions[col+"_"+k];
+            return item.dateCreation===td();
           });
 
           S.data[col]=arr.concat(recentLocal);
-        } else if(arr.length===0 && S.data[col] && S.data[col].length>0){
-          // Cas spécial : serveur vide mais on a des données locales
-          // Vérifier si c'est une suppression récente
-          var hasRecentDeletion=Object.keys(window._recentDeletions||{}).some(function(k){return k.indexOf(col+"_")===0;});
-          if(hasRecentDeletion){
-            // L'utilisateur vient de supprimer - accepter le vide
-            S.data[col]=[];
-          }
-          // Sinon ne pas écraser (sécurité)
         } else {
-          S.data[col]=arr;
+          // Serveur vide → cohérent avec une suppression
+          S.data[col]=[];
         }
         cnt++;
         if(cnt>=COLS.length){showSync("Synchronisé","ok");}
@@ -6122,18 +6145,37 @@ function confirmDeleteChauffeur(id){
   if(!c) return;
   if(!confirm("Supprimer définitivement « "+c.nom+" » ?\n\nCette action est irréversible.\nSes versements seront conservés mais le chauffeur disparaîtra.")) return;
 
-  // Marquer la suppression
+  // Marquer la suppression (persistante)
   if(!window._recentDeletions) window._recentDeletions={};
   window._recentDeletions["chauffeurs_"+id]=Date.now();
+  try{
+    var saved=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+    saved["chauffeurs_"+id]=Date.now();
+    localStorage.setItem("sal_deletions",JSON.stringify(saved));
+  }catch(e){}
   setTimeout(function(){
     if(window._recentDeletions) delete window._recentDeletions["chauffeurs_"+id];
-  },30000);
+    try{
+      var s=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+      delete s["chauffeurs_"+id];
+      localStorage.setItem("sal_deletions",JSON.stringify(s));
+    }catch(e){}
+  },60*60*1000);
 
   S.data.chauffeurs=S.data.chauffeurs.filter(function(x){return String(x.id)!==String(id);});
   save();
-  try{
-    if(db) db.collection("sal_chauffeurs").doc(String(id)).delete().catch(function(e){console.warn("Del FB error:",e);});
-  }catch(e){}
+  // Suppression Firebase avec retry
+  function tryDel(attempts){
+    attempts=attempts||0;
+    try{
+      if(db) db.collection("sal_chauffeurs").doc(String(id)).delete().catch(function(e){
+        if(attempts<3) setTimeout(function(){tryDel(attempts+1);},1000);
+      });
+    }catch(e){
+      if(attempts<3) setTimeout(function(){tryDel(attempts+1);},1000);
+    }
+  }
+  tryDel();
   toast("Chauffeur supprimé","success");
   closeModal();
   render();
@@ -6239,6 +6281,55 @@ function loadJsPDF(callback){
 function genererContratPDF(chauffeurId){
   var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
   if(!c){toast("Chauffeur introuvable","error");return;}
+
+  // ─── Si le chauffeur n'a pas de créateur enregistré, proposer le choix ───
+  // (utile pour les chauffeurs créés avant la mise à jour)
+  if(!c.creePar || c.creeParNiveau===undefined){
+    var admins=(S.data.sousComptes||[]).filter(function(x){return x.niveau===2;});
+    if(admins.length>0){
+      // Proposer une sélection d'admin garant
+      var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px;line-height:1.5">Ce chauffeur n\'a pas d\'administrateur garant enregistré. Souhaitez-vous en ajouter un au contrat ?</div>';
+      body+='<div class="field"><label>Administrateur garant (optionnel)</label>';
+      body+='<select id="contratAdmin"><option value="">— Aucun (contrat sans garant) —</option>';
+      admins.forEach(function(a){
+        body+='<option value="'+a.pseudo+'">'+(a.nom||a.pseudo)+' ('+a.pseudo+')</option>';
+      });
+      body+='</select></div>';
+      body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">';
+      body+='<button class="btn-ghost" onclick="closeModal();_doGenererContrat('+chauffeurId+',null)">Sans garant</button>';
+      body+='<button class="btn-primary" onclick="_doGenererContratAvecChoix('+chauffeurId+')">✓ Générer</button>';
+      body+='</div>';
+      openModal("📄 Générer le contrat",body);
+      return;
+    }
+  }
+
+  _doGenererContrat(chauffeurId,null);
+}
+
+function _doGenererContratAvecChoix(chauffeurId){
+  var sel=document.getElementById("contratAdmin");
+  var pseudoAdmin=sel?sel.value:"";
+  closeModal();
+  _doGenererContrat(chauffeurId,pseudoAdmin);
+}
+
+function _doGenererContrat(chauffeurId,pseudoAdmin){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+
+  // Si admin sélectionné, l'enregistrer sur le chauffeur
+  if(pseudoAdmin){
+    var admin=(S.data.sousComptes||[]).find(function(x){return x.pseudo===pseudoAdmin;});
+    if(admin){
+      c.creePar=admin.pseudo;
+      c.creeParNiveau=admin.niveau;
+      c.creeParNom=admin.nom||admin.pseudo;
+      save();
+      try{ fbSave("chauffeurs",c); }catch(e){}
+    }
+  }
+
   toast("⏳ Génération du contrat...","info");
   loadJsPDF(function(){
     try{
@@ -7807,25 +7898,44 @@ function delSousCompte(pseudo){
   // Marquer la suppression pour empêcher la re-création via Firebase
   if(!window._recentDeletions) window._recentDeletions={};
   window._recentDeletions["sousComptes_"+pseudo]=Date.now();
-  // Nettoyer après 30 secondes
+  // Persister en localStorage (survit au rechargement)
+  try{
+    var saved=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+    saved["sousComptes_"+pseudo]=Date.now();
+    localStorage.setItem("sal_deletions",JSON.stringify(saved));
+  }catch(e){}
+  // Nettoyer après 1 heure
   setTimeout(function(){
     if(window._recentDeletions) delete window._recentDeletions["sousComptes_"+pseudo];
-  },30000);
+    try{
+      var s=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+      delete s["sousComptes_"+pseudo];
+      localStorage.setItem("sal_deletions",JSON.stringify(s));
+    }catch(e){}
+  },60*60*1000);
 
   // Supprimer localement
   S.data.sousComptes=(S.data.sousComptes||[]).filter(function(c){return c.pseudo!==pseudo;});
   save();
 
-  // Supprimer sur Firebase
-  try {
-    if(db) {
-      db.collection("sal_sousComptes").doc(pseudo).delete().then(function(){
-        console.log("✅ Sous-compte supprimé sur Firebase:",pseudo);
-      }).catch(function(e){
-        console.warn("Erreur suppression Firebase:",e);
-      });
+  // Supprimer sur Firebase (avec retry)
+  function tryDelete(attempts){
+    attempts=attempts||0;
+    try {
+      if(db) {
+        db.collection("sal_sousComptes").doc(pseudo).delete().then(function(){
+          console.log("✅ Sous-compte supprimé sur Firebase:",pseudo);
+        }).catch(function(e){
+          console.warn("Erreur suppression Firebase (essai "+attempts+"):",e);
+          if(attempts<3) setTimeout(function(){tryDelete(attempts+1);},1000);
+        });
+      }
+    } catch(e){
+      console.warn("Erreur catch:",e);
+      if(attempts<3) setTimeout(function(){tryDelete(attempts+1);},1000);
     }
-  } catch(e){console.warn("Erreur catch:",e);}
+  }
+  tryDelete();
 
   toast("Sous-compte supprimé","success");
   if(typeof render==="function") render();
