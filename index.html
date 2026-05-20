@@ -673,7 +673,7 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
     <button class="login-btn" onclick="login()">Se connecter</button>
     <div id="LE" class="login-error"></div>
   </div>
-  <div class="login-foot">Saloni v20.0 · Abidjan 🇨🇮</div>
+  <div class="login-foot">Saloni v20.1 · Abidjan 🇨🇮</div>
 </div>
 
 <!-- ═══ MAIN APP ═══ -->
@@ -927,7 +927,7 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
         Se déconnecter
       </button>
-      <div class="sidebar-version">Saloni v20.0 · Abidjan 🇨🇮</div>
+      <div class="sidebar-version">Saloni v20.1 · Abidjan 🇨🇮</div>
     </div>
   </aside>
 
@@ -6341,136 +6341,109 @@ function _doGenererContrat(chauffeurId,pseudoAdmin){
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   CONTRAT PDF — RESTAURATION DE L'ANCIEN CODE V19 QUI MARCHAIT
+   + Article 9 (constat restitution) + 3 signataires si admin créateur
+   ═══════════════════════════════════════════════════════════════ */
 function _genererContratInner(c){
+  var sal=(S.data.salonis||[]).filter(function(x){return String(x.id)===String(c.saloniId||c.saloni);})[0];
   var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
-  var doc=new jsPDFClass({orientation:"portrait",unit:"mm",format:"a4"});
-  var W=210, ml=15, mr=15, pw=W-ml-mr;
+  var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,ml=15,mr=15,pw=180;
   var y=15;
 
-  // ── Données ──
-  var today=new Date();
-  var fin=new Date(today);
-  fin.setMonth(fin.getMonth()+6);
-  var fmt=function(d){return d.getDate().toString().padStart(2,"0")+"/"+(d.getMonth()+1).toString().padStart(2,"0")+"/"+d.getFullYear();};
-  var dateDebut=fmt(today), dateFin=fmt(fin);
-  var sal=(S.data.salonis||[]).find(function(s){return String(s.id)===String(c.saloniId||c.saloni);});
-  var nom=(c.nom||"").toUpperCase();
-  var isH=c.freqPaiement==="Hebdomadaire";
-  var objVal=isH?((c.objectifSemaine||0).toLocaleString("fr-FR")+" FCFA"):((c.objectifJour||0).toLocaleString("fr-FR")+" FCFA");
-  var objLabel=isH?"Hebdomadaire":"Journalier";
-  var salInfo=sal?("Saloni "+(sal.numero||sal.id)+(sal.modele?" — "+sal.modele:"")):(c.saloniId||"N/A");
-
   // ── Helpers ──
+  var today=new Date();
+  var fin=new Date(today);fin.setMonth(fin.getMonth()+6);
+  var fmt=function(d){return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear();};
+  var dateDebut=fmt(today),dateFin=fmt(fin);
+  var nom=c.nom||"";
+  var isH=c.freqPaiement==="Hebdomadaire";
+  var objVal=isH?(c.objectifSemaine||0).toLocaleString()+" FCFA":(c.objectifJour||0).toLocaleString()+" FCFA";
+  var objLabel=isH?"Hebdomadaire":"Journalier";
+  var salInfo=sal?"Saloni "+(sal.numero||sal.id||c.saloniId||"N/A"):(c.saloniId||"N/A");
+
   function setFont(size,style,r,g,b){
     doc.setFontSize(size);
-    doc.setFont("helvetica",style||"normal");
+    doc.setFont('helvetica',style||'normal');
     doc.setTextColor(r||0,g||0,b||0);
   }
-  function fillRect(x,yy,w,h,r,g,b){doc.setFillColor(r,g,b);doc.rect(x,yy,w,h,"F");}
-  function hline(yy,r,g,b,thick){doc.setDrawColor(r||200,g||200,b||200);doc.setLineWidth(thick||0.3);doc.line(ml,yy,W-mr,yy);}
-  function sectionTitle(title,yy,r,g,b){
-    fillRect(ml,yy,pw,7,r||29,g||78,b||216);
-    setFont(9,"bold",255,255,255);
-    doc.text(title,ml+3,yy+4.8);
-    return yy+9;
+  function fillRect(x,y,w,h,r,g,b){
+    doc.setFillColor(r,g,b);doc.rect(x,y,w,h,'F');
   }
-  function tableRow(label,val,yy,shade){
-    if(shade) fillRect(ml,yy,pw,5.5,245,247,250);
+  function hline(y2,r,g,b,thick){
+    doc.setDrawColor(r||200,g||200,b||200);
+    doc.setLineWidth(thick||0.3);
+    doc.line(ml,y2,W-mr,y2);
+  }
+  function sectionTitle(title,y2,r,g,b){
+    fillRect(ml,y2,pw,7,r||29,g||78,b||216);
+    setFont(9,'bold',255,255,255);
+    doc.text(title,ml+3,y2+4.8);
+    return y2+9;
+  }
+  function tableRow(label,val,y2,shade){
+    if(shade)fillRect(ml,y2,pw,5.5,245,247,250);
     var safeLabel=String(label||"");
     var safeVal=String(val||"—");
-    setFont(8,"bold",75,85,99); doc.text(safeLabel,ml+3,yy+3.8);
-    setFont(8,"normal",17,24,39); doc.text(safeVal,ml+50,yy+3.8);
-    hline(yy+5.5,229,231,235,0.2);
-    return yy+5.5;
+    setFont(8,'bold',75,85,99);doc.text(safeLabel,ml+3,y2+3.8);
+    setFont(8,'normal',17,24,39);doc.text(safeVal,ml+50,y2+3.8);
+    hline(y2+5.5,229,231,235,0.2);
+    return y2+5.5;
   }
-  function clauseBox(title,text,yy,r,g,b){
+  function clauseBox(title,text,y2,r,g,b){
     var lines=doc.splitTextToSize(String(text||""),pw-8);
     var h=8+lines.length*4.5;
-    // Nouvelle page si pas assez d'espace
-    if(yy+h>275){doc.addPage();yy=15;}
-    fillRect(ml,yy,pw,h,r||239,g||246,b||255);
-    setFont(8,"bold",29,78,216); doc.text(title,ml+3,yy+5);
-    setFont(8,"normal",17,24,39);
-    lines.forEach(function(l,i){doc.text(l,ml+3,yy+9+i*4.5);});
-    hline(yy+h,229,231,235,0.2);
-    return yy+h+3;
+    if(y2+h>275){doc.addPage();y2=15;}
+    fillRect(ml,y2,pw,h,r||239,g||246,b||255);
+    setFont(8,'bold',29,78,216);doc.text(title,ml+3,y2+5);
+    setFont(8,'normal',17,24,39);
+    lines.forEach(function(l,i){doc.text(l,ml+3,y2+9+i*4.5);});
+    hline(y2+h,229,231,235,0.2);
+    return y2+h+3;
   }
 
-  // ── Identifier les signataires ──
-  // Le contrat a TOUJOURS 2 ou 3 signataires :
-  // - Le BAILLEUR/GÉRANT (toujours, c'est le propriétaire de la fleet)
-  // - L'ADMIN GARANT (si le chauffeur a été créé par un admin/collaborateur)
-  // - Le CHAUFFEUR (toujours, c'est le locataire)
-  var nomGerant="Le Gerant";
-  var titreGerant="Proprietaire & Bailleur";
-  var hasAdminGarant=false;
-  var nomAdmin="";
-  var titreAdmin="Administrateur Garant";
-
+  // Identifier le créateur (admin garant éventuel)
   var creePar=c.creePar||(S.user?S.user.pseudo:"gerant");
-  var creeParNiveau=c.creeParNiveau||(S.user?S.user.niveau:3);
-
-  // Si le chauffeur a été créé par un admin (pas le gérant), on ajoute l'admin comme 3e signataire
-  if(creeParNiveau<3 && creeParNiveau>=1){
-    hasAdminGarant=true;
-    // Priorité 1 : nom stocké au moment de la création
-    if(c.creeParNom){
-      nomAdmin=String(c.creeParNom);
-    } else {
-      // Priorité 2 : chercher dans sous-comptes
-      var scCreateur=(S.data.sousComptes||[]).find(function(x){return x.pseudo===creePar;});
-      if(scCreateur){
-        nomAdmin=String(scCreateur.nom||scCreateur.pseudo||creePar);
-      } else {
-        nomAdmin=String(creePar);
-      }
-    }
-  }
+  var creeParNiveau=(c.creeParNiveau!==undefined)?c.creeParNiveau:(S.user?S.user.niveau:3);
+  var scCreateur=(S.data.sousComptes||[]).filter(function(x){return x.pseudo===creePar;})[0];
+  var nomCompletCreateur=String(c.creeParNom||(scCreateur?(scCreateur.nom||scCreateur.role||scCreateur.pseudo):creePar)||"N/A");
+  var hasAdminGarant=(creeParNiveau<3 && creeParNiveau>=1);
 
   // ══ HEADER ══
   fillRect(0,0,W,30,29,78,216);
-  setFont(17,"bold",255,255,255);
-  doc.text("SALONI MANAGER",W/2,11,{align:"center"});
-  setFont(8,"normal",200,220,255);
-  doc.text("Gestion de Flotte de Tricycles-Taxis — Abidjan",W/2,17,{align:"center"});
-  doc.text("Cote d'Ivoire",W/2,22,{align:"center"});
+  setFont(17,'bold',255,255,255);
+  doc.text("SALONI MANAGER",W/2,11,{align:'center'});
+  setFont(8,'normal',200,220,255);
+  doc.text("Gestion de Flotte de Tricycles-Taxis — Abidjan",W/2,17,{align:'center'});
+  doc.text("Cote d'Ivoire",W/2,22,{align:'center'});
   fillRect(0,28,W,1,17,55,170);
   y=36;
 
   // ══ TITRE ══
-  setFont(13,"bold",17,24,39);
-  doc.text("CONTRAT DE LOCATION-EXPLOITATION DE TRICYCLE",W/2,y,{align:"center"});
+  setFont(13,'bold',17,24,39);
+  doc.text("CONTRAT DE LOCATION-EXPLOITATION DE TRICYCLE",W/2,y,{align:'center'});
   y+=6;
-  setFont(9,"italic",107,114,128);
-  doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:"center"});
+  setFont(9,'italic',107,114,128);
+  doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:'center'});
   y+=5;
-  hline(y,29,78,216,0.6); y+=7;
+  hline(y,29,78,216,0.6);y+=7;
 
   // ══ ART 1: PARTIES ══
   y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT",y);
-
-  // Bailleur (toujours présent)
+  // Bailleur
   fillRect(ml,y,pw,5.5,239,246,255);
-  setFont(8.5,"bold",29,78,216); doc.text("BAILLEUR (Proprietaire de la Flotte)",ml+3,y+4); y+=5.5;
+  setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire de la Flotte)",ml+3,y+4);y+=5.5;
   y=tableRow("Entreprise :","Gerant de fleet saloni",y,false);
-  y=tableRow("Represente par :",nomGerant+" — "+titreGerant,y,true);
-  y=tableRow("Adresse :","Abidjan, Cote d'Ivoire",y,false);
-  y+=3;
-
-  // Administrateur Garant (uniquement si un admin a créé ce chauffeur)
+  y=tableRow("Representee par :","Le Gerant — Proprietaire & Bailleur",y,true);
   if(hasAdminGarant){
-    fillRect(ml,y,pw,5.5,124,58,237);
-    setFont(8.5,"bold",255,255,255); doc.text("ADMINISTRATEUR GARANT",ml+3,y+4); y+=5.5;
-    y=tableRow("Nom & Prenom :",nomAdmin,y,false);
-    y=tableRow("Fonction :",titreAdmin,y,true);
-    y=tableRow("Pseudo :",creePar,y,false);
-    y=tableRow("Role :","Garant du contrat et de la conformite du Locataire",y,true);
-    y+=3;
+    y=tableRow("Administrateur :",nomCompletCreateur+" (pseudo: "+creePar+")",y,false);
   }
-
-  // Locataire (toujours présent)
+  y=tableRow("Adresse :","Abidjan, Cote d'Ivoire",y,!hasAdminGarant);
+  y+=3;
+  // Locataire
   fillRect(ml,y,pw,5.5,5,150,105);
-  setFont(8.5,"bold",255,255,255); doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4); y+=5.5;
+  setFont(8.5,'bold',255,255,255);doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4);y+=5.5;
   y=tableRow("Nom & Prenom :",nom,y,false);
   y=tableRow("Telephone :",c.tel||"N/A",y,true);
   y=tableRow("Date de naissance :",c.dateNaissance?fmt(new Date(c.dateNaissance)):"N/A",y,false);
@@ -6485,19 +6458,19 @@ function _genererContratInner(c){
 
   // ══ ART 2: OBJECTIFS ══
   y=sectionTitle("ARTICLE 2 — OBJECTIFS ET VERSEMENTS",y,55,65,81);
-  y=tableRow("Frequence de versement :",objLabel,y,false);
-  y=tableRow("Montant objectif :",objVal,y,true);
-  y=tableRow("Modes de paiement :","Especes / Wave / Orange Money / MTN Money",y,false);
+  y=tableRow("Frequence :",objLabel,y,false);
+  y=tableRow("Objectif :",objVal,y,true);
+  y=tableRow("Mode de paiement :","Especes / Wave / Orange Money / MTN Money",y,false);
   y+=5;
 
   // ══ ART 3: DUREE ══
   y=sectionTitle("ARTICLE 3 — DUREE DU CONTRAT",y);
   fillRect(ml,y,pw,16,239,246,255);
-  setFont(8.5,"normal",17,24,39);
+  setFont(8.5,'normal',17,24,39);
   var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
   var linesD=doc.splitTextToSize(texteduree,pw-8);
-  linesD.forEach(function(l){doc.text(l,ml+3,y+4.5); y+=4.5;});
-  setFont(8,"bold",220,38,38);
+  linesD.forEach(function(l){doc.text(l,ml+3,y+4.5);y+=4.5;});
+  setFont(8,'bold',220,38,38);
   doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.",ml+3,y+3);
   y+=9;
 
@@ -6527,332 +6500,129 @@ function _genererContratInner(c){
     "Le contrat peut etre resilie de plein droit, sans preavis, en cas de : non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, ou fausse declaration lors de la signature.",
     y,243,244,246);
 
-  // ══ ARTICLE 9 — CONSTAT DE RESTITUTION (NOUVEAU) ══
   y=clauseBox(
     "ARTICLE 9 — CONSTAT DE RESTITUTION DU VEHICULE",
-    "Si l'une des deux parties souhaite mettre fin au present contrat, anticipativement ou a son terme, un CONSTAT CONTRADICTOIRE du tricycle doit obligatoirement etre effectue en presence des deux parties (Bailleur et Locataire). Ce constat vise a : (1) verifier l'etat general du vehicule ; (2) detecter toute panne, deterioration, ou usure anormale ; (3) inventorier les accessoires et documents (carte grise, vignette, papiers du vehicule, casque le cas echeant). Le tricycle doit etre restitue au Bailleur DANS L'ETAT OU IL A ETE REMIS au debut du contrat, hors usure normale liee a l'usage. Toute degradation imputable au Locataire (negligence, accident sans declaration, modification non autorisee) sera prise en charge financierement par ce dernier, selon devis etabli par un garage agree. Un proces-verbal de constat sera signe par les deux parties a l'issue de la restitution.",
+    "Si l'une des deux parties souhaite mettre fin au present contrat, anticipativement ou a son terme, un CONSTAT CONTRADICTOIRE du tricycle doit obligatoirement etre effectue en presence des deux parties. Ce constat vise a : (1) verifier l'etat general du vehicule ; (2) detecter toute panne, deterioration ou usure anormale ; (3) inventorier les accessoires et documents (carte grise, vignette, papiers du vehicule). Le tricycle doit etre restitue au Bailleur DANS L'ETAT OU IL A ETE REMIS au debut du contrat, hors usure normale liee a l'usage. Toute degradation imputable au Locataire sera prise en charge financierement par ce dernier, selon devis etabli par un garage agree. Un proces-verbal de constat sera signe par les deux parties.",
     y,254,243,231);
 
   // ══ SIGNATURES ══
-  if(y>200){doc.addPage(); y=15;} else {y+=4;}
-  hline(y,229,231,235,0.5); y+=6;
-  setFont(11,"bold",55,65,81);
-  doc.text("SIGNATURES",W/2,y,{align:"center"});
+  if(y>200){doc.addPage();y=15;}else{y+=4;}
+  hline(y,229,231,235,0.5);y+=6;
+  setFont(11,'bold',55,65,81);
+  doc.text("SIGNATURES",W/2,y,{align:'center'});
   y+=5;
-  setFont(8,"normal",107,114,128);
-  doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:"center"});
+  setFont(8,'normal',107,114,128);
+  doc.text("Fait a Abidjan, le "+dateDebut,W/2,y,{align:'center'});
   y+=8;
 
+  // ── Colonne Bailleur (gauche) ──
+  var c1=ml,c2=W/2+5,cw=(pw/2)-5;
+
+  // Header colonne bailleur
+  fillRect(c1,y,cw,6,29,78,216);
+  setFont(8,'bold',255,255,255);
+  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
+  y+=8;
+
+  // Nom + titre
+  setFont(8.5,'bold',17,24,39);
+  doc.text("Saloni Manager",c1+3,y);
+  y+=5;
+  setFont(8,'normal',55,65,81);
+  doc.text("Proprietaire / Gerant",c1+3,y);
+  y+=5;
   if(hasAdminGarant){
-    // ═══ 3 COLONNES : Bailleur + Admin Garant + Chauffeur ═══
-    var cw3=(pw-10)/3; // largeur de chaque colonne
-    var c1x=ml, c2x=ml+cw3+5, c3x=ml+2*(cw3+5);
+    setFont(8,'normal',29,78,216);
+    doc.text("Administrateur Garant :",c1+3,y);
+    y+=4;
+    setFont(8,'bold',29,78,216);
+    doc.text(nomCompletCreateur,c1+3,y);
+    y+=4;
+    setFont(7,'italic',107,114,128);
+    doc.text("(Agissant au nom du Gerant proprietaire)",c1+3,y);
+    y+=6;
+  }else{y+=2;}
 
-    // Headers colonnes
-    fillRect(c1x,y,cw3,6,29,78,216);
-    setFont(7.5,"bold",255,255,255);
-    doc.text("LE BAILLEUR",c1x+3,y+4.2);
+  // Ligne signature bailleur
+  doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
+  doc.line(c1,y+14,c1+cw-5,y+14);
+  setFont(7,'normal',107,114,128);
+  doc.text("Signature & Cachet",c1+3,y+18);
+  y+=22;
 
-    fillRect(c2x,y,cw3,6,124,58,237);
-    setFont(7.5,"bold",255,255,255);
-    doc.text("ADMIN GARANT",c2x+3,y+4.2);
+  // ── Colonne Chauffeur (droite) ──
+  var yChauf=y-22;
 
-    fillRect(c3x,y,cw3,6,5,150,105);
-    setFont(7.5,"bold",255,255,255);
-    doc.text("LE LOCATAIRE",c3x+3,y+4.2);
+  // Header colonne chauffeur
+  fillRect(c2,yChauf-22,cw,6,5,150,105);
+  setFont(8,'bold',255,255,255);
+  doc.text("LE LOCATAIRE (CHAUFFEUR)",c2+3,yChauf-22+4.2);
+  yChauf-=14;
+
+  // Nom chauffeur
+  setFont(8.5,'bold',17,24,39);
+  doc.text(nom,c2+3,yChauf);
+  yChauf+=5;
+
+  // Mention "Lu et approuvé" pré-imprimée
+  fillRect(c2,yChauf,cw,8,240,253,244);
+  setFont(7.5,'bold',5,150,105);
+  doc.text("Lu et approuve :",c2+3,yChauf+3.5);
+  setFont(7,'italic',55,65,81);
+  doc.text("Je certifie avoir lu et accepte les termes",c2+3,yChauf+7);
+  yChauf+=10;
+
+  // Ligne signature chauffeur
+  doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
+  doc.line(c2,yChauf+10,c2+cw-5,yChauf+10);
+  setFont(7,'normal',107,114,128);
+  doc.text("Signature du chauffeur",c2+3,yChauf+14);
+  doc.text("(Faire preceder de: Lu et approuve)",c2+3,yChauf+18);
+
+  // ── Si admin : ajouter aussi visa du gérant ──
+  if(hasAdminGarant){
     y+=8;
-
-    // Noms + titres
-    setFont(8,"bold",17,24,39);
-    doc.text(nomGerant,c1x+3,y);
-    doc.text(nomAdmin,c2x+3,y);
-    doc.text(nom,c3x+3,y);
-
-    setFont(7.5,"normal",55,65,81);
-    doc.text(titreGerant,c1x+3,y+4);
-    doc.text(titreAdmin,c2x+3,y+4);
-    doc.text("Chauffeur",c3x+3,y+4);
-
-    // Lignes signatures
-    doc.setDrawColor(55,65,81); doc.setLineWidth(0.3);
-    doc.line(c1x,y+22,c1x+cw3-2,y+22);
-    doc.line(c2x,y+22,c2x+cw3-2,y+22);
-    doc.line(c3x,y+22,c3x+cw3-2,y+22);
-
-    setFont(6.5,"normal",107,114,128);
-    doc.text("Signature + cachet",c1x+3,y+26);
-    doc.text("Signature",c2x+3,y+26);
-    doc.text("Lu et approuve + Sign.",c3x+3,y+26);
-  } else {
-    // ═══ 2 COLONNES classiques : Bailleur + Chauffeur ═══
-    var c1=ml, c2=W/2+5, cw=(pw/2)-5;
-
-    fillRect(c1,y,cw,6,29,78,216);
-    setFont(8,"bold",255,255,255);
-    doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
-
-    fillRect(c2,y,cw,6,5,150,105);
-    setFont(8,"bold",255,255,255);
-    doc.text("LE LOCATAIRE / CHAUFFEUR",c2+3,y+4.2);
+    hline(y,229,231,235,0.3);y+=6;
+    setFont(8,'bold',17,24,39);
+    doc.text("VISA DU GERANT PROPRIETAIRE",ml+3,y);
+    y+=6;
+    setFont(8,'normal',55,65,81);
+    doc.text("Le Gerant — Proprietaire de la Flotte",ml+3,y);
+    y+=10;
+    doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
+    doc.line(ml,y,ml+80,y);
+    setFont(7,'normal',107,114,128);
+    doc.text("Signature & Cachet du Gerant",ml+3,y+4);
     y+=8;
-
-    setFont(8.5,"bold",17,24,39);
-    doc.text(nomGerant,c1+3,y);
-    doc.text(nom,c2+3,y);
-    setFont(8,"normal",55,65,81);
-    doc.text(titreGerant,c1+3,y+4);
-    doc.text("Chauffeur",c2+3,y+4);
-
-    doc.setDrawColor(55,65,81); doc.setLineWidth(0.3);
-    doc.line(c1,y+22,c1+cw-5,y+22);
-    doc.line(c2,y+22,c2+cw-5,y+22);
-    setFont(7,"normal",107,114,128);
-    doc.text("Signature + cachet",c1+3,y+26);
-    doc.text("Lu et approuve + Signature",c2+3,y+26);
+  }else{
+    y+=8;
   }
 
-  // ══ Footer ══
-  setFont(7,"italic",150,150,150);
-  doc.text("Contrat genere automatiquement par Saloni Manager — "+dateDebut,W/2,290,{align:"center"});
+  hline(y,229,231,235,0.5);y+=4;
+  setFont(7,'normal',107,114,128);
+  doc.text("Contrat etabli en 2 exemplaires originaux — Genere par Saloni Manager",W/2,y,{align:'center'});
 
   // Sauvegarder
-  var filename="Contrat_"+(c.nom||"chauffeur").replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
+  var filename="Contrat_"+nom.replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
   doc.save(filename);
 
+  // Enregistrer la date de fin de contrat
   if(!c.contratFin){
     c.contratFin=fin.toISOString().substring(0,10);
     try{ fbSave("chauffeurs",c); }catch(e){}
     save();
   }
-  if(!c.creePar){
+  // Enregistrer le créateur si pas encore défini
+  if(!c.creePar && S.user){
     c.creePar=S.user.pseudo;
     c.creeParNiveau=S.user.niveau;
+    if(S.user.nom) c.creeParNom=S.user.nom;
     try{ fbSave("chauffeurs",c); }catch(e){}
     save();
   }
 
   toast("✅ Contrat généré et téléchargé","success");
   if(typeof addIAJournal==="function") addIAJournal("contrat","Contrat PDF généré",c.nom);
-}
-
-function _genererContratInner(c){
-  var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
-  var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
-  var W=210, ml=15, mr=15, pw=W-ml-mr;
-  var y=15;
-
-  // ─── DONNÉES ───
-  var today=new Date();
-  var fin=new Date(today);
-  fin.setMonth(fin.getMonth()+6);
-  var fmt=function(d){return d.getDate().toString().padStart(2,"0")+"/"+(d.getMonth()+1).toString().padStart(2,"0")+"/"+d.getFullYear();};
-  var dateDebut=fmt(today);
-  var dateFin=fmt(fin);
-  var sal=(S.data.salonis||[]).find(function(s){return String(s.id)===String(c.saloniId||c.saloni);});
-  var nom=c.nom||"N/A";
-  var isH=c.freqPaiement==="Hebdomadaire";
-  var objVal=isH?((c.objectifSemaine||0).toLocaleString("fr-FR")+" FCFA"):((c.objectifJour||0).toLocaleString("fr-FR")+" FCFA");
-  var objLabel=isH?"Hebdomadaire":"Journalier";
-  var salInfo=sal?(sal.modele||"Saloni")+" — N° "+(sal.numero||sal.id):(c.saloniId||"N/A");
-
-  // ─── HELPERS ───
-  function setFont(size, style, r, g, b){
-    doc.setFontSize(size);
-    doc.setFont("helvetica", style||"normal");
-    doc.setTextColor(r||0, g||0, b||0);
-  }
-  function fillRect(x, y, w, h, r, g, b){
-    doc.setFillColor(r, g, b);
-    doc.rect(x, y, w, h, "F");
-  }
-  function hline(yy, r, g, b, w){
-    doc.setDrawColor(r||200, g||200, b||200);
-    doc.setLineWidth(w||0.3);
-    doc.line(ml, yy, W-mr, yy);
-  }
-  function sectionTitle(title, yy, r, g, b){
-    fillRect(ml, yy, pw, 7, r||29, g||78, b||216);
-    setFont(9, "bold", 255, 255, 255);
-    doc.text(title, ml+3, yy+4.8);
-    return yy+9;
-  }
-  function tableRow(label, val, yy, shade){
-    if(shade) fillRect(ml, yy, pw, 5.5, 245, 247, 250);
-    setFont(8, "bold", 75, 85, 99);
-    doc.text(String(label||""), ml+3, yy+3.8);
-    setFont(8, "normal", 17, 24, 39);
-    doc.text(String(val||"—"), ml+50, yy+3.8);
-    hline(yy+5.5, 229, 231, 235, 0.2);
-    return yy+5.5;
-  }
-  function clauseBox(title, text, yy, r, g, b){
-    var lines=doc.splitTextToSize(String(text||""), pw-8);
-    var h=8+lines.length*4.5;
-    if(yy+h>275){doc.addPage();yy=15;}
-    fillRect(ml, yy, pw, h, r||239, g||246, b||255);
-    setFont(8, "bold", 29, 78, 216);
-    doc.text(title, ml+3, yy+5);
-    setFont(8, "normal", 17, 24, 39);
-    lines.forEach(function(l, i){doc.text(l, ml+3, yy+9+i*4.5);});
-    hline(yy+h, 229, 231, 235, 0.2);
-    return yy+h+3;
-  }
-
-  // ─── EN-TÊTE ENTREPRISE ───
-  fillRect(0, 0, W, 30, 29, 78, 216);
-  setFont(17, "bold", 255, 255, 255);
-  doc.text("DIAKITE TRANSPORT", W/2, 11, {align:"center"});
-  setFont(8, "normal", 200, 220, 255);
-  doc.text("Adjame St Michel, Lot 611, Abidjan", W/2, 17, {align:"center"});
-  doc.text("Gestion de flotte de tricycles-taxis (Salonis)", W/2, 22, {align:"center"});
-  fillRect(0, 28, W, 1, 17, 55, 170);
-  y=36;
-
-  // ─── TITRE ───
-  setFont(13, "bold", 17, 24, 39);
-  doc.text("CONTRAT DE LOCATION DE TRICYCLE (SALONI)", W/2, y, {align:"center"});
-  y+=6;
-  setFont(9, "italic", 107, 114, 128);
-  doc.text("Contrat a Duree Determinee — 6 mois", W/2, y, {align:"center"});
-  y+=5;
-  hline(y, 29, 78, 216, 0.6);
-  y+=7;
-
-  // ─── ART 1 : PARTIES ───
-  y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT", y);
-  fillRect(ml, y, pw, 5.5, 239, 246, 255);
-  setFont(8.5, "bold", 29, 78, 216);
-  doc.text("BAILLEUR (Proprietaire)", ml+3, y+4);
-  y+=5.5;
-  y=tableRow("Entreprise :", "DIAKITE TRANSPORT", y, false);
-  y=tableRow("Representee par :", "DIAKITE Korotum Marceline — Gerante", y, true);
-  y=tableRow("Adresse :", "Adjame St Michel, Lot 611, Abidjan", y, false);
-  y+=3;
-
-  fillRect(ml, y, pw, 5.5, 5, 150, 105);
-  setFont(8.5, "bold", 255, 255, 255);
-  doc.text("LOCATAIRE (Chauffeur)", ml+3, y+4);
-  y+=5.5;
-  y=tableRow("Nom & Prenom :", nom, y, false);
-  y=tableRow("Telephone :", c.tel||"N/A", y, true);
-  y=tableRow("Date de naissance :", c.dateNaissance?fmt(new Date(c.dateNaissance)):"N/A", y, false);
-  y=tableRow("Lieu de naissance :", c.lieuNaissance||"N/A", y, true);
-  y=tableRow("N° CNI / Passeport :", c.numCNI||"N/A", y, false);
-  y=tableRow("Adresse :", c.adresse||"N/A", y, true);
-  y=tableRow("Contact urgence :", c.contactUrgence||"N/A", y, false);
-  y=tableRow("Saloni attribue :", salInfo, y, true);
-  y=tableRow("Zone d'activite :", c.zone||"N/A", y, false);
-  y+=5;
-
-  // ─── ART 2 : OBJECTIFS ───
-  y=sectionTitle("ARTICLE 2 — OBJECTIFS ET VERSEMENTS", y, 55, 65, 81);
-  y=tableRow("Frequence :", objLabel, y, false);
-  y=tableRow("Objectif :", objVal, y, true);
-  y=tableRow("Mode de paiement :", "Especes / Wave / Orange Money / MTN", y, false);
-  y+=5;
-
-  // ─── ART 3 : DURÉE ───
-  y=sectionTitle("ARTICLE 3 — DUREE DU CONTRAT", y);
-  fillRect(ml, y, pw, 16, 239, 246, 255);
-  setFont(8.5, "normal", 17, 24, 39);
-  var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
-  var linesD=doc.splitTextToSize(texteduree, pw-8);
-  linesD.forEach(function(l){doc.text(l, ml+3, y+4.5); y+=4.5;});
-  setFont(8, "bold", 220, 38, 38);
-  doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.", ml+3, y+3);
-  y+=9;
-
-  // ─── ART 4 ───
-  y=clauseBox(
-    "ARTICLE 4 — RETRAIT DU TRICYCLE",
-    "En cas d'absence de versement pendant 2 jours consecutifs sans justificatif valable (panne, maladie, vidange) signale des le premier jour d'arret au gerant ou a un administrateur via l'application, le tricycle sera retire immediatement sans preavis.",
-    y, 239, 246, 255);
-
-  // ─── ART 5 ───
-  y=clauseBox(
-    "ARTICLE 5 — PRIMES DE PERFORMANCE",
-    "Le locataire beneficie d'une prime mensuelle de 5.000 a 15.000 FCFA si tous les versements du mois ont ete effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree durant le mois concerne.",
-    y, 240, 253, 244);
-
-  // ─── ART 6 ───
-  y=clauseBox(
-    "ARTICLE 6 — ENTRETIEN DU TRICYCLE",
-    "Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires aux intervalles requis. Les frais de reparation resultant d'une negligence d'entretien sont integralement a la charge du locataire.",
-    y, 255, 251, 235);
-
-  // ─── ART 7 ───
-  y=clauseBox(
-    "ARTICLE 7 — INTERDICTIONS ET OBLIGATIONS",
-    "Il est formellement interdit : (1) d'abandonner le tricycle sans en informer le gerant ou un administrateur — tout abandon caracterise constituera un abandon de bien confie et fera l'objet de poursuites judiciaires ; (2) de laisser le tricycle aller en fourriere sans avertissement — les frais sont a la charge du locataire ; (3) de sous-louer ou preter le tricycle sans autorisation ecrite.",
-    y, 254, 242, 242);
-
-  // ─── ART 8 ───
-  y=clauseBox(
-    "ARTICLE 8 — RESILIATION",
-    "Le contrat peut etre resilie de plein droit, sans preavis, en cas de : non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, ou fausse declaration lors de la signature.",
-    y, 243, 244, 246);
-
-  // ─── ART 9 : CONSTAT DE FIN DE CONTRAT (NOUVELLE CLAUSE) ───
-  y=clauseBox(
-    "ARTICLE 9 — CONSTAT DE FIN DE CONTRAT ET RESTITUTION",
-    "Si l'une des deux parties (Bailleur ou Locataire) decide de mettre fin au present contrat — que ce soit a l'echeance normale, par resiliation anticipee ou d'un commun accord — un CONSTAT CONTRADICTOIRE du tricycle sera OBLIGATOIREMENT effectue avant la restitution. Ce constat permettra de verifier l'etat general du vehicule, d'identifier les eventuelles pannes ou dommages, et d'evaluer l'usure des pieces. Le tricycle DOIT etre restitue dans le meme etat qu'au moment de sa prise en charge initiale, sauf usure normale due a un usage conforme. Toute deterioration anormale (rayures profondes, casses, pieces manquantes, panne due a la negligence) constatee sera CHIFFREE et IMPUTEE au Locataire, qui s'engage a en assumer le cout integral. Le constat sera signe par les deux parties et fera office de quittus liberatoire une fois les eventuelles reparations effectuees ou payees.",
-    y, 254, 240, 220);
-
-  // ─── ART 10 ───
-  y=clauseBox(
-    "ARTICLE 10 — REGLEMENT DES LITIGES",
-    "Tout litige relatif au present contrat sera regle a l'amiable. A defaut, les tribunaux competents d'Abidjan seront seuls competents.",
-    y, 245, 245, 250);
-
-  // ─── SIGNATURES ───
-  if(y>210){doc.addPage(); y=15;} else {y+=4;}
-  hline(y, 229, 231, 235, 0.5);
-  y+=6;
-  setFont(11, "bold", 55, 65, 81);
-  doc.text("SIGNATURES", W/2, y, {align:"center"});
-  y+=5;
-  setFont(8, "normal", 107, 114, 128);
-  doc.text("Fait a Abidjan, le "+dateDebut, W/2, y, {align:"center"});
-  y+=14;
-
-  doc.setDrawColor(100, 100, 100);
-  doc.line(ml, y, ml+70, y);
-  doc.line(W-mr-70, y, W-mr, y);
-  y+=5;
-  setFont(9, "bold", 17, 24, 39);
-  doc.text("Le BAILLEUR", ml+25, y);
-  doc.text("Le LOCATAIRE", W-mr-50, y);
-  y+=4;
-  setFont(7, "italic", 120, 120, 120);
-  doc.text("DIAKITE Korotum Marceline", ml+13, y);
-  doc.text("Signature precedee de \"Lu et approuve\"", W-mr-65, y);
-  y+=4;
-  setFont(7, "normal", 120, 120, 120);
-  doc.text("Gerante & Proprietaire", ml+25, y);
-  doc.text(nom, W-mr-25, y, {align:"left"});
-
-  // ─── PIED DE PAGE ───
-  setFont(7, "italic", 150, 150, 150);
-  var totalPages=doc.getNumberOfPages();
-  for(var p=1;p<=totalPages;p++){
-    doc.setPage(p);
-    doc.text("Contrat genere automatiquement par Saloni Manager — "+dateDebut+" — Page "+p+"/"+totalPages, W/2, 290, {align:"center"});
-  }
-
-  // ─── SAUVEGARDE ───
-  var filename="Contrat_"+(c.nom||"chauffeur").replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
-  doc.save(filename);
-
-  if(!c.contratFin){
-    c.contratFin=fin.toISOString().substring(0,10);
-  }
-  c.contratGenere=true;
-  c.contratDateGen=td();
-  try{ fbSave("chauffeurs",c); }catch(e){}
-  save();
-
-  toast("✅ Contrat généré et téléchargé","success");
-  addIAJournal("contrat","Contrat PDF généré",c.nom);
 }
 
 function openSaloniModal(existing){
@@ -10865,15 +10635,337 @@ function renderSecurite(){
 }
 function renderParametres(){
   var h='<div class="screen-title">⚙️ Paramètres</div>';
-  h+='<button class="btn-secondary" style="margin-bottom:8px" onclick="toggleTheme();render()">🌓 Basculer thème (clair/sombre)</button>';
-  h+='<button class="btn-secondary" style="margin-bottom:8px" onclick="clearLocal()">🗑 Effacer le cache local</button>';
-  h+='<button class="btn-secondary" onclick="window.location.reload()">🔄 Rafraîchir l\'application</button>';
+
+  // Info utilisateur
+  h+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;border-radius:14px;padding:14px;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:12px">';
+  h+='<div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px">'+(S.user?S.user.pseudo.substring(0,2).toUpperCase():"?")+'</div>';
+  h+='<div><div style="font-weight:800;font-size:15px">'+(S.user?(S.user.nom||S.user.pseudo):"—")+'</div>';
+  h+='<div style="font-size:11.5px;opacity:.85">'+(S.user?S.user.role+" · Niveau "+S.user.niveau:"")+'</div></div>';
+  h+='</div></div>';
+
+  // Apparence
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🎨 Apparence</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:14px">';
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="toggleTheme();render()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#475569,#334155);color:#fff">🌓</div>';
+  h+='<div class="sidebar-item-label">Basculer thème (clair / sombre)</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+  h+='</div>';
+
+  // Données & Sync
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">📊 Données et synchronisation</div>';
+
+  // Stats
+  var statsData={
+    chauffeurs:(S.data.chauffeurs||[]).length,
+    versements:(S.data.versements||[]).length,
+    sousComptes:(S.data.sousComptes||[]).length,
+    chats:(S.data.chats||[]).length
+  };
+  var dataSize=0;
+  try{ dataSize=Math.round(JSON.stringify(S.data).length/1024); }catch(e){}
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px">';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">';
+  h+='<div><span style="color:var(--txt-2)">👥 Chauffeurs :</span> <strong>'+statsData.chauffeurs+'</strong></div>';
+  h+='<div><span style="color:var(--txt-2)">💰 Versements :</span> <strong>'+statsData.versements+'</strong></div>';
+  h+='<div><span style="color:var(--txt-2)">👔 Sous-comptes :</span> <strong>'+statsData.sousComptes+'</strong></div>';
+  h+='<div><span style="color:var(--txt-2)">💬 Messages :</span> <strong>'+statsData.chats+'</strong></div>';
+  h+='</div>';
+  h+='<div style="font-size:11px;color:var(--txt-3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">💾 Cache local : '+dataSize+' KB</div>';
+  h+='</div>';
+
+  // Actions données
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:14px">';
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="exporterDonneesJSON()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">📥</div>';
+  h+='<div class="sidebar-item-label">Exporter mes données (sauvegarde)</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="document.getElementById(\'importFile\').click()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff">📤</div>';
+  h+='<div class="sidebar-item-label">Importer une sauvegarde</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+  h+='<input type="file" id="importFile" accept="application/json" style="display:none" onchange="importerDonneesJSON(event)"/>';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="resyncFirebase()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">🔄</div>';
+  h+='<div class="sidebar-item-label">Forcer la sync Firebase</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+  h+='</div>';
+
+  // Maintenance / Urgence
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🛠️ Maintenance</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:14px">';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="window.location.reload()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:#fff">🔄</div>';
+  h+='<div class="sidebar-item-label">Rafraîchir l\'application</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="diagnostiquerApp()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff">🩺</div>';
+  h+='<div class="sidebar-item-label">Diagnostiquer l\'application</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="verifierIntegrite()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff">🔍</div>';
+  h+='<div class="sidebar-item-label">Vérifier l\'intégrité des données</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="viderCacheNavigateur()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff">🧹</div>';
+  h+='<div class="sidebar-item-label">Vider le cache navigateur</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+
+  h+='<button class="sidebar-item" style="margin:0;width:100%" onclick="clearLocal()">';
+  h+='<div class="sidebar-item-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff">🗑</div>';
+  h+='<div class="sidebar-item-label">Effacer cache local (réinitialiser)</div>';
+  h+='<div class="sidebar-item-chevron">›</div></button>';
+  h+='</div>';
+
+  // Déconnexion
+  h+='<button class="btn-ghost" style="color:var(--danger);border-color:var(--danger);margin-top:10px" onclick="seDeconnecter()">🚪 Se déconnecter</button>';
+
   return h;
 }
+
 function clearLocal(){
-  if(!confirm("Effacer le cache local ? Les données Firebase seront rechargées."))return;
+  if(!confirm("Effacer le cache local ?\n\n⚠️ Les données Firebase seront rechargées.\nVotre session sera fermée."))return;
   localStorage.removeItem("sal_v20");
+  localStorage.removeItem("sal_session");
   toast("Cache effacé","success");
+  setTimeout(function(){window.location.reload();},800);
+}
+
+function exporterDonneesJSON(){
+  try{
+    var data={
+      version:"20.1",
+      dateExport:new Date().toISOString(),
+      user:S.user?S.user.pseudo:null,
+      data:S.data
+    };
+    var json=JSON.stringify(data,null,2);
+    var blob=new Blob([json],{type:"application/json"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;
+    a.download="saloni-backup-"+td()+".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    toast("✅ Sauvegarde téléchargée","success");
+  }catch(e){
+    toast("Erreur: "+e.message,"error");
+  }
+}
+
+function importerDonneesJSON(event){
+  var file=event.target.files[0];
+  if(!file) return;
+  if(!confirm("Importer cette sauvegarde ?\n\n⚠️ Les données actuelles seront REMPLACÉES.\nCette action est irréversible.\n\nFichier : "+file.name)){
+    event.target.value="";
+    return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(!data.data){throw new Error("Format de fichier invalide");}
+      S.data=data.data;
+      save();
+      toast("✅ Données importées. Rechargement...","success");
+      setTimeout(function(){window.location.reload();},1500);
+    }catch(err){
+      toast("❌ Erreur : "+err.message,"error");
+    }
+    event.target.value="";
+  };
+  reader.readAsText(file);
+}
+
+function resyncFirebase(){
+  if(!db){
+    toast("Firebase non connecté","error");
+    return;
+  }
+  toast("⏳ Re-synchronisation en cours...","info");
+  // Forcer une re-lecture complète
+  try{
+    if(window._iaInterval) clearInterval(window._iaInterval);
+    if(window._iaEventInterval) clearInterval(window._iaEventInterval);
+    initFirebase();
+    setTimeout(function(){
+      toast("✅ Synchronisation effectuée","success");
+      render();
+    },1500);
+  }catch(e){
+    toast("Erreur: "+e.message,"error");
+  }
+}
+
+function diagnostiquerApp(){
+  var diag=[];
+
+  // Test 1: Firebase
+  diag.push({label:"Firebase",val:db?"✅ Connecté":"❌ Non connecté",ok:!!db});
+
+  // Test 2: Service Worker
+  var hasSW=("serviceWorker" in navigator);
+  diag.push({label:"Service Worker",val:hasSW?"✅ Supporté":"❌ Non supporté",ok:hasSW});
+
+  // Test 3: Notifications
+  var notifPerm=("Notification" in window)?Notification.permission:"unsupported";
+  diag.push({label:"Notifications",val:notifPerm==="granted"?"✅ Autorisées":(notifPerm==="denied"?"❌ Bloquées":"⚠️ Non demandées"),ok:notifPerm==="granted"});
+
+  // Test 4: localStorage
+  var lsOK=true;
+  try{
+    localStorage.setItem("_test_","1");
+    localStorage.removeItem("_test_");
+  }catch(e){lsOK=false;}
+  diag.push({label:"Stockage local",val:lsOK?"✅ Fonctionnel":"❌ Bloqué",ok:lsOK});
+
+  // Test 5: Online
+  diag.push({label:"Connexion",val:navigator.onLine?"✅ En ligne":"❌ Hors ligne",ok:navigator.onLine});
+
+  // Test 6: PWA
+  var isPWA=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
+  diag.push({label:"Mode PWA",val:isPWA?"✅ Installée":"ℹ️ Navigateur",ok:true});
+
+  // Test 7: Audio (notifications sonores)
+  var audioOK=true;
+  try{ new (window.AudioContext||window.webkitAudioContext)(); }catch(e){audioOK=false;}
+  diag.push({label:"Audio",val:audioOK?"✅ OK":"❌ Bloqué",ok:audioOK});
+
+  // Test 8: Vibration
+  diag.push({label:"Vibration",val:navigator.vibrate?"✅ Supportée":"⚠️ Non supportée",ok:!!navigator.vibrate});
+
+  // Test 9: Géolocalisation
+  diag.push({label:"GPS",val:navigator.geolocation?"✅ Disponible":"❌ Non supportée",ok:!!navigator.geolocation});
+
+  // Test 10: Données
+  var dataKB=Math.round(JSON.stringify(S.data).length/1024);
+  diag.push({label:"Cache local",val:dataKB+" KB",ok:dataKB<5000});
+
+  var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Diagnostic complet de votre installation</div>';
+  diag.forEach(function(d){
+    body+='<div style="display:flex;justify-content:space-between;padding:10px 12px;background:'+(d.ok?"var(--surface)":"var(--warning-soft)")+';border-radius:10px;margin-bottom:6px;font-size:13px">';
+    body+='<span style="font-weight:700">'+d.label+'</span>';
+    body+='<span style="color:'+(d.ok?"var(--txt)":"var(--warning)")+'">'+d.val+'</span>';
+    body+='</div>';
+  });
+
+  // Info navigateur
+  body+='<div style="margin-top:14px;padding:10px;background:var(--surface-2);border-radius:10px;font-size:11px;color:var(--txt-2);font-family:monospace;line-height:1.5">';
+  body+='Navigateur : '+navigator.userAgent.substring(0,80)+'<br>';
+  body+='Plateforme : '+(navigator.platform||"—")+'<br>';
+  body+='Langue : '+(navigator.language||"—");
+  body+='</div>';
+
+  openModal("🩺 Diagnostic Saloni Manager", body);
+}
+
+function verifierIntegrite(){
+  var problems=[];
+  var corrections=0;
+
+  // Vérifier les chauffeurs
+  (S.data.chauffeurs||[]).forEach(function(c,i){
+    if(!c.id){
+      c.id=Date.now()+i;
+      problems.push("Chauffeur sans ID corrigé : "+c.nom);
+      corrections++;
+    }
+    if(!c.nom){
+      problems.push("Chauffeur "+c.id+" sans nom");
+    }
+    if(c.solde===undefined) {c.solde=0;corrections++;}
+  });
+
+  // Vérifier les versements
+  var versementsValides=(S.data.versements||[]).filter(function(v){
+    if(!v.id || !v.chauffeurId || !v.montant){
+      problems.push("Versement invalide ignoré : "+JSON.stringify(v).substring(0,50));
+      return false;
+    }
+    return true;
+  });
+  if(versementsValides.length!==(S.data.versements||[]).length){
+    S.data.versements=versementsValides;
+    corrections++;
+  }
+
+  // Vérifier sous-comptes
+  var sousComptesValides=(S.data.sousComptes||[]).filter(function(c){
+    if(!c.pseudo){
+      problems.push("Sous-compte sans pseudo ignoré");
+      return false;
+    }
+    if(c.niveau===2 && (!c.permissions || Object.keys(c.permissions).length===0)){
+      c.permissions=getDefaultPerms(2);
+      problems.push("Permissions par défaut appliquées : "+c.pseudo);
+      corrections++;
+    }
+    return true;
+  });
+  if(sousComptesValides.length!==(S.data.sousComptes||[]).length){
+    S.data.sousComptes=sousComptesValides;
+  }
+
+  if(corrections>0) save();
+
+  var body='';
+  if(problems.length===0){
+    body+='<div style="text-align:center;padding:30px 10px">';
+    body+='<div style="font-size:56px;margin-bottom:14px">✅</div>';
+    body+='<div style="font-weight:800;font-size:16px;color:var(--success);margin-bottom:8px">Aucun problème détecté</div>';
+    body+='<div style="font-size:13px;color:var(--txt-2)">Toutes vos données sont saines et cohérentes</div>';
+    body+='</div>';
+  } else {
+    body+='<div style="background:'+(corrections>0?"var(--success-soft)":"var(--warning-soft)")+';color:'+(corrections>0?"var(--success)":"var(--warning)")+';border-radius:12px;padding:14px;margin-bottom:14px">';
+    body+='<div style="font-weight:800;font-size:14px">'+(corrections>0?"✅ "+corrections+" correction(s) appliquée(s)":"⚠️ "+problems.length+" problème(s) détecté(s)")+'</div>';
+    body+='</div>';
+    body+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:12px;line-height:1.7;max-height:300px;overflow-y:auto">';
+    problems.forEach(function(p){
+      body+='• '+escapeHtml(p)+'<br>';
+    });
+    body+='</div>';
+  }
+  openModal("🔍 Intégrité des données", body);
+}
+
+function viderCacheNavigateur(){
+  if(!confirm("Vider le cache du navigateur ?\n\nCela force le téléchargement de la dernière version de l'app. Votre session sera fermée mais vos données restent sur Firebase.")) return;
+
+  // Nettoyer service worker
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      regs.forEach(function(reg){reg.unregister();});
+    });
+  }
+
+  // Nettoyer caches
+  if("caches" in window){
+    caches.keys().then(function(names){
+      names.forEach(function(name){caches.delete(name);});
+    });
+  }
+
+  toast("Cache vidé. Rechargement...","success");
+  setTimeout(function(){
+    // Forcer le rechargement sans cache
+    window.location.reload(true);
+  },1500);
+}
+
+function seDeconnecter(){
+  if(!confirm("Se déconnecter ?")) return;
+  localStorage.removeItem("sal_session");
+  toast("Déconnexion...","success");
   setTimeout(function(){window.location.reload();},800);
 }
 function renderApropos(){
