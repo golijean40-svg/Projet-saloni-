@@ -7459,6 +7459,15 @@ function renderSousComptes(){
   // Bouton ajouter
   h+='<button class="btn-primary" style="margin:14px 0" onclick="openSousCompteModal()">+ Créer un sous-compte</button>';
 
+  // ─── BOUTON NETTOYAGE FIREBASE (toujours visible) ───
+  h+='<div style="background:linear-gradient(135deg,rgba(220,38,38,.08),rgba(153,27,27,.04));border:2px solid #dc2626;border-radius:14px;padding:14px;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+  h+='<div style="font-size:28px">🔥</div>';
+  h+='<div style="flex:1"><div style="font-weight:800;font-size:13.5px;color:#dc2626">Comptes fantômes qui reviennent ?</div>';
+  h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px">Nettoyage radical de Firebase</div></div></div>';
+  h+='<button class="btn-primary" style="background:linear-gradient(135deg,#dc2626,#991b1b);margin:0" onclick="nettoyageFirebaseRadical()">🔥 Lancer le nettoyage Firebase</button>';
+  h+='</div>';
+
   // ─── Migration rapide : activer "versements" pour tous les admins existants ───
   var adminsListSansVers=sc.filter(function(c){return c.niveau===2 && !(c.permissions && c.permissions.versements);});
   if(adminsListSansVers.length>0){
@@ -7741,6 +7750,148 @@ function activerVersementsTousAdmins(){
   toast("✅ "+modifies+" admin(s) mis à jour. Reconnexion recommandée.","success");
   var content=document.getElementById("content-generic");
   if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NETTOYAGE RADICAL FIREBASE - Pour supprimer définitivement
+   ═══════════════════════════════════════════════════════════════ */
+function nettoyageFirebaseRadical(){
+  if(!db){
+    alert("❌ Firebase non connecté. Activez la connexion internet.");
+    return;
+  }
+  if(!confirm("🚨 NETTOYAGE RADICAL FIREBASE\n\nCette action va :\n1. Lister TOUS les sous-comptes sur Firebase\n2. Comparer avec votre liste locale\n3. Supprimer DÉFINITIVEMENT les comptes qui ne devraient plus exister\n\n⚠️ Action irréversible. Continuer ?")) return;
+
+  toast("⏳ Chargement de Firebase...","info");
+
+  db.collection("sal_sousComptes").get().then(function(snapshot){
+    var firebaseAccounts=[];
+    snapshot.forEach(function(doc){
+      firebaseAccounts.push({
+        docId:doc.id,
+        data:doc.data()
+      });
+    });
+
+    var localPseudos={};
+    (S.data.sousComptes||[]).forEach(function(c){
+      localPseudos[c.pseudo]=true;
+    });
+
+    var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Comptes trouvés sur Firebase ('+firebaseAccounts.length+') :</div>';
+
+    if(firebaseAccounts.length===0){
+      body+='<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">Firebase est propre, aucun compte à nettoyer.</div></div>';
+    } else {
+      firebaseAccounts.forEach(function(fb){
+        var pseudo=fb.data.pseudo||fb.docId;
+        var role=fb.data.role||"—";
+        var nom=fb.data.nom||"";
+        var existeEnLocal=localPseudos[pseudo];
+
+        body+='<div style="background:'+(existeEnLocal?"var(--surface)":"var(--danger-soft)")+';border:1px solid '+(existeEnLocal?"var(--border)":"var(--danger)")+';border-radius:12px;padding:12px;margin-bottom:8px">';
+        body+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">';
+        body+='<div style="flex:1;min-width:0">';
+        body+='<div style="font-weight:800;font-size:14px">'+pseudo+'</div>';
+        body+='<div style="font-size:11.5px;color:var(--txt-2)">'+role+(nom?" · "+nom:"")+'</div>';
+        body+='<div style="font-size:11px;margin-top:4px;color:'+(existeEnLocal?"var(--success)":"var(--danger)")+';font-weight:700">'+(existeEnLocal?"✅ Existe en local":"🚨 Fantôme - n\'existe que sur Firebase")+'</div>';
+        body+='</div>';
+        body+='<button onclick="supprimerFirebaseRadical(\''+fb.docId+'\',\''+pseudo+'\')" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-weight:800;font-size:12px;font-family:inherit;cursor:pointer">🗑 Supprimer</button>';
+        body+='</div></div>';
+      });
+
+      // Bouton "Tout supprimer les fantômes"
+      var fantomes=firebaseAccounts.filter(function(fb){
+        return !localPseudos[fb.data.pseudo||fb.docId];
+      });
+      if(fantomes.length>0){
+        body+='<button class="btn-primary" style="background:linear-gradient(135deg,#dc2626,#991b1b);margin-top:14px" onclick="supprimerTousFantomes()">🗑 Supprimer les '+fantomes.length+' compte(s) fantôme(s)</button>';
+      }
+    }
+
+    // Garder la liste pour la suppression en masse
+    window._firebaseAccounts=firebaseAccounts;
+    window._localPseudos=localPseudos;
+
+    openModal("🔥 Nettoyage Firebase", body);
+    toast("✅ "+firebaseAccounts.length+" compte(s) trouvé(s)","success");
+  }).catch(function(e){
+    toast("Erreur: "+e.message,"error");
+    console.error(e);
+  });
+}
+
+function supprimerFirebaseRadical(docId, pseudo){
+  if(!confirm("Supprimer DÉFINITIVEMENT le compte « "+pseudo+" » de Firebase ?\n\nCette action est irréversible.")) return;
+
+  db.collection("sal_sousComptes").doc(docId).delete().then(function(){
+    // Aussi supprimer en local au cas où
+    S.data.sousComptes=(S.data.sousComptes||[]).filter(function(c){return c.pseudo!==pseudo;});
+    save();
+    // Marquer en suppression persistante
+    if(!window._recentDeletions) window._recentDeletions={};
+    window._recentDeletions["sousComptes_"+pseudo]=Date.now();
+    try{
+      var saved=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+      saved["sousComptes_"+pseudo]=Date.now();
+      localStorage.setItem("sal_deletions",JSON.stringify(saved));
+    }catch(e){}
+
+    toast("✅ « "+pseudo+" » supprimé définitivement","success");
+    // Relancer le scan
+    setTimeout(nettoyageFirebaseRadical,500);
+  }).catch(function(e){
+    toast("❌ Erreur: "+e.message,"error");
+  });
+}
+
+function supprimerTousFantomes(){
+  if(!window._firebaseAccounts || !window._localPseudos){
+    toast("Lancez d'abord le nettoyage","error");
+    return;
+  }
+  var fantomes=window._firebaseAccounts.filter(function(fb){
+    return !window._localPseudos[fb.data.pseudo||fb.docId];
+  });
+  if(fantomes.length===0){
+    toast("Aucun fantôme à supprimer","info");
+    return;
+  }
+  if(!confirm("🗑 Supprimer DÉFINITIVEMENT "+fantomes.length+" compte(s) fantôme(s) de Firebase ?\n\nCette action est irréversible.")) return;
+
+  toast("⏳ Suppression de "+fantomes.length+" comptes...","info");
+  var done=0;
+  var errors=0;
+
+  fantomes.forEach(function(fb){
+    var pseudo=fb.data.pseudo||fb.docId;
+    db.collection("sal_sousComptes").doc(fb.docId).delete().then(function(){
+      done++;
+      // Marquer en suppression persistante
+      if(!window._recentDeletions) window._recentDeletions={};
+      window._recentDeletions["sousComptes_"+pseudo]=Date.now();
+      try{
+        var saved=JSON.parse(localStorage.getItem("sal_deletions")||"{}");
+        saved["sousComptes_"+pseudo]=Date.now();
+        localStorage.setItem("sal_deletions",JSON.stringify(saved));
+      }catch(e){}
+
+      if(done+errors===fantomes.length){
+        toast("✅ "+done+" supprimé(s), "+errors+" erreur(s)","success");
+        closeModal();
+        setTimeout(function(){
+          var content=document.getElementById("content-generic");
+          if(content) content.innerHTML='<div class="content-inner">'+renderSousComptes()+'</div>';
+        },500);
+      }
+    }).catch(function(e){
+      errors++;
+      console.error("Erreur suppression "+pseudo+":",e);
+      if(done+errors===fantomes.length){
+        toast("⚠️ "+done+" supprimé(s), "+errors+" erreur(s)","warning");
+      }
+    });
+  });
 }
 
 function renderReglement(){
