@@ -884,6 +884,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <div class="sidebar-item-label">Sous-comptes</div>
         <div class="sidebar-item-chevron">›</div>
       </button>
+      <button class="sidebar-item" onclick="goGeneric('performance')" style="background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">📊</div>
+        <div class="sidebar-item-label">Performance & Notation</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
       <button class="sidebar-item" onclick="goGeneric('autopilot')" style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(91,33,182,.04))">
         <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">🤖</div>
         <div class="sidebar-item-label">Autopilot IA</div>
@@ -1040,6 +1045,185 @@ function getVM(c,VE){
 }
 function getObjJ(c){return c.objectifJour||0;}
 function getObjS(c){return c.objectifSemaine||(c.objectifJour*5)||0;}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE PERFORMANCE - Calcul avancé sur 3 périodes
+   ═══════════════════════════════════════════════════════════════ */
+
+// Obtenir les 7 derniers jours glissants (incluant aujourd'hui)
+function get7JoursGlissants(){
+  var d=[],n=new Date();
+  for(var i=6;i>=0;i--){
+    var x=new Date(n);x.setDate(n.getDate()-i);
+    d.push(fmtISO(x));
+  }
+  return d;
+}
+
+// Calculer le ratio de jours avec versement sur 7 jours
+// Retourne {jours:5, total:7, ratio:0.71, montant:50000, montantAttendu:70000}
+function getStatsChauffeur(c, VE, periode){
+  // periode: "glissant" | "semaine" | "mois"
+  var jours;
+  if(periode==="semaine") jours=getSem();
+  else if(periode==="mois") jours=getMois();
+  else jours=get7JoursGlissants();
+
+  var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+
+  // Pour les chauffeurs hebdomadaires : on compte au moins 1 versement sur la période
+  var isH=c.freqPaiement==="Hebdomadaire";
+  var nbAttendu=isH?Math.max(1,Math.floor(jours.length/7)):jours.length;
+  var joursAvecVersement=0;
+  var montantTotal=0;
+  var montantAttendu=isH?
+    (c.objectifSemaine||(c.objectifJour||0)*5)*Math.ceil(jours.length/7):
+    (c.objectifJour||0)*jours.length;
+
+  jours.forEach(function(j){
+    var vsJ=versCh.filter(function(v){return normDate(v.date)===j;});
+    if(vsJ.length>0){
+      joursAvecVersement++;
+      vsJ.forEach(function(v){montantTotal+=(v.montant||0);});
+    }
+  });
+
+  // Pour hebdo, on compte les versements de la période entière comme un seul
+  if(isH){
+    joursAvecVersement=versCh.filter(function(v){return jours.indexOf(normDate(v.date))>=0;}).length>0?1:0;
+  }
+
+  var ratio=nbAttendu>0?(montantTotal/montantAttendu):0;
+  var ratioJours=nbAttendu>0?(joursAvecVersement/nbAttendu):0;
+
+  return {
+    jours:joursAvecVersement,
+    total:nbAttendu,
+    ratio:Math.min(ratio,1.5),  // cap à 150%
+    ratioJours:ratioJours,
+    montant:montantTotal,
+    montantAttendu:montantAttendu,
+    pourcentage:Math.round(ratio*100),
+    pourcentageJours:Math.round(ratioJours*100),
+    estHebdo:isH
+  };
+}
+
+// Couleur de performance basée sur le pourcentage versé
+// >= 85% = vert ; 51-84% = orange ; < 50% = rouge
+function getCouleurPerformance(pct){
+  if(pct>=85) return {bg:"#10b981",bgSoft:"rgba(16,185,129,.12)",label:"Excellent",emoji:"🟢",texte:"#059669"};
+  if(pct>=51) return {bg:"#f59e0b",bgSoft:"rgba(245,158,11,.12)",label:"Moyen",emoji:"🟠",texte:"#d97706"};
+  return {bg:"#ef4444",bgSoft:"rgba(239,68,68,.12)",label:"Faible",emoji:"🔴",texte:"#dc2626"};
+}
+
+// Notation A/B/C/D basée sur les stats hebdo
+function getNotationChauffeur(c, VE){
+  var stats=getStatsChauffeur(c,VE,"glissant");
+  var sanctions=(S.data.sanctions||[]).filter(function(s){
+    if(String(s.chauffeurId)!==String(c.id)) return false;
+    var d=new Date(s.date);
+    var sept=new Date();sept.setDate(sept.getDate()-7);
+    return d>=sept;
+  }).length;
+
+  if(stats.pourcentage>=85 && sanctions===0) return {note:"A",col:"#10b981",label:"Excellent"};
+  if(stats.pourcentage>=70 && sanctions<=1) return {note:"B",col:"#3b82f6",label:"Bon"};
+  if(stats.pourcentage>=51) return {note:"C",col:"#f59e0b",label:"Moyen"};
+  return {note:"D",col:"#ef4444",label:"À surveiller"};
+}
+
+// Détecter si le chauffeur a une sanction ACTIVE (non-payée ou récente)
+function hasActiveSanction(c){
+  var sanctions=(S.data.sanctions||[]).filter(function(s){
+    if(String(s.chauffeurId)!==String(c.id)) return false;
+    if(s.statut==="annulee") return false;
+    var d=new Date(s.date);
+    var il_y_a_3j=new Date();il_y_a_3j.setDate(il_y_a_3j.getDate()-3);
+    return d>=il_y_a_3j;
+  });
+  return sanctions.length>0;
+}
+
+// Vérifier si le chauffeur a une justification valide en cours
+function hasJustificationActive(c){
+  var justs=(c.justifications||[]).filter(function(j){
+    if(j.statut==="rejetee") return false;
+    var d=new Date(j.dateDebut);
+    var fin=j.dateFin?new Date(j.dateFin):new Date();
+    var today=new Date();
+    return today>=d && today<=fin && j.statut!=="terminee";
+  });
+  return justs.length>0;
+}
+
+// Vérifier si on doit envoyer une sanction (selon le profil quotidien/hebdo)
+function checkBesoinSanction(c, VE){
+  if(hasActiveSanction(c)) return null;       // Déjà une sanction
+  if(hasJustificationActive(c)) return null;  // A une excuse valide
+
+  var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);}).sort(function(a,b){
+    return new Date(b.date)-new Date(a.date);
+  });
+  if(versCh.length===0) return null;
+
+  var dernierVers=new Date(versCh[0].date);
+  var today=new Date();today.setHours(0,0,0,0);
+  var diff=Math.floor((today-dernierVers)/(24*3600*1000));
+
+  if(c.freqPaiement==="Hebdomadaire"){
+    // Hebdo : sanction après 3 jours de retard
+    var prochainAttendu=new Date(dernierVers);
+    prochainAttendu.setDate(prochainAttendu.getDate()+7);
+    var retard=Math.floor((today-prochainAttendu)/(24*3600*1000));
+    if(retard>=3){
+      return {
+        type:"hebdo",
+        jours:retard,
+        message:"Versement hebdomadaire en retard de "+retard+" jour(s)"
+      };
+    }
+  } else {
+    // Quotidien : sanction après 2 jours sans versement
+    if(diff>=2){
+      return {
+        type:"quotidien",
+        jours:diff,
+        message:"Aucun versement depuis "+diff+" jours"
+      };
+    }
+  }
+  return null;
+}
+
+// Liste des avertissements précédents (pour la progression)
+function getNbAvertissements(chauffeurId){
+  var trentejAvant=new Date();trentejAvant.setDate(trentejAvant.getDate()-30);
+  return (S.data.sanctions||[]).filter(function(s){
+    if(String(s.chauffeurId)!==String(chauffeurId)) return false;
+    if(s.statut==="annulee") return false;
+    return new Date(s.date)>=trentejAvant;
+  }).length;
+}
+
+// Texte de l'avertissement progressif
+function getMessageAvertissement(c, niveau, raison){
+  var ent=getEntrepriseConfig();
+  var sign="\n\n— "+ent.nomGerant+" / "+ent.nomEntreprise;
+
+  if(niveau===1){
+    return "Bonjour "+c.nom+",\n\n⚠️ AVERTISSEMENT AMICAL\n\n"+raison+".\n\nMerci de régulariser ta situation rapidement ou de me prévenir si tu as un souci (maladie, panne, etc.). Tu peux le faire directement dans l'app Saloni Manager.\n\nJe compte sur toi 💪"+sign;
+  }
+  if(niveau===2){
+    return "Bonjour "+c.nom+",\n\n⚠️⚠️ AVERTISSEMENT FERME (2ème)\n\n"+raison+".\n\nC'est le 2ème avertissement ce mois. Si la situation ne se régularise pas immédiatement, des mesures plus strictes seront prises.\n\nMerci de me contacter au plus vite."+sign;
+  }
+  if(niveau===3){
+    return "Bonjour "+c.nom+",\n\n🚨 AVERTISSEMENT SÉVÈRE (3ème)\n\n"+raison+".\n\nC'est ton 3ème avertissement en 30 jours. Un entretien obligatoire est requis avant de pouvoir continuer à travailler. Merci de venir me voir dès que possible.\n\nSi rien ne change, le saloni sera retiré."+sign;
+  }
+  // Niveau 4+
+  return "Bonjour "+c.nom+",\n\n🚨🚨 DERNIER AVERTISSEMENT\n\n"+raison+".\n\nC'est ton 4ème avertissement. Sans régularisation dans les 24h, le saloni sera retiré conformément au contrat (Article 4)."+sign;
+}
+
 
 function avatarClass(idx){return"c"+((idx%5)+1);}
 function avatarHTML(c,idx){
@@ -2571,7 +2755,7 @@ function renderChAccueil(c){
   // Actions rapides
   html+='<div class="actions" style="margin-top:14px">';
   html+='<button class="action" onclick="goChTab(\'vers\')"><div class="action-icon">💵</div><div class="action-label">Mes versements</div></button>';
-  html+='<button class="action" onclick="goChTab(\'entretien\')"><div class="action-icon">🚨</div><div class="action-label">Signaler</div></button>';
+  html+='<button class="action" onclick="ouvrirJustificationChauffeur()"><div class="action-icon">📋</div><div class="action-label">Justifier</div></button>';
   html+='<button class="action" onclick="goChTab(\'chat\')"><div class="action-icon">💬</div><div class="action-label">Chat</div></button>';
   html+='</div>';
 
@@ -5538,6 +5722,384 @@ function sauverGPSConfig(){
   toast("✅ Configuration sauvegardée","success");
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD PERFORMANCE - Top/Flop + Carte FIFA + 3 vues période
+   ═══════════════════════════════════════════════════════════════ */
+
+window._perfPeriode="glissant"; // "glissant" | "semaine" | "mois"
+
+function renderPerformance(){
+  var VE=(S.data.versements||[]).map(normVers);
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">📊 Performance des chauffeurs</div>';
+
+  // Sélecteur de période
+  h+='<div style="display:flex;gap:6px;margin-bottom:14px;background:var(--surface-2);padding:4px;border-radius:12px">';
+  var periodes=[
+    {k:"glissant",l:"📅 7j glissants"},
+    {k:"semaine",l:"📆 Semaine"},
+    {k:"mois",l:"🗓️ Mois"}
+  ];
+  periodes.forEach(function(p){
+    var actif=window._perfPeriode===p.k;
+    h+='<button onclick="setPerfPeriode(\''+p.k+'\')" style="flex:1;padding:8px;border-radius:10px;border:none;background:'+(actif?"linear-gradient(135deg,#0a1f44,#1e3a8a)":"transparent")+';color:'+(actif?"#fff":"var(--txt-2)")+';font-weight:'+(actif?"800":"600")+';font-size:11.5px;cursor:pointer;font-family:inherit">'+p.l+'</button>';
+  });
+  h+='</div>';
+
+  // Calculer stats pour tous les chauffeurs sur la période choisie
+  var chauffeursAvecStats=CH.map(function(c){
+    return {
+      ch:c,
+      stats:getStatsChauffeur(c,VE,window._perfPeriode),
+      sanc:hasActiveSanction(c),
+      notation:getNotationChauffeur(c,VE)
+    };
+  }).sort(function(a,b){return b.stats.pourcentage-a.stats.pourcentage;});
+
+  if(chauffeursAvecStats.length===0){
+    h+='<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Aucun chauffeur actif</div></div>';
+    return h;
+  }
+
+  // KPI globaux
+  var totalPct=chauffeursAvecStats.reduce(function(s,x){return s+x.stats.pourcentage;},0);
+  var moyennePct=Math.round(totalPct/chauffeursAvecStats.length);
+  var verts=chauffeursAvecStats.filter(function(x){return x.stats.pourcentage>=85;}).length;
+  var oranges=chauffeursAvecStats.filter(function(x){return x.stats.pourcentage>=51 && x.stats.pourcentage<85;}).length;
+  var rouges=chauffeursAvecStats.filter(function(x){return x.stats.pourcentage<51;}).length;
+
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b1">📊</div><div class="kpi-label">Moyenne</div><div class="kpi-val">'+moyennePct+'%</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2" style="background:linear-gradient(135deg,#10b981,#059669)">🟢</div><div class="kpi-label">Excellents</div><div class="kpi-val">'+verts+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b3" style="background:linear-gradient(135deg,#ef4444,#dc2626)">🔴</div><div class="kpi-label">À surveiller</div><div class="kpi-val">'+rouges+'</div></div>';
+  h+='</div>';
+
+  // ─── TOP 3 PERFORMERS ───
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">🏆 Top 3 performers</div>';
+  var top3=chauffeursAvecStats.slice(0,3);
+  var medailles=["🥇","🥈","🥉"];
+  top3.forEach(function(x,idx){
+    var c=x.ch;
+    var s=x.stats;
+    var col=getCouleurPerformance(s.pourcentage);
+    h+='<div onclick="openCartePerf('+c.id+')" style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col.bg+';border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px">';
+    h+='<div style="font-size:28px">'+medailles[idx]+'</div>';
+    h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">'+c.nom+'</div>';
+    h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px">'+s.jours+'/'+s.total+(s.estHebdo?' versement(s) hebdo':' jours versés')+' · '+fc(s.montant)+'</div></div>';
+    h+='<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:'+col.texte+'">'+s.pourcentage+'%</div>';
+    h+='<div style="font-size:10px;color:'+col.texte+';font-weight:700">'+col.label+'</div></div>';
+    h+='</div>';
+  });
+
+  // ─── FLOP 3 À SURVEILLER ───
+  var flop=chauffeursAvecStats.slice().reverse().slice(0,3).filter(function(x){return x.stats.pourcentage<70;});
+  if(flop.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">🚨 À surveiller ('+flop.length+')</div>';
+    flop.forEach(function(x){
+      var c=x.ch;
+      var s=x.stats;
+      var col=getCouleurPerformance(s.pourcentage);
+      h+='<div onclick="openCartePerf('+c.id+')" style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col.bg+';border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px">';
+      h+='<div style="width:36px;height:36px;background:'+col.bg+';color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800">'+initials(c.nom)+'</div>';
+      h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">'+c.nom+'</div>';
+      h+='<div style="font-size:11.5px;color:var(--txt-2)">'+s.jours+'/'+s.total+' · '+fc(s.montant)+' / '+fc(s.montantAttendu)+'</div></div>';
+      h+='<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:'+col.texte+'">'+s.pourcentage+'%</div>';
+      if(x.sanc) h+='<div style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:6px;font-size:10px;font-weight:800;margin-top:2px">🚨 Sanction</div>';
+      h+='</div></div>';
+    });
+  }
+
+  // ─── LISTE COMPLÈTE ───
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">👥 Tous les chauffeurs ('+chauffeursAvecStats.length+')</div>';
+  chauffeursAvecStats.forEach(function(x){
+    var c=x.ch;
+    var s=x.stats;
+    var col=getCouleurPerformance(s.pourcentage);
+    h+='<div onclick="openCartePerf('+c.id+')" style="background:var(--surface);border:1px solid var(--border);border-left:3px solid '+col.bg+';border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px">';
+    h+='<span style="background:'+x.notation.col+';color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px">'+x.notation.note+'</span>';
+    h+='<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">'+c.nom+'</div>';
+    h+='<div style="font-size:11px;color:var(--txt-2)">'+s.jours+'/'+s.total+' · '+fc(s.montant)+'</div></div>';
+    h+='<div style="font-weight:800;font-size:14px;color:'+col.texte+'">'+s.pourcentage+'%</div>';
+    h+='</div>';
+  });
+
+  return h;
+}
+
+function setPerfPeriode(p){
+  window._perfPeriode=p;
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderPerformance()+'</div>';
+}
+
+/* ─── CARTE DE PERFORMANCE FIFA-LIKE ─── */
+function openCartePerf(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var VE=(S.data.versements||[]).map(normVers);
+  var statsGli=getStatsChauffeur(c,VE,"glissant");
+  var statsSem=getStatsChauffeur(c,VE,"semaine");
+  var statsMois=getStatsChauffeur(c,VE,"mois");
+  var notation=getNotationChauffeur(c,VE);
+
+  // Calculer les jauges
+  var regularite=Math.min(100,Math.round(statsGli.ratioJours*100));
+  var perf=Math.min(100,statsGli.pourcentage);
+  var msgs=(S.data.chats||[]).filter(function(m){return m.convId==="conv_"+c.id && m.de==="chauffeur";}).length;
+  var commun=Math.min(100,msgs*10);
+  var ancienJours=c.dateAjout?Math.floor((Date.now()-new Date(c.dateAjout).getTime())/(24*3600*1000)):0;
+  var anciennete=Math.min(100,Math.round(ancienJours/365*100));
+
+  // Note globale
+  var noteGlob=Math.round((regularite+perf+commun+anciennete)/4);
+  var couleurGlob=getCouleurPerformance(noteGlob>=70?85:noteGlob>=51?60:30);
+
+  var body='';
+  // ─── CARTE FIFA ───
+  body+='<div id="carteFifa" style="background:linear-gradient(135deg,#0a1f44 0%,#1e3a8a 60%,'+couleurGlob.bg+' 100%);color:#fff;border-radius:18px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden">';
+
+  // Badge note dans le coin
+  body+='<div style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,.2);padding:6px 10px;border-radius:10px;backdrop-filter:blur(10px)">';
+  body+='<div style="font-size:9px;font-weight:700;opacity:.85;letter-spacing:1.5px">NOTE</div>';
+  body+='<div style="font-size:24px;font-weight:800;text-align:center">'+notation.note+'</div></div>';
+
+  // Nom
+  body+='<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;opacity:.85;letter-spacing:2px">CHAUFFEUR</div>';
+  body+='<div style="font-size:20px;font-weight:800;margin-top:2px">'+c.nom+'</div>';
+  body+='<div style="font-size:11px;opacity:.85;margin-top:2px">'+(c.zone||"—")+' · '+(c.saloni||c.saloniId||"—")+'</div></div>';
+
+  // Note globale grosse
+  body+='<div style="text-align:center;margin:14px 0">';
+  body+='<div style="font-size:48px;font-weight:900;line-height:1">'+noteGlob+'<span style="font-size:20px;opacity:.7">/100</span></div>';
+  body+='<div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:2px;margin-top:2px">'+notation.label+'</div></div>';
+
+  // Jauges
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">';
+  [
+    {label:"Régularité",val:regularite,icon:"📅"},
+    {label:"Performance",val:perf,icon:"💰"},
+    {label:"Communication",val:commun,icon:"💬"},
+    {label:"Ancienneté",val:anciennete,icon:"⏱️"}
+  ].forEach(function(j){
+    body+='<div>';
+    body+='<div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;margin-bottom:3px;opacity:.9"><span>'+j.icon+' '+j.label+'</span><span>'+j.val+'</span></div>';
+    body+='<div style="height:5px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+j.val+'%;background:#fff;border-radius:3px"></div></div>';
+    body+='</div>';
+  });
+  body+='</div>';
+
+  body+='</div>';
+
+  // ─── 3 PÉRIODES ───
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">';
+  [
+    {label:"7j glissants",stats:statsGli,icon:"📅"},
+    {label:"Semaine",stats:statsSem,icon:"📆"},
+    {label:"Mois",stats:statsMois,icon:"🗓️"}
+  ].forEach(function(p){
+    var col=getCouleurPerformance(p.stats.pourcentage);
+    body+='<div style="background:'+col.bgSoft+';border:1px solid '+col.bg+';border-radius:10px;padding:10px;text-align:center">';
+    body+='<div style="font-size:10px;color:var(--txt-2);font-weight:700;margin-bottom:2px">'+p.icon+' '+p.label+'</div>';
+    body+='<div style="font-size:18px;font-weight:800;color:'+col.texte+'">'+p.stats.pourcentage+'%</div>';
+    body+='<div style="font-size:9px;color:var(--txt-3);margin-top:2px">'+p.stats.jours+'/'+p.stats.total+'</div>';
+    body+='</div>';
+  });
+  body+='</div>';
+
+  // Boutons
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);margin:0" onclick="partagerCarteWA('+c.id+')">📤 Partager WhatsApp</button>';
+  body+='<button class="btn-ghost" style="margin:0" onclick="closeModal();openDetailChauffeur('+c.id+')">👁️ Détails</button>';
+  body+='</div>';
+
+  openModal("📊 "+c.nom, body);
+}
+
+function partagerCarteWA(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var VE=(S.data.versements||[]).map(normVers);
+  var stats=getStatsChauffeur(c,VE,"glissant");
+  var notation=getNotationChauffeur(c,VE);
+
+  var txt="🏆 *CARTE DE PERFORMANCE*\n\n";
+  txt+="👤 *"+c.nom+"*\n";
+  txt+="📍 Zone : "+(c.zone||"—")+"\n";
+  txt+="🛺 Saloni : "+(c.saloni||c.saloniId||"—")+"\n\n";
+  txt+="📊 *Performance 7 jours* : "+stats.pourcentage+"%\n";
+  txt+="✅ Versements : "+stats.jours+"/"+stats.total+"\n";
+  txt+="💰 Total : "+fc(stats.montant)+" / "+fc(stats.montantAttendu)+"\n";
+  txt+="⭐ Note : "+notation.note+" ("+notation.label+")\n\n";
+
+  if(stats.pourcentage>=85) txt+="🟢 Performance excellente, continue comme ça !\n";
+  else if(stats.pourcentage>=51) txt+="🟠 Performance moyenne, on peut faire mieux\n";
+  else txt+="🔴 Performance faible, urgence !\n";
+
+  var ent=getEntrepriseConfig();
+  txt+="\n— "+ent.nomEntreprise;
+
+  var tel=c.tel?c.tel.replace(/\D/g,""):"";
+  var url=tel?"https://wa.me/"+tel+"?text="+encodeURIComponent(txt):"https://wa.me/?text="+encodeURIComponent(txt);
+  window.open(url,"_blank");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME D'AVERTISSEMENTS PROGRESSIFS
+   ═══════════════════════════════════════════════════════════════ */
+function envoyerAvertissement(chauffeurId, raison){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  if(hasJustificationActive(c)){
+    toast("⚠️ Ce chauffeur a une justification active","warning");
+    return;
+  }
+
+  var nbPrec=getNbAvertissements(chauffeurId);
+  var niveau=Math.min(nbPrec+1,4);
+
+  // Confirmation
+  if(!confirm("Envoyer un avertissement à "+c.nom+" ?\n\nNiveau : "+niveau+"/4\nRaison : "+raison+"\n\nL'avertissement sera enregistré et un message WhatsApp préparé.")) return;
+
+  // Enregistrer
+  var avert={
+    id:Date.now(),
+    chauffeurId:c.id,
+    niveau:niveau,
+    raison:raison,
+    type:"avertissement",
+    statut:"actif",
+    date:td(),
+    heure:hr(),
+    par:S.user?S.user.pseudo:"system"
+  };
+  if(!S.data.sanctions) S.data.sanctions=[];
+  S.data.sanctions.push(avert);
+  save();
+  try{ fbSave("sanctions",avert); }catch(e){}
+
+  // Message à envoyer
+  var msg=getMessageAvertissement(c,niveau,raison);
+
+  // Sauvegarder aussi dans le chat
+  var chatMsg={
+    id:Date.now()+1,
+    convId:"conv_"+c.id,
+    de:"admin",
+    auteur:S.user?S.user.pseudo:"admin",
+    texte:msg,
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false,
+    type:"avertissement"
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(chatMsg);
+  try{ fbSave("chats",chatMsg); }catch(e){}
+
+  // Notification
+  if(typeof notify==="function") notify("⚠️ Avertissement envoyé",c.nom+" — Niveau "+niveau,"sanction");
+  if(typeof addIAJournal==="function") addIAJournal("sanction","Avertissement niveau "+niveau,c.nom+" — "+raison);
+
+  // Proposer envoi WhatsApp
+  if(c.tel && confirm("📲 Envoyer aussi par WhatsApp à "+c.tel+" ?")){
+    var tel=c.tel.replace(/\D/g,"");
+    window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");
+  }
+
+  toast("✅ Avertissement niveau "+niveau+" envoyé","success");
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   JUSTIFICATIONS PAR LE CHAUFFEUR
+   ═══════════════════════════════════════════════════════════════ */
+function ouvrirJustificationChauffeur(){
+  var c=getChauffeurDuCompte();
+  if(!c){toast("Erreur","error");return;}
+
+  var body='';
+  body+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px;line-height:1.5">Préviens ton gérant si tu ne peux pas travailler temporairement. Cela évite une sanction.</div>';
+
+  body+='<div class="field"><label>Raison *</label><select id="justRaison">';
+  [
+    {v:"maladie",l:"🏥 Maladie"},
+    {v:"panne",l:"🔧 Panne du tricycle"},
+    {v:"accident",l:"🚨 Accident"},
+    {v:"famille",l:"🛕 Cérémonie / Décès familial"},
+    {v:"vidange",l:"🚗 Vidange / Entretien"},
+    {v:"autre",l:"❓ Autre"}
+  ].forEach(function(o){
+    body+='<option value="'+o.v+'">'+o.l+'</option>';
+  });
+  body+='</select></div>';
+
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  body+='<div class="field"><label>Du *</label><input id="justDateDebut" type="date" value="'+td()+'"/></div>';
+  body+='<div class="field"><label>Au</label><input id="justDateFin" type="date"/></div>';
+  body+='</div>';
+
+  body+='<div class="field"><label>Détails (facultatif)</label><textarea id="justDetails" rows="3" placeholder="Explique brièvement la situation..."></textarea></div>';
+
+  body+='<button class="btn-primary" onclick="envoyerJustification()">📤 Envoyer la justification</button>';
+
+  openModal("📋 Justifier mon absence", body);
+}
+
+function envoyerJustification(){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+
+  var raisonV=document.getElementById("justRaison").value;
+  var raisonL=document.getElementById("justRaison").selectedOptions[0].text;
+  var dDeb=document.getElementById("justDateDebut").value||td();
+  var dFin=document.getElementById("justDateFin").value||"";
+  var details=document.getElementById("justDetails").value||"";
+
+  var just={
+    id:Date.now(),
+    type:raisonV,
+    label:raisonL,
+    dateDebut:dDeb,
+    dateFin:dFin,
+    details:details,
+    statut:"en_attente",
+    dateCreation:td(),
+    heureCreation:hr()
+  };
+
+  // Ajouter au chauffeur
+  if(!c.justifications) c.justifications=[];
+  c.justifications.push(just);
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+
+  // Notifier le gérant via chat
+  var msg={
+    id:Date.now()+1,
+    convId:"conv_"+c.id,
+    de:"chauffeur",
+    auteur:S.user?S.user.pseudo:"chauffeur",
+    texte:"📋 JUSTIFICATION D'ABSENCE\n\n"+raisonL+"\n\nDu : "+formatDateRelative(dDeb)+(dFin?"\nAu : "+formatDateRelative(dFin):"\n(Durée à confirmer)")+(details?"\n\nDétails : "+details:""),
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false,
+    type:"justification"
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  if(typeof notify==="function") notify("📋 Justification reçue", c.nom+" — "+raisonL,"info");
+
+  closeModal();
+  toast("✅ Justification envoyée au gérant","success");
+  renderChauffeurApp();
+}
+
+
 function renderNotifications(){
   var cfg=getNotifConfig();
   var isPWA=isPWAInstalled();
@@ -6776,16 +7338,46 @@ function renderTeam(){
       var paye=getVJ(c,VE);var obj=getObjJ(c);
       var note=c.note||0;
       var stars="★★★★★".substring(0,Math.round(note))+"☆☆☆☆☆".substring(0,5-Math.round(note));
-      html+='<div class="driver" style="padding:16px" onclick="openDetailChauffeur('+c.id+')">';
+
+      // ─── PERFORMANCE & COULEURS ───
+      var stats=getStatsChauffeur(c,VE,"glissant");
+      var couleur=getCouleurPerformance(stats.pourcentage);
+      var sancActive=hasActiveSanction(c);
+      var justActive=hasJustificationActive(c);
+      var notation=getNotationChauffeur(c,VE);
+
+      // Bordure rouge si sanction active, sinon couleur de perf
+      var borderColor=sancActive?"#ef4444":couleur.bg;
+      var bgTint=sancActive?"rgba(239,68,68,.08)":couleur.bgSoft;
+
+      html+='<div class="driver" style="padding:14px;border-left:4px solid '+borderColor+';background:'+bgTint+'" onclick="openDetailChauffeur('+c.id+')">';
       html+='<div class="driver-avatar '+avatarClass(idx)+'">'+avatarHTML(c,idx)+'</div>';
       html+='<div class="driver-info">';
+
+      // Nom + notation A/B/C/D
+      html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
       html+='<div class="driver-name">'+c.nom+'</div>';
-      html+='<div class="driver-meta" style="margin-top:4px"><span class="stars">'+stars+'</span><span class="dot"></span><span>'+(c.saloni||"—")+' · '+(c.zone||"—")+'</span></div>';
-      html+='<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">';
-      var statBadge=c.statut==="suspendu"?'<span class="badge stopped">Suspendu</span>':c.statut==="repos"?'<span class="badge maint">Repos</span>':'<span class="badge active">✓ Actif</span>';
-      html+=statBadge;
-      if(obj>0)html+='<span class="badge '+(paye>=obj?"active":paye>0?"maint":"stopped")+'">'+Math.round(paye/obj*100)+'% objectif</span>';
-      if(c.dette>0)html+='<span class="badge stopped">Dette: '+fcShort(c.dette)+'</span>';
+      html+='<span style="background:'+notation.col+';color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px">'+notation.note+'</span>';
+      if(sancActive) html+='<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800">🚨 SANCTION</span>';
+      else if(justActive) html+='<span style="background:#0ea5e9;color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800">📋 Justifié</span>';
+      html+='</div>';
+
+      html+='<div class="driver-meta" style="margin-top:4px;font-size:11.5px"><span class="stars">'+stars+'</span><span class="dot"></span><span>'+(c.saloni||"—")+' · '+(c.zone||"—")+'</span></div>';
+
+      // ─── MARQUEURS : versements sur 7 jours ───
+      html+='<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+      var marqueur=c.freqPaiement==="Hebdomadaire"?
+        '<span style="background:'+couleur.bg+';color:#fff;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:800">📅 '+stats.jours+'/'+stats.total+' versement</span>':
+        '<span style="background:'+couleur.bg+';color:#fff;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:800">📊 '+stats.jours+'/'+stats.total+' jours</span>';
+      html+=marqueur;
+
+      // Pourcentage performance
+      html+='<span style="background:'+couleur.bg+';color:#fff;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:800">'+couleur.emoji+' '+stats.pourcentage+'%</span>';
+
+      var statBadge=c.statut==="suspendu"?'<span class="badge stopped">Suspendu</span>':c.statut==="repos"?'<span class="badge maint">Repos</span>':'';
+      if(statBadge) html+=statBadge;
+      if(c.dette>0) html+='<span class="badge stopped">Dette: '+fcShort(c.dette)+'</span>';
+
       html+='</div></div></div>';
     });
   }
@@ -6849,11 +7441,147 @@ function openDetailChauffeur(id){
     });
   }
 
+  // ─── ACTIONS DE GESTION (Performance + Avertissement + Justifications) ───
+  if(S.user && S.user.niveau>=2){
+    body+='<div style="margin-top:18px;padding-top:14px;border-top:2px solid var(--border)">';
+    body+='<div style="font-weight:800;font-size:14px;margin-bottom:10px">⚙️ Actions de gestion</div>';
+
+    // Performance / Carte FIFA
+    body+='<button class="btn-secondary" style="margin-bottom:8px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none" onclick="closeModal();openCartePerf('+c.id+')">📊 Voir la performance & notation</button>';
+
+    // Avertissement progressif
+    var nbAvert=getNbAvertissements(c.id);
+    var prochainNiveau=Math.min(nbAvert+1,4);
+    body+='<button class="btn-secondary" style="margin-bottom:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none" onclick="proposerAvertissement('+c.id+')">⚠️ Envoyer avertissement (niveau '+prochainNiveau+'/4)</button>';
+
+    // Justifications en attente
+    var justs=(c.justifications||[]).filter(function(j){return j.statut==="en_attente";});
+    if(justs.length>0){
+      body+='<button class="btn-secondary" style="margin-bottom:8px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none" onclick="gererJustifications('+c.id+')">📋 '+justs.length+' justification(s) à valider</button>';
+    }
+
+    body+='</div>';
+  }
+
   if(S.user.niveau>=3){
     body+='<button class="btn-secondary" style="margin-top:14px;color:var(--danger);border-color:var(--danger-soft);background:var(--danger-soft)" onclick="delChauffeur('+c.id+')">🗑 Supprimer le chauffeur</button>';
   }
 
   openModal(c.nom,body);
+}
+
+/* ─── Proposer un avertissement avec choix de raison ─── */
+function proposerAvertissement(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var body='';
+  body+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px;line-height:1.5">Choisis la raison de l\'avertissement pour <strong>'+c.nom+'</strong> :</div>';
+
+  var raisons=[
+    {v:"Aucun versement depuis 2 jours",l:"📉 Aucun versement (2j)"},
+    {v:"Aucun versement depuis 3 jours",l:"📉 Aucun versement (3j+)"},
+    {v:"Retard répété de versement",l:"⏰ Retards répétés"},
+    {v:"Versement systématiquement inférieur à l'objectif",l:"💰 Sous-objectif systématique"},
+    {v:"Manque de communication",l:"🤐 Manque de communication"},
+    {v:"Comportement inapproprié",l:"😠 Comportement inapproprié"},
+    {v:"Non-respect du règlement intérieur",l:"📜 Non-respect du règlement"},
+    {v:"Autre",l:"❓ Autre raison"}
+  ];
+
+  raisons.forEach(function(r){
+    var btnRaison=(r.v==="Autre"?"raisonAutreInput":"")+'';
+    body+='<button onclick="'+(r.v==="Autre"?"demanderRaisonCustom("+chauffeurId+")":"closeModal();envoyerAvertissement("+chauffeurId+",\""+r.v.replace(/"/g,"&quot;")+"\")")+'" style="display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:6px;font-family:inherit;font-size:13px;color:var(--txt);cursor:pointer">'+r.l+'</button>';
+  });
+
+  openModal("⚠️ Avertir "+c.nom, body);
+}
+
+function demanderRaisonCustom(chauffeurId){
+  var raison=prompt("Raison de l'avertissement :");
+  if(!raison || raison.trim()==="") return;
+  closeModal();
+  envoyerAvertissement(chauffeurId,raison.trim());
+}
+
+/* ─── Gérer les justifications du chauffeur ─── */
+function gererJustifications(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var justs=(c.justifications||[]).filter(function(j){return j.statut==="en_attente";});
+
+  var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Justifications en attente pour <strong>'+c.nom+'</strong></div>';
+
+  if(justs.length===0){
+    body+='<div class="empty"><div class="empty-text">Aucune justification</div></div>';
+  } else {
+    justs.forEach(function(j){
+      body+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">';
+      body+='<div style="font-weight:800;font-size:13.5px;margin-bottom:4px">'+j.label+'</div>';
+      body+='<div style="font-size:11.5px;color:var(--txt-2);margin-bottom:6px">Du '+formatDateRelative(j.dateDebut)+(j.dateFin?" au "+formatDateRelative(j.dateFin):"")+'</div>';
+      if(j.details) body+='<div style="font-size:12px;background:var(--surface-2);padding:8px;border-radius:8px;margin-bottom:8px;font-style:italic">"'+escapeHtml(j.details)+'"</div>';
+      body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+      body+='<button class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669);margin:0;padding:8px;font-size:12px" onclick="validerJustification('+chauffeurId+','+j.id+')">✅ Accepter</button>';
+      body+='<button class="btn-ghost" style="color:var(--danger);padding:8px;font-size:12px;margin:0" onclick="rejeterJustification('+chauffeurId+','+j.id+')">❌ Refuser</button>';
+      body+='</div></div>';
+    });
+  }
+  openModal("📋 Justifications", body);
+}
+
+function validerJustification(chauffeurId, justId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var just=(c.justifications||[]).find(function(j){return j.id===justId;});
+  if(!just) return;
+  just.statut="acceptee";
+  just.dateValidation=td();
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+
+  // Message au chauffeur
+  var msg={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"admin",
+    auteur:S.user?S.user.pseudo:"admin",
+    texte:"✅ Ta justification ("+just.label+") a été acceptée. Aucune sanction ne sera appliquée pour cette période. Bon rétablissement / Bonne suite 💪",
+    date:td(),heure:hr(),ts:Date.now(),lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  toast("✅ Justification acceptée","success");
+  closeModal();
+  render();
+}
+
+function rejeterJustification(chauffeurId, justId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var just=(c.justifications||[]).find(function(j){return j.id===justId;});
+  if(!just) return;
+  if(!confirm("Refuser cette justification ?")) return;
+  just.statut="rejetee";
+  just.dateValidation=td();
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+
+  var msg={
+    id:Date.now(),
+    convId:"conv_"+c.id,
+    de:"admin",
+    auteur:S.user?S.user.pseudo:"admin",
+    texte:"❌ Ta justification ("+just.label+") n'a pas été acceptée. Merci de me contacter pour en discuter.",
+    date:td(),heure:hr(),ts:Date.now(),lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  toast("Justification refusée","info");
+  closeModal();
+  render();
 }
 
 function rateChauffeur(id){
@@ -7023,6 +7751,7 @@ function renderGeneric(){
   else if(p==="formations")html+=renderFormationGerant();
   else if(p==="notifications")html+=renderNotifications();
   else if(p==="autopilot")html+=renderAutopilot();
+  else if(p==="performance")html+=renderPerformance();
   else if(p==="gps")html+=renderGPS();
   else if(p==="gpsChauffeur")html+=renderGPSChauffeur(S.gpsChauffeurId);
   else if(p==="waveconfig")html+=renderWaveConfig();
@@ -9068,18 +9797,91 @@ function iaRunAutomations(){
     }
   }
 
-  // ─── 2. SANCTION AUTO (2 jours non-paiement consécutifs) ───
+  // ─── 2. SANCTION AUTO PROGRESSIVE (quotidien + hebdo + justifications) ───
   if(config.autoSanction){
     CH.forEach(function(c){
+      if(c.statut==="inactif"||c.statut==="suspendu") return;
+
+      // Utilisation du système intelligent
+      var besoin=checkBesoinSanction(c, VE);
+      if(!besoin) return;
+
+      // Compter combien d'avertissements déjà ce mois
+      var nbPrec=getNbAvertissements(c.id);
+      var niveau=Math.min(nbPrec+1,4);
+
+      // Vérifier qu'on n'a pas déjà un avertissement très récent (<24h)
+      var hier=new Date();hier.setDate(hier.getDate()-1);
+      var trecent=(S.data.sanctions||[]).find(function(s){
+        return String(s.chauffeurId)===String(c.id) && new Date(s.date)>=hier;
+      });
+      if(trecent) return;
+
+      // Créer l'avertissement
+      var item={
+        id:Date.now()+Math.floor(Math.random()*1000),
+        chauffeurId:c.id,
+        nomChauffeur:c.nom,
+        type:"avertissement_auto",
+        niveau:niveau,
+        motif:besoin.message,
+        raison:besoin.message,
+        date:t,
+        heure:hr(),
+        statut:"actif",
+        auto:true
+      };
+      S.data.sanctions=S.data.sanctions||[];
+      S.data.sanctions.push(item);
+      try{ fbSave("sanctions",item); }catch(e){}
+
+      actions.push({
+        type:"sanction",
+        msg:"⚠️ Avertissement niveau "+niveau+": "+c.nom,
+        detail:besoin.message
+      });
+      addIAJournal("sanction","Avertissement niveau "+niveau+" automatique",c.nom+" — "+besoin.message);
+
+      if(typeof notify==="function") notify("⚠️ Avertissement niveau "+niveau, c.nom+" — "+besoin.message, "sanction", {action:"navigate",page:"performance"});
+
+      // Message chat
+      var messageText=getMessageAvertissement(c,niveau,besoin.message);
+      var chatMsg={
+        id:Date.now()+2,
+        convId:"conv_"+c.id,
+        de:"admin",
+        auteur:"IA Auto",
+        texte:messageText,
+        date:t,
+        heure:hr(),
+        ts:Date.now(),
+        lu:false,
+        type:"avertissement"
+      };
+      if(!S.data.chats) S.data.chats=[];
+      S.data.chats.push(chatMsg);
+      try{ fbSave("chats",chatMsg); }catch(e){}
+
+      // WhatsApp si numéro disponible
+      if(c.tel){
+        var telFmt=c.tel.replace(/\D/g,"").replace(/^0/,"225");
+        window._iaPendingWA=window._iaPendingWA||[];
+        window._iaPendingWA.push({tel:telFmt,msg:messageText,nom:c.nom});
+        addIAJournal("whatsapp","WhatsApp avertissement préparé",c.nom);
+      }
+    });
+  }
+
+  // ─── 2bis. ANCIENNE LOGIQUE (désactivée, remplacée ci-dessus) ───
+  if(false && config.autoSanction){
+    CH.forEach(function(c){
       if(c.statut==="inactif"||c.freqPaiement==="Hebdomadaire") return;
-      // Vérifier 2 derniers jours
       var d1=new Date(),d2=new Date();
       d2.setDate(d2.getDate()-1);
       d1.setDate(d1.getDate()-2);
       var jours2=[fmtISO(d1),fmtISO(d2)];
       var paye2j=VE.filter(function(v){return String(v.chauffeurId)===String(c.id) && jours2.indexOf(v.date)>=0;}).reduce(function(s,v){return s+v.montant;},0);
       if(paye2j===0){
-        // Vérifier qu'on n'a pas déjà une sanction active
         var existe=SC.some(function(s){return String(s.chauffeurId)===String(c.id) && s.statut==="active" && s.type==="2j_sans_versement";});
         if(!existe){
           var item={
@@ -9096,24 +9898,6 @@ function iaRunAutomations(){
           S.data.sanctions=S.data.sanctions||[];
           S.data.sanctions.push(item);
           fbSave("sanctions",item);
-          actions.push({
-            type:"sanction",
-            msg:"⚖️ Sanction auto: "+c.nom,
-            detail:"2 jours sans versement"
-          });
-          addIAJournal("sanction","Sanction automatique appliquée",c.nom+" — 2j sans versement");
-          // Notification
-          if(typeof notify==="function") notify("⚖️ Sanction automatique", c.nom+" — 2 jours sans versement", "sanction", {action:"navigate",page:"sanctions"});
-
-          // ─── ENVOI WHATSAPP AUTO ───
-          if(c.tel){
-            var msgSanction="⚠️ AVIS DE SANCTION ⚠️\n\nBonjour "+c.nom+",\n\nNous constatons que vous n'avez effectué AUCUN versement depuis 2 jours.\n\nCONSÉQUENCE : Sanction automatique enregistrée à votre dossier.\n\nMERCI de :\n• Régulariser votre situation immédiatement\n• Contacter le gérant si problème\n\n— Saloni Manager (Avis automatique)";
-            var telFmt=c.tel.replace(/\D/g,"").replace(/^0/,"225");
-            // Stocker pour ouvrir au prochain refresh
-            window._iaPendingWA=window._iaPendingWA||[];
-            window._iaPendingWA.push({tel:telFmt,msg:msgSanction,nom:c.nom});
-            addIAJournal("whatsapp","Message WhatsApp préparé",c.nom+" — sanction notifiée");
-          }
         }
       }
     });
