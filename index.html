@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Saloni"/>
 <meta name="theme-color" content="#0a1f44"/>
 <meta name="mobile-web-app-capable" content="yes"/>
-<title>Saloni v20.1</title>
+<title>Saloni v20.2</title>
 <link rel="manifest" href='data:application/manifest+json,{"name":"Saloni Manager","short_name":"Saloni","description":"Gestion de flotte de tricycles-taxis","start_url":".","display":"standalone","background_color":"%23ffffff","theme_color":"%230a1f44","orientation":"portrait","icons":[{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"%230a1f44\"/><text x=\"96\" y=\"126\" font-size=\"110\" text-anchor=\"middle\">🛺</text></svg>","sizes":"192x192","type":"image/svg+xml"},{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"%230a1f44\"/><text x=\"256\" y=\"340\" font-size=\"300\" text-anchor=\"middle\">🛺</text></svg>","sizes":"512x512","type":"image/svg+xml"}]}'/>
 <link rel="apple-touch-icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="40" fill="%230a1f44"/><text x="90" y="120" font-size="100" text-anchor="middle">🛺</text></svg>'/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -672,8 +672,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
     </div>
     <button class="login-btn" onclick="login()">Se connecter</button>
     <div id="LE" class="login-error"></div>
+    <div style="margin-top:18px;text-align:center">
+      <button onclick="forceFullReload()" style="background:transparent;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.3);padding:8px 14px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🔄 Forcer mise à jour</button>
+    </div>
   </div>
-  <div class="login-foot">Saloni v20.1 · Abidjan 🇨🇮</div>
+  <div class="login-foot">Saloni v20.2 · Abidjan 🇨🇮</div>
 </div>
 
 <!-- ═══ MAIN APP ═══ -->
@@ -927,7 +930,7 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
         Se déconnecter
       </button>
-      <div class="sidebar-version">Saloni v20.1 · Abidjan 🇨🇮</div>
+      <div class="sidebar-version">Saloni v20.2 · Abidjan 🇨🇮</div>
     </div>
   </aside>
 
@@ -6342,6 +6345,26 @@ function _doGenererContrat(chauffeurId,pseudoAdmin){
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   CONFIG ENTREPRISE - Nom du gérant et de l'entreprise pour le contrat
+   ═══════════════════════════════════════════════════════════════ */
+function getEntrepriseConfig(){
+  var def={
+    nomEntreprise:"DIAKITE TRANSPORT",
+    nomGerant:"DIAKITE Korotum Marceline",
+    titreGerant:"Gerante & Proprietaire",
+    adresseEntreprise:"Adjame St Michel, Lot 611, Abidjan",
+    villeEntreprise:"Abidjan, Cote d'Ivoire"
+  };
+  try{
+    var c=JSON.parse(localStorage.getItem("sal_entreprise_config")||"{}");
+    return Object.assign(def,c);
+  }catch(e){return def;}
+}
+function setEntrepriseConfig(cfg){
+  try{ localStorage.setItem("sal_entreprise_config",JSON.stringify(cfg)); }catch(e){}
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CONTRAT PDF — RESTAURATION DE L'ANCIEN CODE V19 QUI MARCHAIT
    + Article 9 (constat restitution) + 3 signataires si admin créateur
    ═══════════════════════════════════════════════════════════════ */
@@ -6351,6 +6374,9 @@ function _genererContratInner(c){
   var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
   var W=210,ml=15,mr=15,pw=180;
   var y=15;
+
+  // ── Données entreprise ──
+  var ent=getEntrepriseConfig();
 
   // ── Helpers ──
   var today=new Date();
@@ -6413,10 +6439,10 @@ function _genererContratInner(c){
   // ══ HEADER ══
   fillRect(0,0,W,30,29,78,216);
   setFont(17,'bold',255,255,255);
-  doc.text("SALONI MANAGER",W/2,11,{align:'center'});
+  doc.text(ent.nomEntreprise||"DIAKITE TRANSPORT",W/2,11,{align:'center'});
   setFont(8,'normal',200,220,255);
-  doc.text("Gestion de Flotte de Tricycles-Taxis — Abidjan",W/2,17,{align:'center'});
-  doc.text("Cote d'Ivoire",W/2,22,{align:'center'});
+  doc.text(ent.adresseEntreprise,W/2,17,{align:'center'});
+  doc.text("Gestion de Flotte — Saloni Manager",W/2,22,{align:'center'});
   fillRect(0,28,W,1,17,55,170);
   y=36;
 
@@ -6434,12 +6460,12 @@ function _genererContratInner(c){
   // Bailleur
   fillRect(ml,y,pw,5.5,239,246,255);
   setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire de la Flotte)",ml+3,y+4);y+=5.5;
-  y=tableRow("Entreprise :","Gerant de fleet saloni",y,false);
-  y=tableRow("Representee par :","Le Gerant — Proprietaire & Bailleur",y,true);
+  y=tableRow("Entreprise :",ent.nomEntreprise||"DIAKITE TRANSPORT",y,false);
+  y=tableRow("Representee par :",(ent.nomGerant||"DIAKITE Korotum Marceline")+" — "+(ent.titreGerant||"Gerante & Proprietaire"),y,true);
   if(hasAdminGarant){
     y=tableRow("Administrateur :",nomCompletCreateur+" (pseudo: "+creePar+")",y,false);
   }
-  y=tableRow("Adresse :","Abidjan, Cote d'Ivoire",y,!hasAdminGarant);
+  y=tableRow("Adresse :",ent.adresseEntreprise||"Adjame St Michel, Lot 611, Abidjan",y,!hasAdminGarant);
   y+=3;
   // Locataire
   fillRect(ml,y,pw,5.5,5,150,105);
@@ -6524,22 +6550,30 @@ function _genererContratInner(c){
   doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
   y+=8;
 
-  // Nom + titre
-  setFont(8.5,'bold',17,24,39);
-  doc.text("Saloni Manager",c1+3,y);
+  // Nom entreprise + Gérant (TOUJOURS visibles - même sans admin garant)
+  setFont(8.5,'bold',29,78,216);
+  doc.text(ent.nomEntreprise||"DIAKITE TRANSPORT",c1+3,y);
   y+=5;
   setFont(8,'normal',55,65,81);
-  doc.text("Proprietaire / Gerant",c1+3,y);
-  y+=5;
+  doc.text("Proprietaire / Gerante :",c1+3,y);
+  y+=4;
+  setFont(8.5,'bold',29,78,216);
+  doc.text(ent.nomGerant||"DIAKITE Korotum Marceline",c1+3,y);
+  y+=4;
+  setFont(7,'italic',107,114,128);
+  doc.text(ent.titreGerant||"Gerante & Proprietaire",c1+3,y);
+  y+=6;
+
+  // Si admin créateur : ajout en plus du gérant
   if(hasAdminGarant){
-    setFont(8,'normal',29,78,216);
+    setFont(8,'normal',55,65,81);
     doc.text("Administrateur Garant :",c1+3,y);
     y+=4;
-    setFont(8,'bold',29,78,216);
+    setFont(8.5,'bold',29,78,216);
     doc.text(nomCompletCreateur,c1+3,y);
     y+=4;
     setFont(7,'italic',107,114,128);
-    doc.text("(Agissant au nom du Gerant proprietaire)",c1+3,y);
+    doc.text("(Agissant au nom de "+(ent.nomGerant||"la Gerante")+")",c1+3,y);
     y+=6;
   }else{y+=2;}
 
@@ -6559,8 +6593,13 @@ function _genererContratInner(c){
   doc.text("LE LOCATAIRE (CHAUFFEUR)",c2+3,yChauf-22+4.2);
   yChauf-=14;
 
-  // Nom chauffeur
-  setFont(8.5,'bold',17,24,39);
+  // Label
+  setFont(8,'normal',55,65,81);
+  doc.text("Chauffeur :",c2+3,yChauf);
+  yChauf+=4;
+
+  // ── Nom chauffeur EN BLEU (comme l'admin et la gérante) ──
+  setFont(8.5,'bold',29,78,216);
   doc.text(nom,c2+3,yChauf);
   yChauf+=5;
 
@@ -6583,12 +6622,15 @@ function _genererContratInner(c){
   if(hasAdminGarant){
     y+=8;
     hline(y,229,231,235,0.3);y+=6;
-    setFont(8,'bold',17,24,39);
+    setFont(8,'bold',29,78,216);
     doc.text("VISA DU GERANT PROPRIETAIRE",ml+3,y);
     y+=6;
     setFont(8,'normal',55,65,81);
-    doc.text("Le Gerant — Proprietaire de la Flotte",ml+3,y);
-    y+=10;
+    doc.text("Confirme et valide le present contrat :",ml+3,y);
+    y+=5;
+    setFont(8.5,'bold',29,78,216);
+    doc.text((ent.nomGerant||"DIAKITE Korotum Marceline")+" — "+(ent.titreGerant||"Gerante & Proprietaire"),ml+3,y);
+    y+=8;
     doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
     doc.line(ml,y,ml+80,y);
     setFont(7,'normal',107,114,128);
@@ -10804,6 +10846,29 @@ function renderParametres(){
   h+='<div class="sidebar-item-chevron">›</div></button>';
   h+='</div>';
 
+  // ─── ENTREPRISE - Pour le contrat ───
+  if(S.user && S.user.niveau>=3){
+    var ent=getEntrepriseConfig();
+    h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🏢 Identité entreprise (pour le contrat)</div>';
+    h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:11.5px;color:var(--txt-2);margin-bottom:12px;line-height:1.5">Ces informations apparaissent sur les contrats PDF générés.</div>';
+
+    h+='<div class="field"><label>Nom de l\'entreprise</label>';
+    h+='<input id="entNomEntreprise" type="text" value="'+(ent.nomEntreprise||"").replace(/"/g,"&quot;")+'" placeholder="Ex: DIAKITE TRANSPORT"/></div>';
+
+    h+='<div class="field"><label>Nom complet du Gérant / Propriétaire</label>';
+    h+='<input id="entNomGerant" type="text" value="'+(ent.nomGerant||"").replace(/"/g,"&quot;")+'" placeholder="Ex: DIAKITE Korotum Marceline"/></div>';
+
+    h+='<div class="field"><label>Titre / Fonction</label>';
+    h+='<input id="entTitreGerant" type="text" value="'+(ent.titreGerant||"").replace(/"/g,"&quot;")+'" placeholder="Ex: Gerante & Proprietaire"/></div>';
+
+    h+='<div class="field"><label>Adresse complète</label>';
+    h+='<input id="entAdresse" type="text" value="'+(ent.adresseEntreprise||"").replace(/"/g,"&quot;")+'" placeholder="Ex: Adjame St Michel, Lot 611, Abidjan"/></div>';
+
+    h+='<button class="btn-primary" style="margin-top:10px" onclick="sauverEntrepriseConfig()">💾 Enregistrer</button>';
+    h+='</div>';
+  }
+
   // Données & Sync
   h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">📊 Données et synchronisation</div>';
 
@@ -11118,6 +11183,53 @@ function seDeconnecter(){
   localStorage.removeItem("sal_session");
   toast("Déconnexion...","success");
   setTimeout(function(){window.location.reload();},800);
+}
+
+// Force complete reload : nettoyer Service Worker + Caches + localStorage session
+function forceFullReload(){
+  if(!confirm("🔄 Forcer la mise à jour ?\n\nL'app va se recharger avec la dernière version. Vos données restent intactes (sauvegardées sur Firebase).")) return;
+
+  // 1. Désinstaller tous les Service Workers
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      regs.forEach(function(reg){reg.unregister();});
+    }).catch(function(e){console.warn(e);});
+  }
+
+  // 2. Vider tous les caches
+  if("caches" in window){
+    caches.keys().then(function(names){
+      names.forEach(function(name){caches.delete(name);});
+    }).catch(function(e){console.warn(e);});
+  }
+
+  // 3. Effacer juste la session (garder les données)
+  localStorage.removeItem("sal_session");
+
+  alert("✅ Cache vidé !\n\nL'app va se recharger avec la version v20.2");
+
+  // 4. Recharger avec timestamp pour casser le cache HTTP
+  setTimeout(function(){
+    var url=window.location.href.split("?")[0]+"?v="+Date.now();
+    window.location.href=url;
+  },500);
+}
+
+function sauverEntrepriseConfig(){
+  var cfg={
+    nomEntreprise:(document.getElementById("entNomEntreprise").value||"").trim(),
+    nomGerant:(document.getElementById("entNomGerant").value||"").trim(),
+    titreGerant:(document.getElementById("entTitreGerant").value||"").trim(),
+    adresseEntreprise:(document.getElementById("entAdresse").value||"").trim()
+  };
+  if(!cfg.nomEntreprise || !cfg.nomGerant){
+    toast("Nom entreprise et gérant requis","error");
+    return;
+  }
+  setEntrepriseConfig(cfg);
+  toast("✅ Identité entreprise enregistrée","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderParametres()+'</div>';
 }
 function renderApropos(){
   return '<div class="screen-title">ℹ️ À propos</div>'+
