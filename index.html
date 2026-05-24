@@ -388,6 +388,205 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
   .hero-amount{font-size:28px}
   .actions{gap:6px}
 }
+
+/* Onglets Desktop (cachés sur mobile) */
+.desktop-tabs{display:none}
+
+@media(min-width:1024px){
+  .desktop-tabs{
+    display:flex;
+    gap:6px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    padding:10px 36px;
+    position:sticky;
+    top:80px;
+    z-index:30;
+    align-items:center;
+  }
+  .desktop-tab{
+    background:transparent;
+    border:none;
+    padding:10px 18px;
+    border-radius:10px;
+    font-family:inherit;
+    font-size:13.5px;
+    font-weight:700;
+    color:var(--txt-2);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .desktop-tab:hover{
+    background:var(--surface-2);
+    color:var(--txt);
+  }
+  .desktop-tab.active{
+    background:linear-gradient(135deg,#0a1f44,#1e3a8a);
+    color:#fff;
+    box-shadow:0 4px 10px rgba(10,31,68,.25);
+  }
+  .desktop-tab-add{
+    margin-left:auto;
+    background:linear-gradient(135deg,#f97316,#ea580c) !important;
+    color:#fff !important;
+    box-shadow:0 4px 10px rgba(249,115,22,.3);
+  }
+  .desktop-tab-add:hover{
+    transform:translateY(-1px);
+    box-shadow:0 6px 14px rgba(249,115,22,.4) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE DESKTOP — Tablet (768px+) et Desktop (1024px+)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* TABLETTE et plus (768px+) */
+@media(min-width:768px){
+  .app{max-width:900px;padding:0 0 30px 0}
+  .topbar{border-radius:0 0 0 0;padding:20px 30px 24px}
+  .content{padding:24px 30px 60px}
+  .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .driver{padding:16px 18px}
+  /* Cacher la bottom-nav mobile sur tablette+ */
+  .nav{display:none !important}
+  .app{padding-bottom:30px !important}
+  /* Ajouter une barre de navigation desktop si pas de sidebar permanente */
+  .login-box{max-width:480px;padding:36px 32px}
+  .modal-box{max-width:600px}
+}
+
+/* DESKTOP (1024px+) - SIDEBAR PERMANENTE */
+@media(min-width:1024px){
+  body{background:var(--bg)}
+
+  /* SIDEBAR toujours ouverte à gauche */
+  .sidebar-overlay{display:none !important}
+  .sidebar{
+    position:fixed !important;
+    transform:translateX(0) !important;
+    width:280px !important;
+    max-width:280px !important;
+    height:100vh !important;
+    box-shadow:1px 0 0 var(--border) !important;
+    z-index:50 !important;
+    border-right:1px solid var(--border);
+  }
+  .sidebar.open{transform:translateX(0) !important}
+
+  /* Cacher le bouton hamburger menu */
+  .menu-btn{display:none !important}
+
+  /* Cacher le bouton X de fermeture de la sidebar */
+  .sidebar-close{display:none !important}
+
+  /* App décalée à droite */
+  .app{
+    max-width:none !important;
+    margin-left:280px !important;
+    margin-right:0;
+    padding:0 !important;
+    min-height:100vh;
+  }
+
+  /* Topbar plus pro */
+  .topbar{
+    border-radius:0 !important;
+    padding:18px 36px 22px !important;
+    position:sticky;
+    top:0;
+    z-index:40;
+  }
+
+  /* Contenu central plus large */
+  .content{
+    padding:30px 36px 60px !important;
+    max-width:1400px;
+    margin:0 auto;
+  }
+
+  /* Plus de colonnes dans les grilles */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  .actions{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+
+  /* Cartes chauffeur en grille à 2 colonnes */
+  #content-team .driver,
+  .content .driver{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+
+  /* Modal centrée plus grande */
+  .modal-overlay{padding:40px}
+  .modal-box{max-width:720px}
+
+  /* Login centré sur écran complet */
+  .login-screen{min-height:100vh}
+
+  /* Boutons d'action plus espacés */
+  .btn-primary,.btn-secondary,.btn-accent{
+    cursor:pointer;
+    transition:transform .15s ease,box-shadow .15s ease;
+  }
+  .btn-primary:hover,.btn-accent:hover{
+    transform:translateY(-1px);
+    box-shadow:0 6px 16px rgba(10,31,68,.2);
+  }
+  .driver:hover{
+    transform:translateX(4px);
+    transition:transform .2s ease;
+  }
+  .kpi:hover{
+    transform:translateY(-2px);
+    transition:transform .2s ease;
+  }
+
+  /* Hover sur sidebar items */
+  .sidebar-item{transition:background .15s ease}
+  .sidebar-item:hover{background:var(--surface-2)}
+}
+
+/* DESKTOP TRÈS LARGE (1440px+) — utiliser la largeur disponible */
+@media(min-width:1440px){
+  .sidebar{width:320px !important;max-width:320px !important}
+  .app{margin-left:320px !important}
+
+  /* Grilles à 5 colonnes pour stats */
+  .kpi-grid{grid-template-columns:repeat(4,1fr);max-width:1200px}
+
+  /* Contenu max 1500px centré */
+  .content{max-width:1500px}
+}
+
+/* Indicateur "Mode desktop" en haut */
+@media(min-width:1024px){
+  .app::before{
+    content:"💻 Mode Desktop";
+    position:fixed;
+    bottom:14px;
+    left:294px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--txt-3);
+    font-size:10px;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:8px;
+    z-index:30;
+    box-shadow:var(--shadow-sm);
+    letter-spacing:.5px;
+  }
+}
+
+/* CURSOR pointer sur tous éléments cliquables (desktop UX) */
+@media(min-width:1024px){
+  .driver,.kpi,.action,.btn-primary,.btn-secondary,.btn-accent,.btn-ghost,
+  .sidebar-item,.nav-item,.chip,.ch-tab,.fab,button,[onclick]{
+    cursor:pointer;
+  }
+}
 </style>
 </head>
 <body>
@@ -756,6 +955,25 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
     </button>
   </nav>
 
+  <!-- ═══ ONGLETS DESKTOP (visible uniquement >=1024px) ═══ -->
+  <div class="desktop-tabs" id="desktopTabs">
+    <button class="desktop-tab active" data-screen="home" onclick="goTab('home')">
+      🏠 Accueil
+    </button>
+    <button class="desktop-tab" data-screen="vers" onclick="goTab('vers')">
+      💰 Versements
+    </button>
+    <button class="desktop-tab" data-screen="team" onclick="goTab('team')">
+      👥 Équipe
+    </button>
+    <button class="desktop-tab" data-screen="fin" onclick="goTab('fin')">
+      📊 Finances
+    </button>
+    <button class="desktop-tab desktop-tab-add" onclick="openVersementModal()">
+      + Nouveau versement
+    </button>
+  </div>
+
   <!-- ═══ SIDEBAR ═══ -->
   <div class="sidebar-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
   <aside class="sidebar" id="sidebar">
@@ -889,6 +1107,36 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <div class="sidebar-item-label">Performance & Notation</div>
         <div class="sidebar-item-chevron">›</div>
       </button>
+      <button class="sidebar-item" onclick="goGeneric('compta')" style="background:linear-gradient(135deg,rgba(220,38,38,.08),rgba(153,27,27,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff">💰</div>
+        <div class="sidebar-item-label">Comptabilité avancée</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('cautions')" style="background:linear-gradient(135deg,rgba(6,182,212,.08),rgba(8,145,178,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff">🔐</div>
+        <div class="sidebar-item-label">Cautions</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('statszone')" style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(91,33,182,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">🗺️</div>
+        <div class="sidebar-item-label">Stats par zone</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('calendrier')" style="background:linear-gradient(135deg,rgba(234,88,12,.08),rgba(194,65,12,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#ea580c,#c2410c);color:#fff">📅</div>
+        <div class="sidebar-item-label">Calendrier</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('messagesgroupes')" style="background:linear-gradient(135deg,rgba(37,211,102,.08),rgba(18,140,126,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#25D366,#128C7E);color:#fff">📢</div>
+        <div class="sidebar-item-label">Messages groupés</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
+      <button class="sidebar-item" onclick="goGeneric('ocrpapiers')" style="background:linear-gradient(135deg,rgba(2,132,199,.08),rgba(3,105,161,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff">📸</div>
+        <div class="sidebar-item-label">Documents chauffeurs</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
       <button class="sidebar-item" onclick="goGeneric('autopilot')" style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(91,33,182,.04))">
         <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">🤖</div>
         <div class="sidebar-item-label">Autopilot IA</div>
@@ -960,6 +1208,29 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
 /* ═══════════════════════════════════════════════════════════
    SALONI v20 — JS APPLICATION
    ═══════════════════════════════════════════════════════════ */
+
+// ─── Détection environnement Electron ───
+window.IS_ELECTRON=!!(window.electronAPI && window.electronAPI.isElectron);
+window.PLATFORM=window.IS_ELECTRON?window.electronAPI.platform:"web";
+
+// Si Electron, ajouter une classe au body pour styles spécifiques
+if(window.IS_ELECTRON){
+  document.documentElement.classList.add("is-electron");
+  document.documentElement.classList.add("platform-"+window.PLATFORM);
+  console.log("🖥️ Mode Desktop Electron détecté - Plateforme:",window.PLATFORM);
+}
+
+// ─── Wrapper notifications natives (Electron > Web) ───
+window.nativeNotify=function(title,body){
+  if(window.IS_ELECTRON && window.electronAPI.showNotification){
+    window.electronAPI.showNotification(title,body);
+    return;
+  }
+  // Fallback web
+  if("Notification" in window && Notification.permission==="granted"){
+    try{ new Notification(title,{body:body}); }catch(e){}
+  }
+};
 
 // ═══ CONSTANTES ═══
 var COMPTES_BASE=[
@@ -2097,15 +2368,51 @@ function parseSMSWave(texte){
 
 /* ─── OCR via Claude Vision (lit l'image de capture d'écran) ─── */
 function ocrCaptureWave(imageBase64, callback){
+  // Garde compatible avec l'ancien appel mais utilise le nouveau prompt universel
+  ocrCaptureUniversel(imageBase64, callback);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OCR UNIVERSEL — Wave + Orange Money + MTN avec validation IA
+   ═══════════════════════════════════════════════════════════════ */
+function ocrCaptureUniversel(imageBase64, callback){
   var cfg=getIAConfig();
   if(!cfg.claudeKey){
-    callback(null,"Clé API Claude non configurée. Activez l'IA Claude dans la Config.");
+    callback(null,"⚠️ Clé API Claude non configurée. Va dans 🤖 Assistant IA → Config pour ajouter ta clé.");
     return;
   }
 
-  var prompt="Tu vas analyser une capture d'écran de paiement Wave. Extrait les informations suivantes au format JSON STRICT (sans texte autour) :\n";
-  prompt+="{\"montant\": <nombre en FCFA sans espaces>, \"expediteur\": \"<nom ou numéro>\", \"reference\": \"<ref TXN>\", \"date\": \"<date>\", \"heure\": \"<heure>\", \"statut\": \"<reussi/echec/en_attente>\"}\n";
-  prompt+="Si une info manque, mets null. Si ce n'est PAS un paiement Wave, renvoie {\"erreur\": \"description\"}.";
+  var prompt="Tu es un expert en validation de paiements mobile money en Côte d'Ivoire (Wave, Orange Money, MTN Money, Moov Money).\n\n";
+  prompt+="Analyse cette capture d'écran de SMS ou de transaction et extrais les informations.\n\n";
+  prompt+="ÉTAPES OBLIGATOIRES :\n";
+  prompt+="1. VÉRIFIE que c'est un VRAI SMS de paiement (pas un faux, pas une demande, pas un screenshot édité)\n";
+  prompt+="2. IDENTIFIE l'opérateur : Wave, Orange Money, MTN Money, Moov Money\n";
+  prompt+="3. EXTRAIS le montant, le nom de l'expéditeur, la référence, la date/heure\n";
+  prompt+="4. ÉVALUE la fiabilité (haute/moyenne/basse) selon les indices visuels\n\n";
+  prompt+="Réponds UNIQUEMENT en JSON STRICT (sans texte autour, sans ```json) :\n";
+  prompt+="{\n";
+  prompt+="  \"valide\": true/false,\n";
+  prompt+="  \"raison_invalide\": \"<si pas valide, expliquer>\",\n";
+  prompt+="  \"operateur\": \"Wave\"|\"Orange Money\"|\"MTN Money\"|\"Moov Money\"|\"Autre\",\n";
+  prompt+="  \"type\": \"recu\"|\"envoye\"|\"depot\"|\"retrait\",\n";
+  prompt+="  \"montant\": <nombre sans espaces ni FCFA, ex: 5000>,\n";
+  prompt+="  \"expediteur_nom\": \"<nom complet si visible>\",\n";
+  prompt+="  \"expediteur_tel\": \"<numéro de téléphone>\",\n";
+  prompt+="  \"reference\": \"<numéro de transaction>\",\n";
+  prompt+="  \"date\": \"<format YYYY-MM-DD>\",\n";
+  prompt+="  \"heure\": \"<format HH:MM>\",\n";
+  prompt+="  \"fiabilite\": \"haute\"|\"moyenne\"|\"basse\",\n";
+  prompt+="  \"alertes\": [\"<alerte 1>\", \"<alerte 2>\"]\n";
+  prompt+="}\n\n";
+  prompt+="ALERTES À DÉTECTER :\n";
+  prompt+="- SMS suspect ou édité\n";
+  prompt+="- Référence manquante ou invalide\n";
+  prompt+="- Montant inhabituel\n";
+  prompt+="- Date ancienne (>7 jours)\n";
+  prompt+="- Expéditeur non identifiable\n\n";
+  prompt+="IMPORTANT : Si tu n'es PAS sûr que c'est un VRAI SMS de paiement officiel, mets \"valide\": false";
+
+  toast("🤖 IA en cours d'analyse...","info");
 
   fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",
@@ -2117,7 +2424,7 @@ function ocrCaptureWave(imageBase64, callback){
     },
     body:JSON.stringify({
       model:"claude-haiku-4-5-20251001",
-      max_tokens:500,
+      max_tokens:800,
       messages:[{
         role:"user",
         content:[
@@ -2128,18 +2435,403 @@ function ocrCaptureWave(imageBase64, callback){
     })
   }).then(function(r){return r.json();}).then(function(data){
     if(data.error){callback(null,data.error.message);return;}
-    if(!data.content||!data.content[0]){callback(null,"Réponse vide");return;}
+    if(!data.content||!data.content[0]){callback(null,"Réponse vide de l'IA");return;}
     var txt=data.content[0].text.trim();
-    // Nettoyer le JSON (parfois Claude met des ```json...```)
     txt=txt.replace(/```json\s*|\s*```/g,"").trim();
     try{
       var parsed=JSON.parse(txt);
       callback(parsed,null);
     }catch(e){
-      callback(null,"Impossible de parser la réponse : "+txt);
+      callback(null,"Impossible de parser la réponse IA. Le SMS n'est peut-être pas valide.");
     }
   }).catch(function(e){callback(null,e.message);});
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SCAN SMS DEPUIS LA MODAL VERSEMENT
+   ═══════════════════════════════════════════════════════════════ */
+function scannerSMSVersement(input){
+  var file=input.files[0];
+  if(!file) return;
+
+  if(file.size>5*1024*1024){
+    toast("⚠️ Image trop lourde (max 5 MB)","error");
+    return;
+  }
+
+  // Compresser image avant envoi à l'IA
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement("canvas");
+      var maxW=1500;
+      var scale=img.width>maxW?maxW/img.width:1;
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+      var compressed=canvas.toDataURL("image/jpeg",0.85);
+      var base64=compressed.split(",")[1];
+
+      // Appeler l'IA
+      ocrCaptureUniversel(base64, function(result, err){
+        if(err){
+          toast("❌ "+err,"error");
+          return;
+        }
+        afficherResultatScanSMS(result, compressed);
+      });
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function afficherResultatScanSMS(result, imageBase64){
+  if(!result.valide){
+    // SMS pas valide
+    var body='<div style="text-align:center;padding:20px 10px">';
+    body+='<div style="font-size:48px;margin-bottom:14px">⚠️</div>';
+    body+='<div style="font-weight:800;font-size:16px;color:var(--danger);margin-bottom:8px">SMS non validé</div>';
+    body+='<div style="font-size:13px;color:var(--txt-2);line-height:1.6">'+escapeHtml(result.raison_invalide||"L\'IA n\'a pas pu valider ce SMS comme paiement authentique")+'</div>';
+    body+='</div>';
+    body+='<div style="background:var(--warning-soft);color:var(--warning);border-radius:10px;padding:12px;font-size:12px;margin:14px 0">💡 Tu peux quand même saisir le versement manuellement dans le formulaire.</div>';
+    body+='<button class="btn-ghost" style="width:100%" onclick="closeModal();openVersementModal();">Saisir manuellement</button>';
+
+    openModal("🤖 Analyse IA", body);
+    return;
+  }
+
+  // SMS valide → essayer de matcher avec un chauffeur
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+  var chauffeurDetecte=null;
+
+  if(result.expediteur_tel){
+    var telClean=result.expediteur_tel.replace(/\D/g,"");
+    chauffeurDetecte=CH.find(function(c){
+      if(!c.tel) return false;
+      var telCh=c.tel.replace(/\D/g,"");
+      return telCh.endsWith(telClean.slice(-8)) || telClean.endsWith(telCh.slice(-8));
+    });
+  }
+
+  if(!chauffeurDetecte && result.expediteur_nom){
+    var nomClean=result.expediteur_nom.toLowerCase();
+    chauffeurDetecte=CH.find(function(c){
+      var partsCh=c.nom.toLowerCase().split(" ");
+      return partsCh.some(function(p){return p.length>=3 && nomClean.indexOf(p)>=0;});
+    });
+  }
+
+  // ─── VÉRIFICATION AUTO-ENREGISTREMENT (Niveau 2) ───
+  var autoCfg=getAutoVersementConfig();
+  if(autoCfg.actif && chauffeurDetecte){
+    var peutAuto=verifierConditionsAuto(result, chauffeurDetecte, autoCfg);
+    if(peutAuto.ok){
+      // ENREGISTREMENT AUTOMATIQUE
+      enregistrerVersementAuto(result, chauffeurDetecte, imageBase64);
+      return;
+    }
+  }
+
+  // Sinon, validation manuelle (Niveau 1)
+  afficherModalValidation(result, imageBase64, chauffeurDetecte, CH);
+}
+
+/* ─── Vérifier toutes les conditions pour auto-enregistrement ─── */
+function verifierConditionsAuto(result, chauffeur, cfg){
+  // 1. Fiabilité IA = haute
+  if(result.fiabilite!=="haute") return {ok:false,raison:"Fiabilité IA non haute"};
+
+  // 2. Aucune alerte IA
+  if(result.alertes && result.alertes.length>0) return {ok:false,raison:"Alertes IA détectées"};
+
+  // 3. Montant dans la fourchette configurée
+  var montant=result.montant||0;
+  if(montant<cfg.montantMin) return {ok:false,raison:"Montant trop bas ("+fc(montant)+" < "+fc(cfg.montantMin)+")"};
+  if(montant>cfg.montantMax) return {ok:false,raison:"Montant trop haut ("+fc(montant)+" > "+fc(cfg.montantMax)+")"};
+
+  // 4. Référence présente (anti-doublon)
+  if(!result.reference) return {ok:false,raison:"Référence manquante"};
+
+  // 5. Pas de doublon avec versement existant
+  var doublon=(S.data.versements||[]).find(function(v){return v.ref===result.reference;});
+  if(doublon) return {ok:false,raison:"Référence déjà existante"};
+
+  // 6. Date récente (aujourd'hui ou hier max selon config)
+  if(result.date){
+    var dateSMS=new Date(result.date);
+    var today=new Date();today.setHours(0,0,0,0);
+    var diffJours=Math.floor((today-dateSMS)/(24*3600*1000));
+    if(diffJours>cfg.delaiMaxJours) return {ok:false,raison:"SMS trop ancien ("+diffJours+"j)"};
+  }
+
+  return {ok:true};
+}
+
+/* ─── Configuration auto-versement ─── */
+function getAutoVersementConfig(){
+  var def={
+    actif:true,
+    montantMin:5000,
+    montantMax:30000,
+    delaiMaxJours:1,
+    sonKaching:true,
+    vibration:true
+  };
+  try{
+    var c=JSON.parse(localStorage.getItem("sal_autoVers_config")||"{}");
+    return Object.assign(def,c);
+  }catch(e){return def;}
+}
+function setAutoVersementConfig(cfg){
+  try{ localStorage.setItem("sal_autoVers_config",JSON.stringify(cfg)); }catch(e){}
+}
+
+/* ─── ENREGISTREMENT AUTOMATIQUE ─── */
+function enregistrerVersementAuto(result, c, imageBase64){
+  var item={
+    id:Date.now(),
+    chauffeurId:c.id,
+    montant:result.montant||0,
+    date:result.date||td(),
+    heure:result.heure||hr(),
+    mode:result.operateur||"Mobile Money",
+    ref:result.reference||"",
+    note:"🤖 Auto-enregistré via IA — Fiabilité haute",
+    auteur:S.user?S.user.pseudo:"",
+    scanIA:true,
+    autoValide:true,
+    scanFiabilite:result.fiabilite
+  };
+
+  if(!S.data.versements) S.data.versements=[];
+  S.data.versements.push(item);
+  c.solde=(c.solde||0)+(item.montant||0);
+  save();
+  try{
+    fbSave("versements",item);
+    fbSave("chauffeurs",c);
+  }catch(e){}
+
+  // SON KA-CHING + NOTIF
+  playKaching();
+  if(typeof addIAJournal==="function") addIAJournal("versement","🤖 Auto-enregistré",c.nom+" — "+fc(item.montant));
+  if(typeof nativeNotify==="function") nativeNotify("💰 +"+fc(item.montant),"De "+c.nom+" (auto)");
+
+  // Modal de succès flash (auto-ferme après 2.5s)
+  var body='<div style="text-align:center;padding:20px 10px">';
+  body+='<div style="font-size:64px;margin-bottom:14px;animation:bounce .6s ease">💰</div>';
+  body+='<div style="font-weight:800;font-size:22px;color:var(--success);margin-bottom:6px">+'+fc(item.montant)+'</div>';
+  body+='<div style="font-size:14px;color:var(--txt-2);margin-bottom:6px">De <strong>'+c.nom+'</strong></div>';
+  body+='<div style="font-size:11px;color:var(--txt-3)">🤖 Enregistrement automatique · Ref '+(result.reference||"")+'</div>';
+  body+='</div>';
+  body+='<div style="background:var(--success-soft);color:var(--success);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:700;margin-top:14px">✅ Versement validé par l\'IA et enregistré</div>';
+
+  openModal("✨ Auto-enregistré", body);
+
+  // Auto-fermeture
+  setTimeout(function(){
+    if(typeof closeModal==="function") closeModal();
+    render();
+  },2500);
+}
+
+/* ─── Son "ka-ching" via Web Audio API ─── */
+function playKaching(){
+  var cfg=getAutoVersementConfig();
+  if(!cfg.sonKaching) return;
+  try{
+    var AudioContext=window.AudioContext||window.webkitAudioContext;
+    var ctx=new AudioContext();
+
+    // Son 1 : "ka" (impact métallique)
+    var osc1=ctx.createOscillator();
+    var gain1=ctx.createGain();
+    osc1.type="sine";
+    osc1.frequency.setValueAtTime(1200,ctx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(800,ctx.currentTime+0.1);
+    gain1.gain.setValueAtTime(0.4,ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.15);
+    osc1.connect(gain1);gain1.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime+0.15);
+
+    // Son 2 : "ching" (cloche cristalline)
+    var osc2=ctx.createOscillator();
+    var gain2=ctx.createGain();
+    osc2.type="triangle";
+    osc2.frequency.setValueAtTime(2400,ctx.currentTime+0.1);
+    osc2.frequency.exponentialRampToValueAtTime(1800,ctx.currentTime+0.4);
+    gain2.gain.setValueAtTime(0,ctx.currentTime+0.1);
+    gain2.gain.linearRampToValueAtTime(0.3,ctx.currentTime+0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.5);
+    osc2.connect(gain2);gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime+0.1);
+    osc2.stop(ctx.currentTime+0.5);
+
+    // Son 3 : pièces qui tombent (bruit blanc filtré)
+    var noise=ctx.createBufferSource();
+    var bufferSize=ctx.sampleRate*0.3;
+    var buffer=ctx.createBuffer(1,bufferSize,ctx.sampleRate);
+    var output=buffer.getChannelData(0);
+    for(var i=0;i<bufferSize;i++){
+      output[i]=(Math.random()*2-1)*Math.pow(1-i/bufferSize,2);
+    }
+    noise.buffer=buffer;
+    var filter=ctx.createBiquadFilter();
+    filter.type="bandpass";
+    filter.frequency.value=3000;
+    filter.Q.value=10;
+    var noiseGain=ctx.createGain();
+    noiseGain.gain.value=0.15;
+    noise.connect(filter);filter.connect(noiseGain);noiseGain.connect(ctx.destination);
+    noise.start(ctx.currentTime+0.2);
+    noise.stop(ctx.currentTime+0.6);
+  }catch(e){console.warn("Audio bloqué:",e);}
+
+  // Vibration si supportée
+  if(cfg.vibration && navigator.vibrate){
+    navigator.vibrate([50,30,80]);
+  }
+}
+
+/* ─── MODAL VALIDATION (cas non-auto) ─── */
+function afficherModalValidation(result, imageBase64, chauffeurDetecte, CH){
+  var colFiab={haute:"#10b981",moyenne:"#f59e0b",basse:"#ef4444"};
+  var col=colFiab[result.fiabilite]||"#6b7280";
+
+  var body='';
+  body+='<div style="background:linear-gradient(135deg,'+col+',rgba(0,0,0,.1));color:#fff;border-radius:14px;padding:14px;margin-bottom:14px">';
+  body+='<div style="display:flex;align-items:center;gap:10px">';
+  body+='<div style="font-size:28px">✅</div>';
+  body+='<div><div style="font-weight:800;font-size:14px">Paiement détecté</div>';
+  body+='<div style="font-size:11px;opacity:.85">Fiabilité : '+result.fiabilite+' · '+(result.operateur||"Mobile Money")+'</div></div></div>';
+  body+='</div>';
+
+  body+='<div style="text-align:center;margin-bottom:14px"><img src="'+imageBase64+'" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--border)"/></div>';
+
+  body+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">';
+  body+='<div style="font-weight:800;font-size:13px;margin-bottom:8px">📋 Données extraites</div>';
+
+  body+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">';
+  body+='<span style="color:var(--txt-2);font-size:12.5px">💰 Montant</span>';
+  body+='<span style="font-weight:800;font-size:14px;color:var(--success)">'+fc(result.montant||0)+'</span></div>';
+
+  if(result.expediteur_nom){
+    body+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">';
+    body+='<span style="color:var(--txt-2);font-size:12.5px">👤 Expéditeur</span>';
+    body+='<span style="font-weight:700;font-size:12.5px">'+escapeHtml(result.expediteur_nom)+'</span></div>';
+  }
+
+  if(result.expediteur_tel){
+    body+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">';
+    body+='<span style="color:var(--txt-2);font-size:12.5px">📞 Téléphone</span>';
+    body+='<span style="font-weight:700;font-size:12.5px">'+escapeHtml(result.expediteur_tel)+'</span></div>';
+  }
+
+  if(result.reference){
+    body+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">';
+    body+='<span style="color:var(--txt-2);font-size:12.5px">🔖 Référence</span>';
+    body+='<span style="font-weight:700;font-size:11.5px;font-family:monospace">'+escapeHtml(result.reference)+'</span></div>';
+  }
+
+  if(result.date){
+    body+='<div style="display:flex;justify-content:space-between;padding:6px 0">';
+    body+='<span style="color:var(--txt-2);font-size:12.5px">📅 Date</span>';
+    body+='<span style="font-weight:700;font-size:12.5px">'+result.date+(result.heure?" à "+result.heure:"")+'</span></div>';
+  }
+  body+='</div>';
+
+  if(result.alertes && result.alertes.length>0){
+    body+='<div style="background:rgba(245,158,11,.1);border:1px solid #f59e0b;border-radius:10px;padding:10px;margin-bottom:14px;font-size:12px">';
+    body+='<div style="font-weight:700;color:#d97706;margin-bottom:4px">⚠️ Alertes IA :</div>';
+    result.alertes.forEach(function(a){
+      body+='<div style="font-size:11.5px;color:#92400e;margin-top:2px">• '+escapeHtml(a)+'</div>';
+    });
+    body+='</div>';
+  }
+
+  body+='<div class="field"><label>Chauffeur '+(chauffeurDetecte?" (auto-détecté)":"")+'</label>';
+  body+='<select id="scanChauffeur">';
+  CH.forEach(function(c){
+    var sel=chauffeurDetecte && chauffeurDetecte.id===c.id?"selected":"";
+    body+='<option value="'+c.id+'" '+sel+'>'+c.nom+(c.tel?' · '+c.tel:"")+'</option>';
+  });
+  body+='</select></div>';
+
+  if(chauffeurDetecte){
+    body+='<div style="background:var(--success-soft);color:var(--success);border-radius:8px;padding:8px 12px;font-size:11.5px;margin-bottom:14px;font-weight:600">✅ Chauffeur identifié automatiquement par le numéro/nom</div>';
+  } else {
+    body+='<div style="background:var(--warning-soft);color:var(--warning);border-radius:8px;padding:8px 12px;font-size:11.5px;margin-bottom:14px;font-weight:600">⚠️ Chauffeur non détecté automatiquement. Sélectionne manuellement.</div>';
+  }
+
+  window._scanResult=result;
+  window._scanImage=imageBase64;
+
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669)" onclick="validerVersementScan()">✅ Enregistrer le versement</button>';
+  body+='<button class="btn-ghost" style="margin-top:8px" onclick="closeModal();openVersementModal()">Annuler</button>';
+
+  openModal("🤖 Versement détecté", body);
+}
+
+function validerVersementScan(){
+  if(!window._scanResult){toast("Données perdues","error");return;}
+
+  var r=window._scanResult;
+  var chauffeurId=document.getElementById("scanChauffeur").value;
+  if(!chauffeurId){toast("Sélectionne un chauffeur","error");return;}
+
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c){toast("Chauffeur introuvable","error");return;}
+
+  // Vérification doublon (même référence)
+  if(r.reference){
+    var doublon=(S.data.versements||[]).find(function(v){return v.ref===r.reference;});
+    if(doublon){
+      if(!confirm("⚠️ Cette référence ("+r.reference+") existe déjà.\n\nEnregistrer quand même ?")) return;
+    }
+  }
+
+  // Créer le versement
+  var item={
+    id:Date.now(),
+    chauffeurId:c.id,
+    montant:r.montant||0,
+    date:r.date||td(),
+    heure:r.heure||hr(),
+    mode:r.operateur||"Mobile Money",
+    ref:r.reference||"",
+    note:"📸 Scanné via IA — Fiabilité "+r.fiabilite,
+    auteur:S.user?S.user.pseudo:"",
+    scanIA:true,
+    scanFiabilite:r.fiabilite,
+    scanAlertes:r.alertes||[]
+  };
+
+  if(!S.data.versements) S.data.versements=[];
+  S.data.versements.push(item);
+
+  // Mettre à jour le solde du chauffeur
+  c.solde=(c.solde||0)+(item.montant||0);
+  save();
+  try{
+    fbSave("versements",item);
+    fbSave("chauffeurs",c);
+  }catch(e){}
+
+  toast("✅ Versement de "+fc(item.montant)+" enregistré pour "+c.nom,"success");
+  if(typeof addIAJournal==="function") addIAJournal("versement","Versement scanné via IA",c.nom+" — "+fc(item.montant));
+
+  // Notification
+  if(typeof nativeNotify==="function") nativeNotify("💰 Versement enregistré","+"+fc(item.montant)+" de "+c.nom);
+
+  closeModal();
+  delete window._scanResult;
+  delete window._scanImage;
+  render();
+}
+
 
 /* ─── VÉRIFICATION CROISÉE : détecter incohérences ─── */
 function verifierPreuveCoherence(preuve, ch){
@@ -2599,6 +3291,11 @@ function showApp(){
   document.getElementById("sbAvatar").textContent=S.user.pseudo.substring(0,2).toUpperCase();
   document.getElementById("sbName").textContent=S.user.pseudo.charAt(0).toUpperCase()+S.user.pseudo.slice(1);
   document.getElementById("sbRole").textContent=S.user.role+" · Niveau "+S.user.niveau;
+  // ─── Ouvrir la sidebar par défaut sur desktop ───
+  if(window.innerWidth>=1024){
+    var sb=document.getElementById("sidebar");
+    if(sb) sb.classList.add("open");
+  }
   render();
   // ─── Démarrer le bot IA autonome (avec délai pour ne pas perturber) ───
   setTimeout(function(){
@@ -4722,6 +5419,10 @@ function goTab(tab){
   document.querySelectorAll(".nav-item").forEach(function(n){
     n.classList.toggle("active",n.getAttribute("data-screen")===tab);
   });
+  // Mettre à jour les onglets desktop aussi
+  document.querySelectorAll(".desktop-tab").forEach(function(n){
+    n.classList.toggle("active",n.getAttribute("data-screen")===tab);
+  });
   document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
   var screenId="screen-"+tab;
   if(!document.getElementById(screenId))screenId="screen-home";
@@ -4733,9 +5434,11 @@ function goGeneric(page){
   S.tab="generic";
   S.genericPage=page;
   document.querySelectorAll(".nav-item").forEach(function(n){n.classList.remove("active");});
+  document.querySelectorAll(".desktop-tab").forEach(function(n){n.classList.remove("active");});
   document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
   document.getElementById("screen-generic").classList.add("active");
-  closeSidebar();
+  // Sur mobile uniquement, fermer la sidebar (sur desktop elle reste ouverte)
+  if(window.innerWidth<1024) closeSidebar();
   window.scrollTo({top:0,behavior:"smooth"});
   render();
 }
@@ -4774,9 +5477,23 @@ function openSidebar(){
   updateSidebarDashboard();
 }
 function closeSidebar(){
+  // Sur desktop, ne pas fermer la sidebar (elle est permanente)
+  if(window.innerWidth>=1024) return;
   document.getElementById("sidebar").classList.remove("open");
   document.getElementById("sbOverlay").classList.remove("open");
 }
+
+// Au resize, ouvrir/fermer automatiquement la sidebar
+window.addEventListener("resize",function(){
+  var sb=document.getElementById("sidebar");
+  if(!sb) return;
+  if(window.innerWidth>=1024){
+    sb.classList.add("open");
+    document.getElementById("sbOverlay").classList.remove("open");
+  } else {
+    sb.classList.remove("open");
+  }
+});
 
 function updateSidebarDashboard(){
   var t=td();
@@ -6099,6 +6816,1222 @@ function envoyerJustification(){
   renderChauffeurApp();
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   MODULE COMPTABILITÉ AVANCÉE
+   ═══════════════════════════════════════════════════════════════ */
+
+// Catégories de dépenses
+var CATEGORIES_DEPENSES=[
+  {id:"vidange",l:"🛢️ Vidange / Huile",col:"#f59e0b"},
+  {id:"pneus",l:"🛞 Pneus / Roues",col:"#0ea5e9"},
+  {id:"reparation",l:"🔧 Réparations",col:"#dc2626"},
+  {id:"carburant",l:"⛽ Carburant",col:"#10b981"},
+  {id:"piece",l:"⚙️ Pièces détachées",col:"#7c3aed"},
+  {id:"papier",l:"📄 Papiers (vignette, assurance)",col:"#0284c7"},
+  {id:"amende",l:"🚨 Amendes / Fourrière",col:"#ef4444"},
+  {id:"salaire",l:"💼 Salaires admins",col:"#059669"},
+  {id:"loyer",l:"🏢 Loyer / Garage",col:"#475569"},
+  {id:"prime",l:"⭐ Primes chauffeurs",col:"#eab308"},
+  {id:"caution",l:"🔐 Caution chauffeur (restituée)",col:"#06b6d4"},
+  {id:"autre",l:"❓ Autre",col:"#64748b"}
+];
+
+function getCategorieDepense(id){
+  return CATEGORIES_DEPENSES.find(function(c){return c.id===id;})||CATEGORIES_DEPENSES[CATEGORIES_DEPENSES.length-1];
+}
+
+function renderComptabilite(){
+  var VE=(S.data.versements||[]).map(normVers);
+  var DEP=(S.data.depenses||[]);
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">💰 Comptabilité</div>';
+
+  // Sélecteur de période
+  var periode=window._comptaPeriode||"mois";
+  h+='<div style="display:flex;gap:6px;margin-bottom:14px;background:var(--surface-2);padding:4px;border-radius:12px">';
+  var periodes=[
+    {k:"jour",l:"📅 Jour"},
+    {k:"semaine",l:"📆 Semaine"},
+    {k:"mois",l:"🗓️ Mois"},
+    {k:"trimestre",l:"📊 Trimestre"},
+    {k:"annee",l:"🗂️ Année"}
+  ];
+  periodes.forEach(function(p){
+    var actif=periode===p.k;
+    h+='<button onclick="setComptaPeriode(\''+p.k+'\')" style="flex:1;padding:8px 4px;border-radius:10px;border:none;background:'+(actif?"linear-gradient(135deg,#0a1f44,#1e3a8a)":"transparent")+';color:'+(actif?"#fff":"var(--txt-2)")+';font-weight:'+(actif?"800":"600")+';font-size:11px;cursor:pointer;font-family:inherit">'+p.l+'</button>';
+  });
+  h+='</div>';
+
+  // Calculer la période
+  var jours=getJoursPeriode(periode);
+  var libelle=getLibellePeriode(periode);
+
+  // Filtres
+  var versPeriode=VE.filter(function(v){return jours.indexOf(normDate(v.date))>=0;});
+  var depPeriode=DEP.filter(function(d){return jours.indexOf(normDate(d.date))>=0;});
+
+  // Calculs
+  var ca=versPeriode.reduce(function(s,v){return s+(v.montant||0);},0);
+  var depenses=depPeriode.reduce(function(s,d){return s+(d.montant||0);},0);
+  var benefice=ca-depenses;
+  var marge=ca>0?Math.round(benefice/ca*100):0;
+
+  // Comparaison période précédente
+  var joursPrec=getJoursPeriodePrec(periode);
+  var caPrec=VE.filter(function(v){return joursPrec.indexOf(normDate(v.date))>=0;}).reduce(function(s,v){return s+(v.montant||0);},0);
+  var depPrec=DEP.filter(function(d){return joursPrec.indexOf(normDate(d.date))>=0;}).reduce(function(s,d){return s+(d.montant||0);},0);
+  var benefPrec=caPrec-depPrec;
+  var evolBenef=benefPrec>0?Math.round((benefice-benefPrec)/Math.abs(benefPrec)*100):0;
+
+  // KPI principaux
+  h+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;border-radius:18px;padding:18px;margin-bottom:14px">';
+  h+='<div style="font-size:11px;opacity:.85;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">'+libelle+'</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+  h+='<div><div style="font-size:13px;opacity:.85">Bénéfice net</div>';
+  h+='<div style="font-size:30px;font-weight:800;margin-top:4px;color:'+(benefice>=0?"#fff":"#fca5a5")+'">'+fc(benefice)+'</div>';
+  h+='<div style="font-size:11px;margin-top:4px;opacity:.85">Marge: '+marge+'%</div></div>';
+  if(evolBenef!==0){
+    h+='<div style="text-align:right"><div style="font-size:11px;opacity:.85">vs précédent</div>';
+    h+='<div style="font-size:18px;font-weight:800;color:'+(evolBenef>=0?"#86efac":"#fca5a5")+'">'+(evolBenef>=0?"+":"")+evolBenef+'%</div></div>';
+  }
+  h+='</div></div>';
+
+  // CA vs Dépenses
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+  h+='<div style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:14px;padding:14px">';
+  h+='<div style="font-size:11px;opacity:.85;font-weight:700;text-transform:uppercase;letter-spacing:1px">💰 Recettes</div>';
+  h+='<div style="font-size:20px;font-weight:800;margin-top:4px">'+fc(ca)+'</div>';
+  h+='<div style="font-size:10.5px;opacity:.85;margin-top:2px">'+versPeriode.length+' versements</div>';
+  h+='</div>';
+  h+='<div style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border-radius:14px;padding:14px">';
+  h+='<div style="font-size:11px;opacity:.85;font-weight:700;text-transform:uppercase;letter-spacing:1px">💸 Dépenses</div>';
+  h+='<div style="font-size:20px;font-weight:800;margin-top:4px">'+fc(depenses)+'</div>';
+  h+='<div style="font-size:10.5px;opacity:.85;margin-top:2px">'+depPeriode.length+' dépenses</div>';
+  h+='</div>';
+  h+='</div>';
+
+  // Répartition des dépenses par catégorie
+  if(depPeriode.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📊 Répartition des dépenses</div>';
+    var parCat={};
+    depPeriode.forEach(function(d){
+      var cat=d.categorie||"autre";
+      if(!parCat[cat]) parCat[cat]={total:0,count:0};
+      parCat[cat].total+=(d.montant||0);
+      parCat[cat].count++;
+    });
+    var cats=Object.keys(parCat).map(function(k){
+      return {cat:getCategorieDepense(k),total:parCat[k].total,count:parCat[k].count};
+    }).sort(function(a,b){return b.total-a.total;});
+
+    cats.forEach(function(item){
+      var pct=Math.round(item.total/depenses*100);
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:6px">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+      h+='<div style="font-weight:700;font-size:13px;color:'+item.cat.col+'">'+item.cat.l+'</div>';
+      h+='<div style="font-weight:800;font-size:13.5px">'+fc(item.total)+'</div>';
+      h+='</div>';
+      h+='<div style="display:flex;align-items:center;gap:8px">';
+      h+='<div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+item.cat.col+';border-radius:3px"></div></div>';
+      h+='<div style="font-size:11px;color:var(--txt-2);font-weight:700;min-width:60px;text-align:right">'+pct+'% ('+item.count+')</div>';
+      h+='</div></div>';
+    });
+  }
+
+  // CA par chauffeur
+  if(versPeriode.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">🏆 Recettes par chauffeur</div>';
+    var parChauffeur={};
+    versPeriode.forEach(function(v){
+      if(!parChauffeur[v.chauffeurId]) parChauffeur[v.chauffeurId]=0;
+      parChauffeur[v.chauffeurId]+=(v.montant||0);
+    });
+    var list=Object.keys(parChauffeur).map(function(cid){
+      var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(cid);});
+      return {nom:c?c.nom:"Chauffeur supprimé",total:parChauffeur[cid],id:cid};
+    }).sort(function(a,b){return b.total-a.total;}).slice(0,5);
+
+    list.forEach(function(item,i){
+      var pct=Math.round(item.total/ca*100);
+      var medaille=i===0?"🥇":(i===1?"🥈":(i===2?"🥉":(i+1+".")));
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">';
+      h+='<div style="font-size:18px;width:30px">'+medaille+'</div>';
+      h+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+item.nom+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt-2)">'+pct+'% du CA total</div></div>';
+      h+='<div style="font-weight:800;color:var(--success)">'+fc(item.total)+'</div>';
+      h+='</div>';
+    });
+  }
+
+  // Coûts moyens utiles
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📈 Indicateurs</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  var nbJours=jours.length;
+  var caJour=nbJours>0?Math.round(ca/nbJours):0;
+  var depJour=nbJours>0?Math.round(depenses/nbJours):0;
+  var caParChauffeur=CH.length>0?Math.round(ca/CH.length):0;
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">';
+  h+='<div style="font-size:11px;color:var(--txt-2)">Recette / jour</div>';
+  h+='<div style="font-size:16px;font-weight:800;color:var(--success)">'+fc(caJour)+'</div></div>';
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">';
+  h+='<div style="font-size:11px;color:var(--txt-2)">Dépense / jour</div>';
+  h+='<div style="font-size:16px;font-weight:800;color:var(--danger)">'+fc(depJour)+'</div></div>';
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">';
+  h+='<div style="font-size:11px;color:var(--txt-2)">CA / chauffeur</div>';
+  h+='<div style="font-size:16px;font-weight:800">'+fc(caParChauffeur)+'</div></div>';
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">';
+  h+='<div style="font-size:11px;color:var(--txt-2)">Marge nette</div>';
+  h+='<div style="font-size:16px;font-weight:800;color:'+(marge>=20?"var(--success)":marge>=0?"var(--warning)":"var(--danger)")+'">'+marge+'%</div></div>';
+  h+='</div>';
+
+  // Actions
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">⚡ Actions</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  h+='<button class="btn-primary" style="background:linear-gradient(135deg,#dc2626,#991b1b);margin:0" onclick="openDepenseModal()">💸 Nouvelle dépense</button>';
+  h+='<button class="btn-ghost" style="margin:0" onclick="exportComptaExcel()">📊 Export Excel</button>';
+  h+='</div>';
+
+  return h;
+}
+
+function setComptaPeriode(p){
+  window._comptaPeriode=p;
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderComptabilite()+'</div>';
+}
+
+function getJoursPeriode(periode){
+  var jours=[];
+  var d=new Date();
+  if(periode==="jour"){
+    jours.push(fmtISO(d));
+  } else if(periode==="semaine"){
+    var dow=d.getDay();
+    var lun=new Date(d);lun.setDate(d.getDate()-(dow===0?6:dow-1));
+    for(var i=0;i<7;i++){
+      var x=new Date(lun);x.setDate(lun.getDate()+i);
+      if(x<=d) jours.push(fmtISO(x));
+    }
+  } else if(periode==="mois"){
+    var start=new Date(d.getFullYear(),d.getMonth(),1);
+    for(var i=0;start<=d;i++){
+      jours.push(fmtISO(start));
+      start.setDate(start.getDate()+1);
+    }
+  } else if(periode==="trimestre"){
+    var trim=Math.floor(d.getMonth()/3);
+    var start=new Date(d.getFullYear(),trim*3,1);
+    for(var i=0;start<=d;i++){
+      jours.push(fmtISO(start));
+      start.setDate(start.getDate()+1);
+    }
+  } else if(periode==="annee"){
+    var start=new Date(d.getFullYear(),0,1);
+    for(var i=0;start<=d;i++){
+      jours.push(fmtISO(start));
+      start.setDate(start.getDate()+1);
+    }
+  }
+  return jours;
+}
+
+function getJoursPeriodePrec(periode){
+  var d=new Date();
+  if(periode==="jour"){
+    d.setDate(d.getDate()-1);
+    return [fmtISO(d)];
+  } else if(periode==="semaine"){
+    d.setDate(d.getDate()-7);
+    var dow=d.getDay();
+    var lun=new Date(d);lun.setDate(d.getDate()-(dow===0?6:dow-1));
+    var arr=[];
+    for(var i=0;i<7;i++){
+      var x=new Date(lun);x.setDate(lun.getDate()+i);
+      arr.push(fmtISO(x));
+    }
+    return arr;
+  } else if(periode==="mois"){
+    d.setMonth(d.getMonth()-1);
+    var start=new Date(d.getFullYear(),d.getMonth(),1);
+    var end=new Date(d.getFullYear(),d.getMonth()+1,0);
+    var arr=[];
+    while(start<=end){
+      arr.push(fmtISO(start));
+      start.setDate(start.getDate()+1);
+    }
+    return arr;
+  } else if(periode==="trimestre"){
+    var trim=Math.floor(d.getMonth()/3)-1;
+    var year=d.getFullYear();
+    if(trim<0){trim=3;year--;}
+    var start=new Date(year,trim*3,1);
+    var end=new Date(year,trim*3+3,0);
+    var arr=[];
+    while(start<=end){
+      arr.push(fmtISO(start));
+      start.setDate(start.getDate()+1);
+    }
+    return arr;
+  }
+  return [];
+}
+
+function getLibellePeriode(periode){
+  var d=new Date();
+  if(periode==="jour") return "Aujourd'hui";
+  if(periode==="semaine") return "Cette semaine";
+  if(periode==="mois") return d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  if(periode==="trimestre") return "T"+(Math.floor(d.getMonth()/3)+1)+" "+d.getFullYear();
+  if(periode==="annee") return "Année "+d.getFullYear();
+  return "";
+}
+
+/* ─── MODAL : Nouvelle dépense avec catégorie ─── */
+function openDepenseModal(){
+  if(!hasPerm("depenses") && S.user && S.user.niveau<3){
+    toast("⛔ Vous n'avez pas la permission","error");
+    return;
+  }
+  var body='';
+
+  body+='<div class="field"><label>Date *</label><input id="depDate" type="date" value="'+td()+'"/></div>';
+
+  body+='<div class="field"><label>Catégorie *</label><select id="depCat">';
+  CATEGORIES_DEPENSES.forEach(function(c){
+    body+='<option value="'+c.id+'">'+c.l+'</option>';
+  });
+  body+='</select></div>';
+
+  body+='<div class="field"><label>Montant (F CFA) *</label><input id="depMontant" type="number" inputmode="numeric" placeholder="Ex: 5000"/></div>';
+
+  body+='<div class="field"><label>Libellé / Description</label><input id="depLibelle" type="text" placeholder="Ex: Vidange saloni n°3"/></div>';
+
+  // Chauffeur concerné (optionnel)
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+  body+='<div class="field"><label>Chauffeur concerné (optionnel)</label><select id="depChauffeur">';
+  body+='<option value="">— Aucun (dépense générale) —</option>';
+  CH.forEach(function(c){
+    body+='<option value="'+c.id+'">'+c.nom+'</option>';
+  });
+  body+='</select></div>';
+
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#dc2626,#991b1b)" onclick="saveDepense()">💾 Enregistrer la dépense</button>';
+
+  openModal("💸 Nouvelle dépense", body);
+}
+
+function saveDepense(){
+  var date=document.getElementById("depDate").value||td();
+  var cat=document.getElementById("depCat").value;
+  var montant=parseInt(document.getElementById("depMontant").value)||0;
+  var libelle=(document.getElementById("depLibelle").value||"").trim();
+  var chauffeurId=document.getElementById("depChauffeur").value||"";
+
+  if(montant<=0){
+    toast("Montant invalide","error");
+    return;
+  }
+
+  var item={
+    id:Date.now(),
+    date:date,
+    heure:hr(),
+    categorie:cat,
+    montant:montant,
+    libelle:libelle,
+    chauffeurId:chauffeurId,
+    auteur:S.user?S.user.pseudo:""
+  };
+  if(!S.data.depenses) S.data.depenses=[];
+  S.data.depenses.push(item);
+  save();
+  try{ fbSave("depenses",item); }catch(e){}
+
+  toast("✅ Dépense enregistrée","success");
+  closeModal();
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderComptabilite()+'</div>';
+}
+
+function exportComptaExcel(){
+  var periode=window._comptaPeriode||"mois";
+  var jours=getJoursPeriode(periode);
+  var VE=(S.data.versements||[]).map(normVers).filter(function(v){return jours.indexOf(normDate(v.date))>=0;});
+  var DEP=(S.data.depenses||[]).filter(function(d){return jours.indexOf(normDate(d.date))>=0;});
+
+  var csv="RAPPORT FINANCIER - "+getLibellePeriode(periode)+"\n\n";
+  csv+="=== RECETTES ===\n";
+  csv+="Date;Heure;Chauffeur;Montant;Mode;Reference\n";
+  VE.forEach(function(v){
+    var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(v.chauffeurId);});
+    csv+=v.date+";"+(v.heure||"")+";"+(c?c.nom:"Inconnu")+";"+v.montant+";"+(v.mode||"")+";"+(v.ref||"")+"\n";
+  });
+  csv+="\n=== DEPENSES ===\n";
+  csv+="Date;Categorie;Montant;Libelle;Chauffeur\n";
+  DEP.forEach(function(d){
+    var cat=getCategorieDepense(d.categorie);
+    var c=d.chauffeurId?(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(d.chauffeurId);}):null;
+    csv+=d.date+";"+cat.l+";"+d.montant+";"+(d.libelle||"")+";"+(c?c.nom:"")+"\n";
+  });
+
+  // Totaux
+  var ca=VE.reduce(function(s,v){return s+(v.montant||0);},0);
+  var dep=DEP.reduce(function(s,d){return s+(d.montant||0);},0);
+  csv+="\n=== TOTAUX ===\n";
+  csv+="Recettes totales;"+ca+"\n";
+  csv+="Depenses totales;"+dep+"\n";
+  csv+="Benefice net;"+(ca-dep)+"\n";
+
+  // Téléchargement
+  var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;
+  a.download="comptabilite-"+periode+"-"+td()+".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast("✅ Export Excel téléchargé","success");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE GESTION DES CAUTIONS
+   ═══════════════════════════════════════════════════════════════ */
+function renderCautions(){
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">🔐 Gestion des cautions</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Cautions versées par les chauffeurs au début du contrat.</div>';
+
+  // Stats
+  var totalCautions=0;
+  var nbAvec=0;
+  CH.forEach(function(c){
+    if(c.caution && c.caution.montant){
+      totalCautions+=c.caution.montant;
+      nbAvec++;
+    }
+  });
+
+  h+='<div class="kpi-grid">';
+  h+='<div class="kpi"><div class="kpi-icon b1">🔐</div><div class="kpi-label">Total cautions</div><div class="kpi-val">'+fcShort(totalCautions)+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b2">✅</div><div class="kpi-label">Avec caution</div><div class="kpi-val">'+nbAvec+'/'+CH.length+'</div></div>';
+  h+='<div class="kpi"><div class="kpi-icon b3">⚠️</div><div class="kpi-label">Sans caution</div><div class="kpi-val">'+(CH.length-nbAvec)+'</div></div>';
+  h+='</div>';
+
+  // Liste des chauffeurs avec cautions
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📋 Chauffeurs et cautions</div>';
+
+  if(CH.length===0){
+    h+='<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Aucun chauffeur</div></div>';
+  } else {
+    CH.forEach(function(c){
+      var caut=c.caution||{};
+      var hasCaution=caut.montant>0;
+      var borderColor=hasCaution?"#10b981":"#f59e0b";
+
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+borderColor+';border-radius:12px;padding:12px;margin-bottom:8px">';
+      h+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+      h+='<div style="width:40px;height:40px;background:'+avatarColor(c.id)+';color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px">'+initials(c.nom)+'</div>';
+      h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">'+c.nom+'</div>';
+      if(hasCaution){
+        h+='<div style="font-size:12px;color:var(--success);font-weight:700;margin-top:2px">🔐 '+fc(caut.montant)+' versés le '+formatDateRelative(caut.dateVersement||"")+'</div>';
+      } else {
+        h+='<div style="font-size:12px;color:var(--warning);font-weight:700;margin-top:2px">⚠️ Aucune caution enregistrée</div>';
+      }
+      h+='</div></div>';
+
+      if(hasCaution){
+        h+='<div style="background:var(--surface-2);border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:var(--txt-2)">';
+        if(caut.mode) h+='💳 Mode : '+caut.mode+'<br>';
+        if(caut.recu) h+='📄 N° reçu : '+caut.recu;
+        if(caut.note) h+='<div style="font-style:italic;margin-top:4px">"'+escapeHtml(caut.note)+'"</div>';
+        h+='</div>';
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+        h+='<button class="btn-ghost" style="padding:8px;font-size:12px;margin:0" onclick="modifierCaution('+c.id+')">✏️ Modifier</button>';
+        h+='<button class="btn-ghost" style="padding:8px;font-size:12px;margin:0;color:var(--info)" onclick="restituerCaution('+c.id+')">💸 Restituer</button>';
+        h+='</div>';
+      } else {
+        h+='<button class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669);margin:0;padding:8px;font-size:12px" onclick="enregistrerCaution('+c.id+')">➕ Enregistrer caution</button>';
+      }
+      h+='</div>';
+    });
+  }
+
+  return h;
+}
+
+function enregistrerCaution(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+
+  var body='';
+  body+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Caution pour <strong>'+c.nom+'</strong></div>';
+
+  body+='<div class="field"><label>Montant (F CFA) *</label><input id="cautMontant" type="number" inputmode="numeric" placeholder="Ex: 50000"/></div>';
+  body+='<div class="field"><label>Date du versement *</label><input id="cautDate" type="date" value="'+td()+'"/></div>';
+
+  body+='<div class="field"><label>Mode de paiement</label><select id="cautMode">';
+  ["Especes","Wave","Orange Money","MTN Money","Cheque","Virement"].forEach(function(m){
+    body+='<option value="'+m+'">'+m+'</option>';
+  });
+  body+='</select></div>';
+
+  body+='<div class="field"><label>N° du reçu (facultatif)</label><input id="cautRecu" type="text" placeholder="Ex: REC-2026-001"/></div>';
+  body+='<div class="field"><label>Note (facultatif)</label><textarea id="cautNote" rows="2" placeholder="Ex: Reçu en espèces devant 2 témoins"></textarea></div>';
+
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#10b981,#059669)" onclick="saveCaution('+chauffeurId+')">💾 Enregistrer la caution</button>';
+
+  openModal("🔐 Nouvelle caution - "+c.nom, body);
+}
+
+function saveCaution(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+
+  var montant=parseInt(document.getElementById("cautMontant").value)||0;
+  if(montant<=0){toast("Montant invalide","error");return;}
+
+  c.caution={
+    montant:montant,
+    dateVersement:document.getElementById("cautDate").value||td(),
+    mode:document.getElementById("cautMode").value,
+    recu:document.getElementById("cautRecu").value||"",
+    note:document.getElementById("cautNote").value||"",
+    statut:"active",
+    enregistrePar:S.user?S.user.pseudo:""
+  };
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+
+  toast("✅ Caution enregistrée","success");
+  closeModal();
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderCautions()+'</div>';
+}
+
+function modifierCaution(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c || !c.caution) return;
+  var caut=c.caution;
+
+  var body='';
+  body+='<div class="field"><label>Montant (F CFA) *</label><input id="cautMontant" type="number" value="'+(caut.montant||"")+'" inputmode="numeric"/></div>';
+  body+='<div class="field"><label>Date du versement *</label><input id="cautDate" type="date" value="'+(caut.dateVersement||td())+'"/></div>';
+  body+='<div class="field"><label>Mode de paiement</label><select id="cautMode">';
+  ["Especes","Wave","Orange Money","MTN Money","Cheque","Virement"].forEach(function(m){
+    body+='<option value="'+m+'"'+(caut.mode===m?" selected":"")+'>'+m+'</option>';
+  });
+  body+='</select></div>';
+  body+='<div class="field"><label>N° du reçu</label><input id="cautRecu" type="text" value="'+(caut.recu||"")+'"/></div>';
+  body+='<div class="field"><label>Note</label><textarea id="cautNote" rows="2">'+(caut.note||"")+'</textarea></div>';
+  body+='<button class="btn-primary" onclick="saveCaution('+chauffeurId+')">💾 Mettre à jour</button>';
+
+  openModal("✏️ Modifier caution - "+c.nom, body);
+}
+
+function restituerCaution(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c || !c.caution) return;
+
+  if(!confirm("Restituer la caution de "+fc(c.caution.montant)+" à "+c.nom+" ?\n\nCela créera une dépense dans la comptabilité.")) return;
+
+  // Créer une dépense de restitution
+  var item={
+    id:Date.now(),
+    date:td(),
+    heure:hr(),
+    categorie:"caution",
+    montant:c.caution.montant,
+    libelle:"Restitution caution - "+c.nom,
+    chauffeurId:c.id,
+    auteur:S.user?S.user.pseudo:""
+  };
+  if(!S.data.depenses) S.data.depenses=[];
+  S.data.depenses.push(item);
+  try{ fbSave("depenses",item); }catch(e){}
+
+  // Marquer la caution comme restituée
+  c.caution.statut="restituee";
+  c.caution.dateRestitution=td();
+  c.caution.restituePar=S.user?S.user.pseudo:"";
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+
+  toast("✅ Caution restituée et enregistrée dans la compta","success");
+
+  // Message au chauffeur
+  var msg={
+    id:Date.now()+1,
+    convId:"conv_"+c.id,
+    de:"admin",
+    auteur:S.user?S.user.pseudo:"admin",
+    texte:"💰 Votre caution de "+fc(c.caution.montant)+" F CFA a été restituée aujourd'hui. Merci pour votre collaboration.",
+    date:td(),
+    heure:hr(),
+    ts:Date.now(),
+    lu:false
+  };
+  if(!S.data.chats) S.data.chats=[];
+  S.data.chats.push(msg);
+  try{ fbSave("chats",msg); }catch(e){}
+
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderCautions()+'</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE STATS PAR ZONE
+   ═══════════════════════════════════════════════════════════════ */
+function renderStatsZone(){
+  var VE=(S.data.versements||[]).map(normVers);
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">🗺️ Stats par zone</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Performance détaillée par zone d\'exploitation</div>';
+
+  // Sélecteur période
+  var periode=window._zonePeriode||"mois";
+  h+='<div style="display:flex;gap:6px;margin-bottom:14px;background:var(--surface-2);padding:4px;border-radius:12px">';
+  [{k:"semaine",l:"📆 Semaine"},{k:"mois",l:"🗓️ Mois"},{k:"trimestre",l:"📊 Trimestre"}].forEach(function(p){
+    var actif=periode===p.k;
+    h+='<button onclick="setZonePeriode(\''+p.k+'\')" style="flex:1;padding:8px;border-radius:10px;border:none;background:'+(actif?"linear-gradient(135deg,#0a1f44,#1e3a8a)":"transparent")+';color:'+(actif?"#fff":"var(--txt-2)")+';font-weight:'+(actif?"800":"600")+';font-size:11.5px;cursor:pointer;font-family:inherit">'+p.l+'</button>';
+  });
+  h+='</div>';
+
+  var jours=getJoursPeriode(periode);
+  var versFiltres=VE.filter(function(v){return jours.indexOf(normDate(v.date))>=0;});
+
+  // Grouper par zone
+  var parZone={};
+  CH.forEach(function(c){
+    var zone=c.zone||"Non définie";
+    if(!parZone[zone]) parZone[zone]={chauffeurs:0,ca:0,versements:0,chauffeursIds:[]};
+    parZone[zone].chauffeurs++;
+    parZone[zone].chauffeursIds.push(c.id);
+  });
+
+  versFiltres.forEach(function(v){
+    var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(v.chauffeurId);});
+    if(!c) return;
+    var zone=c.zone||"Non définie";
+    if(!parZone[zone]) parZone[zone]={chauffeurs:0,ca:0,versements:0,chauffeursIds:[]};
+    parZone[zone].ca+=(v.montant||0);
+    parZone[zone].versements++;
+  });
+
+  // Trier par CA
+  var zones=Object.keys(parZone).map(function(z){
+    return Object.assign({nom:z},parZone[z],{caParChauffeur:parZone[z].chauffeurs>0?Math.round(parZone[z].ca/parZone[z].chauffeurs):0});
+  }).sort(function(a,b){return b.ca-a.ca;});
+
+  if(zones.length===0){
+    h+='<div class="empty"><div class="empty-icon">🗺️</div><div class="empty-text">Aucune donnée</div></div>';
+    return h;
+  }
+
+  // KPI top zone
+  var topZone=zones[0];
+  var totalCA=zones.reduce(function(s,z){return s+z.ca;},0);
+  h+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);color:#fff;border-radius:18px;padding:18px;margin-bottom:14px">';
+  h+='<div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px">🏆 Meilleure zone</div>';
+  h+='<div style="font-size:24px;font-weight:800">'+topZone.nom+'</div>';
+  h+='<div style="font-size:13px;opacity:.9;margin-top:4px">'+fc(topZone.ca)+' · '+topZone.chauffeurs+' chauffeur(s)</div>';
+  h+='</div>';
+
+  // Liste des zones
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📊 Toutes les zones ('+zones.length+')</div>';
+  zones.forEach(function(z,i){
+    var pct=totalCA>0?Math.round(z.ca/totalCA*100):0;
+    var medaille=i===0?"🥇":(i===1?"🥈":(i===2?"🥉":""));
+    h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    h+='<div><div style="font-weight:800;font-size:15px">'+medaille+' '+z.nom+'</div>';
+    h+='<div style="font-size:11.5px;color:var(--txt-2);margin-top:2px">'+z.chauffeurs+' chauffeur(s) · '+z.versements+' versements</div></div>';
+    h+='<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--success)">'+fc(z.ca)+'</div>';
+    h+='<div style="font-size:11px;color:var(--txt-2)">'+pct+'% du CA</div></div>';
+    h+='</div>';
+    // Barre de progression
+    h+='<div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden">';
+    h+='<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#10b981,#059669);border-radius:3px"></div></div>';
+    h+='<div style="font-size:11px;color:var(--txt-2);margin-top:6px">CA moyen/chauffeur : <strong>'+fc(z.caParChauffeur)+'</strong></div>';
+    h+='</div>';
+  });
+
+  return h;
+}
+function setZonePeriode(p){
+  window._zonePeriode=p;
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderStatsZone()+'</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE CALENDRIER INTÉGRÉ
+   ═══════════════════════════════════════════════════════════════ */
+function renderCalendrier(){
+  var mois=window._calMois!==undefined?window._calMois:new Date().getMonth();
+  var annee=window._calAnnee||new Date().getFullYear();
+
+  var noms=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  var h='<div class="screen-title">📅 Calendrier</div>';
+
+  // Navigation mois
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:var(--surface);border-radius:14px;padding:10px 14px">';
+  h+='<button onclick="navMois(-1)" style="background:var(--surface-2);border:none;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--txt)">◀</button>';
+  h+='<div style="font-weight:800;font-size:16px">'+noms[mois]+' '+annee+'</div>';
+  h+='<button onclick="navMois(1)" style="background:var(--surface-2);border:none;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--txt)">▶</button>';
+  h+='</div>';
+
+  // Compute events
+  var events=getEventsCalendrier(annee, mois);
+
+  // Calendrier grid
+  var debut=new Date(annee, mois, 1);
+  var fin=new Date(annee, mois+1, 0);
+  var firstDay=debut.getDay()===0?6:debut.getDay()-1; // Lundi = 0
+  var nbJours=fin.getDate();
+
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:14px">';
+  // En-tête jours
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px">';
+  ["L","M","M","J","V","S","D"].forEach(function(d){
+    h+='<div style="text-align:center;font-weight:800;font-size:11px;color:var(--txt-2);padding:6px 0">'+d+'</div>';
+  });
+  h+='</div>';
+
+  // Jours
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+  // Cases vides début
+  for(var i=0;i<firstDay;i++){
+    h+='<div style="height:42px"></div>';
+  }
+  var today=td();
+  var todayStr=annee+"-"+String(mois+1).padStart(2,"0")+"-"+String(new Date().getDate()).padStart(2,"0");
+  for(var j=1;j<=nbJours;j++){
+    var dateStr=annee+"-"+String(mois+1).padStart(2,"0")+"-"+String(j).padStart(2,"0");
+    var isToday=dateStr===today;
+    var ev=events[dateStr]||[];
+    var hasEvent=ev.length>0;
+    var bgCol=isToday?"#0a1f44":(hasEvent?"var(--surface-2)":"transparent");
+    var txtCol=isToday?"#fff":(hasEvent?"var(--txt)":"var(--txt-2)");
+    h+='<div onclick="ouvrirJourCal(\''+dateStr+'\')" style="height:42px;background:'+bgCol+';color:'+txtCol+';border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-weight:'+(isToday?"800":"600")+';font-size:13px;position:relative">';
+    h+=j;
+    if(hasEvent){
+      h+='<div style="position:absolute;bottom:3px;width:5px;height:5px;background:'+(isToday?"#fff":"#f97316")+';border-radius:50%"></div>';
+    }
+    h+='</div>';
+  }
+  h+='</div></div>';
+
+  // Liste des événements à venir
+  var todayDate=new Date();
+  todayDate.setHours(0,0,0,0);
+  var upcoming=Object.keys(events).filter(function(d){
+    return new Date(d)>=todayDate;
+  }).sort().slice(0,10);
+
+  if(upcoming.length>0){
+    h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">📌 À venir ('+upcoming.length+')</div>';
+    upcoming.forEach(function(d){
+      var evs=events[d];
+      evs.forEach(function(e){
+        h+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+e.color+';border-radius:12px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">';
+        h+='<div style="font-size:22px">'+e.icon+'</div>';
+        h+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+e.titre+'</div>';
+        h+='<div style="font-size:11px;color:var(--txt-2);margin-top:2px">'+formatDateRelative(d)+(e.detail?' · '+e.detail:'')+'</div></div>';
+        h+='</div>';
+      });
+    });
+  }
+
+  // Boutons actions
+  h+='<div class="section-title" style="font-size:14px;margin:18px 0 10px">➕ Ajouter</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  h+='<button class="btn-primary" style="margin:0" onclick="openEventModal()">📌 Nouvel événement</button>';
+  h+='<button class="btn-ghost" style="margin:0" onclick="goAujourdhui()">📍 Aujourd\'hui</button>';
+  h+='</div>';
+
+  return h;
+}
+
+function getEventsCalendrier(annee, mois){
+  var events={};
+  var pad=function(n){return String(n).padStart(2,"0");};
+
+  // Versements
+  (S.data.versements||[]).map(normVers).forEach(function(v){
+    var d=new Date(v.date);
+    if(d.getFullYear()===annee && d.getMonth()===mois){
+      var key=v.date;
+      if(!events[key]) events[key]=[];
+      var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(v.chauffeurId);});
+      events[key].push({
+        icon:"💰",
+        titre:"Versement "+fc(v.montant),
+        detail:c?c.nom:"",
+        color:"#10b981",
+        type:"versement"
+      });
+    }
+  });
+
+  // Maintenances/Entretiens (prochains)
+  (S.data.entretiens||[]).forEach(function(e){
+    if(!e.dateProchain) return;
+    var d=new Date(e.dateProchain);
+    if(d.getFullYear()===annee && d.getMonth()===mois){
+      var key=e.dateProchain;
+      if(!events[key]) events[key]=[];
+      events[key].push({
+        icon:"🔧",
+        titre:"Entretien prévu",
+        detail:e.libelle||"",
+        color:"#f59e0b",
+        type:"entretien"
+      });
+    }
+  });
+
+  // Fins de contrat des chauffeurs
+  (S.data.chauffeurs||[]).forEach(function(c){
+    if(!c.contratFin) return;
+    var d=new Date(c.contratFin);
+    if(d.getFullYear()===annee && d.getMonth()===mois){
+      var key=c.contratFin;
+      if(!events[key]) events[key]=[];
+      events[key].push({
+        icon:"📄",
+        titre:"Fin contrat",
+        detail:c.nom,
+        color:"#dc2626",
+        type:"contrat"
+      });
+    }
+  });
+
+  // Événements personnalisés
+  (S.data.evenements||[]).forEach(function(e){
+    var d=new Date(e.date);
+    if(d.getFullYear()===annee && d.getMonth()===mois){
+      var key=e.date;
+      if(!events[key]) events[key]=[];
+      events[key].push({
+        icon:e.icon||"📅",
+        titre:e.titre,
+        detail:e.detail||"",
+        color:e.color||"#7c3aed",
+        type:"personnalise",
+        id:e.id
+      });
+    }
+  });
+
+  return events;
+}
+
+function navMois(delta){
+  var m=window._calMois!==undefined?window._calMois:new Date().getMonth();
+  var a=window._calAnnee||new Date().getFullYear();
+  m+=delta;
+  if(m>11){m=0;a++;}
+  if(m<0){m=11;a--;}
+  window._calMois=m;
+  window._calAnnee=a;
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderCalendrier()+'</div>';
+}
+
+function goAujourdhui(){
+  window._calMois=new Date().getMonth();
+  window._calAnnee=new Date().getFullYear();
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderCalendrier()+'</div>';
+}
+
+function ouvrirJourCal(date){
+  var events=getEventsCalendrier(parseInt(date.substring(0,4)),parseInt(date.substring(5,7))-1);
+  var evs=events[date]||[];
+
+  var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px"><strong>'+formatDateRelative(date)+'</strong></div>';
+  if(evs.length===0){
+    body+='<div class="empty"><div class="empty-text">Aucun événement ce jour</div></div>';
+  } else {
+    evs.forEach(function(e){
+      body+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+e.color+';border-radius:10px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">';
+      body+='<div style="font-size:22px">'+e.icon+'</div>';
+      body+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+e.titre+'</div>';
+      if(e.detail) body+='<div style="font-size:11px;color:var(--txt-2)">'+e.detail+'</div>';
+      body+='</div></div>';
+    });
+  }
+  body+='<button class="btn-primary" style="margin-top:14px" onclick="closeModal();openEventModal(\''+date+'\')">📌 Ajouter un événement ce jour</button>';
+
+  openModal(formatDateRelative(date), body);
+}
+
+function openEventModal(dateDefault){
+  var body='';
+  body+='<div class="field"><label>Titre *</label><input id="evTitre" type="text" placeholder="Ex: RDV mécanicien"/></div>';
+  body+='<div class="field"><label>Date *</label><input id="evDate" type="date" value="'+(dateDefault||td())+'"/></div>';
+  body+='<div class="field"><label>Icône</label><select id="evIcon">';
+  [{v:"📅",l:"📅 Général"},{v:"🔧",l:"🔧 Mécanique"},{v:"📄",l:"📄 Administratif"},{v:"💼",l:"💼 Rendez-vous"},{v:"🎉",l:"🎉 Fête"},{v:"⚠️",l:"⚠️ Important"}].forEach(function(o){
+    body+='<option value="'+o.v+'">'+o.l+'</option>';
+  });
+  body+='</select></div>';
+  body+='<div class="field"><label>Détails (facultatif)</label><textarea id="evDetail" rows="2"></textarea></div>';
+  body+='<button class="btn-primary" onclick="saveEvent()">💾 Enregistrer</button>';
+
+  openModal("📌 Nouvel événement", body);
+}
+
+function saveEvent(){
+  var titre=document.getElementById("evTitre").value.trim();
+  var date=document.getElementById("evDate").value||td();
+  var icon=document.getElementById("evIcon").value;
+  var detail=document.getElementById("evDetail").value;
+
+  if(!titre){toast("Titre requis","error");return;}
+
+  var item={
+    id:Date.now(),
+    titre:titre,
+    date:date,
+    icon:icon,
+    detail:detail,
+    color:"#7c3aed",
+    auteur:S.user?S.user.pseudo:""
+  };
+  if(!S.data.evenements) S.data.evenements=[];
+  S.data.evenements.push(item);
+  save();
+  try{ fbSave("evenements",item); }catch(e){}
+
+  toast("✅ Événement ajouté","success");
+  closeModal();
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderCalendrier()+'</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE MESSAGES GROUPÉS / MARKETING
+   ═══════════════════════════════════════════════════════════════ */
+function renderMessagesGroupes(){
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">📢 Messages groupés</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Envoyez un message à plusieurs chauffeurs en même temps.</div>';
+
+  // Modèles de messages prêts
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">📋 Modèles rapides</div>';
+
+  var modeles=[
+    {icon:"💰",titre:"Rappel versement",msg:"Bonjour [NOM], merci de bien vouloir verser ta recette du jour. Bonne journée 💪"},
+    {icon:"🎉",titre:"Félicitations",msg:"Bonjour [NOM], félicitations pour ta belle performance ! Continue comme ça 🏆"},
+    {icon:"⚠️",titre:"Alerte importante",msg:"Bonjour [NOM], message important : merci de me contacter dès que possible."},
+    {icon:"🔧",titre:"Rappel entretien",msg:"Bonjour [NOM], n'oublie pas l'entretien de ton tricycle prévu cette semaine. Merci 🔧"},
+    {icon:"🎊",titre:"Fête / Annonce",msg:"Bonjour [NOM], grande annonce ! Réunion d'équipe ce [JOUR] à [HEURE]. Présence souhaitée 🎊"},
+    {icon:"📊",titre:"Bilan mensuel",msg:"Bonjour [NOM], voici ton bilan de ce mois :\n- Versements : [X]\n- Performance : [Y]%\n\nMerci pour ton engagement 💪"}
+  ];
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">';
+  modeles.forEach(function(m,i){
+    h+='<button onclick="useTemplate('+i+')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font-family:inherit">';
+    h+='<div style="font-size:20px;margin-bottom:4px">'+m.icon+'</div>';
+    h+='<div style="font-weight:700;font-size:12px">'+m.titre+'</div>';
+    h+='</button>';
+  });
+  h+='</div>';
+
+  // Stocker les modèles globalement
+  window._msgTemplates=modeles;
+
+  // Composer un message custom
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">✏️ Composer un message</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px">';
+  h+='<textarea id="msgGroupeText" rows="4" placeholder="Tape ton message ici... Utilise [NOM] pour personnaliser." style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:13px;color:var(--txt);resize:vertical"></textarea>';
+  h+='<div style="font-size:11px;color:var(--txt-2);margin-top:6px">💡 Variable [NOM] sera remplacé par le nom de chaque chauffeur</div>';
+  h+='</div>';
+
+  // Sélection des destinataires
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">👥 Destinataires</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
+  h+='<button class="btn-ghost" style="margin:0;padding:8px;font-size:12px" onclick="selectAllChauffeurs(true)">✅ Tout sélectionner</button>';
+  h+='<button class="btn-ghost" style="margin:0;padding:8px;font-size:12px" onclick="selectAllChauffeurs(false)">❌ Tout désélectionner</button>';
+  h+='</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;max-height:300px;overflow-y:auto">';
+  CH.forEach(function(c){
+    h+='<label style="display:flex;align-items:center;gap:10px;padding:8px;cursor:pointer">';
+    h+='<input type="checkbox" class="chauffeur-check" data-id="'+c.id+'" data-tel="'+(c.tel||"")+'" data-nom="'+escapeAttr(c.nom)+'" checked style="width:18px;height:18px;cursor:pointer"/>';
+    h+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+c.nom+'</div>';
+    h+='<div style="font-size:11px;color:var(--txt-2)">'+(c.tel||"Pas de tél")+'</div></div>';
+    h+='</label>';
+  });
+  h+='</div>';
+
+  // Boutons d'envoi
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">';
+  h+='<button class="btn-primary" style="background:linear-gradient(135deg,#25D366,#128C7E);margin:0" onclick="envoyerGroupeWhatsApp()">📱 WhatsApp</button>';
+  h+='<button class="btn-primary" style="margin:0" onclick="envoyerGroupeChat()">💬 Chat interne</button>';
+  h+='</div>';
+
+  return h;
+}
+
+function useTemplate(i){
+  var t=window._msgTemplates[i];
+  if(t) document.getElementById("msgGroupeText").value=t.msg;
+}
+
+function selectAllChauffeurs(state){
+  document.querySelectorAll(".chauffeur-check").forEach(function(c){c.checked=state;});
+}
+
+function envoyerGroupeWhatsApp(){
+  var msg=document.getElementById("msgGroupeText").value.trim();
+  if(!msg){toast("Message vide","error");return;}
+
+  var selected=Array.from(document.querySelectorAll(".chauffeur-check:checked"));
+  if(selected.length===0){toast("Aucun destinataire sélectionné","error");return;}
+
+  var avecTel=selected.filter(function(c){return c.getAttribute("data-tel").length>0;});
+  if(avecTel.length===0){toast("Aucun destinataire n'a de numéro WhatsApp","error");return;}
+
+  if(!confirm("Envoyer ce message à "+avecTel.length+" chauffeur(s) via WhatsApp ?\n\nLes onglets WhatsApp s'ouvriront un par un.")) return;
+
+  // Ouvrir un onglet WhatsApp pour chaque chauffeur (avec délai)
+  avecTel.forEach(function(c,i){
+    var tel=c.getAttribute("data-tel").replace(/\D/g,"");
+    var nom=c.getAttribute("data-nom");
+    var personalised=msg.replace(/\[NOM\]/g,nom);
+    setTimeout(function(){
+      window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(personalised),"_blank");
+    },i*800); // 800ms entre chaque ouverture
+  });
+
+  toast("✅ "+avecTel.length+" WhatsApp ouvert(s)","success");
+  if(typeof addIAJournal==="function") addIAJournal("message","Diffusion WhatsApp",avecTel.length+" chauffeurs");
+}
+
+function envoyerGroupeChat(){
+  var msg=document.getElementById("msgGroupeText").value.trim();
+  if(!msg){toast("Message vide","error");return;}
+
+  var selected=Array.from(document.querySelectorAll(".chauffeur-check:checked"));
+  if(selected.length===0){toast("Aucun destinataire sélectionné","error");return;}
+
+  if(!confirm("Envoyer ce message à "+selected.length+" chauffeur(s) via le chat interne ?")) return;
+
+  selected.forEach(function(c){
+    var id=c.getAttribute("data-id");
+    var nom=c.getAttribute("data-nom");
+    var personalised=msg.replace(/\[NOM\]/g,nom);
+    var chatMsg={
+      id:Date.now()+Math.floor(Math.random()*10000),
+      convId:"conv_"+id,
+      de:"admin",
+      auteur:S.user?S.user.pseudo:"admin",
+      texte:personalised,
+      date:td(),
+      heure:hr(),
+      ts:Date.now(),
+      lu:false,
+      type:"groupe"
+    };
+    if(!S.data.chats) S.data.chats=[];
+    S.data.chats.push(chatMsg);
+    try{ fbSave("chats",chatMsg); }catch(e){}
+  });
+  save();
+
+  toast("✅ Message envoyé à "+selected.length+" chauffeur(s)","success");
+  if(typeof addIAJournal==="function") addIAJournal("message","Diffusion chat interne",selected.length+" chauffeurs");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE OCR - SCAN DE PAPIERS (CNI, Permis, etc.)
+   ═══════════════════════════════════════════════════════════════ */
+function renderOCRPapiers(){
+  var CH=(S.data.chauffeurs||[]).filter(function(c){return c.statut!=="suspendu";});
+
+  var h='<div class="screen-title">📸 Documents chauffeurs</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Gérez les papiers des chauffeurs et suivez leurs dates d\'expiration.</div>';
+
+  // Alertes documents qui expirent
+  var alertes=[];
+  CH.forEach(function(c){
+    var docs=c.docs||{};
+    [
+      {k:"cni",l:"CNI",exp:c.cniExp},
+      {k:"permis",l:"Permis",exp:c.permisExp},
+      {k:"assurance",l:"Assurance",exp:c.assuranceExp},
+      {k:"vignette",l:"Vignette",exp:c.vignetteExp}
+    ].forEach(function(d){
+      if(!d.exp) return;
+      var dExp=new Date(d.exp);
+      var today=new Date();today.setHours(0,0,0,0);
+      var diff=Math.floor((dExp-today)/(24*3600*1000));
+      if(diff<=30){
+        alertes.push({chauffeur:c,doc:d.l,exp:d.exp,jours:diff});
+      }
+    });
+  });
+
+  if(alertes.length>0){
+    h+='<div style="background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.05));border:2px solid #f59e0b;border-radius:14px;padding:14px;margin-bottom:14px">';
+    h+='<div style="font-weight:800;color:#d97706;margin-bottom:8px">⚠️ '+alertes.length+' document(s) à renouveler bientôt</div>';
+    alertes.sort(function(a,b){return a.jours-b.jours;}).slice(0,5).forEach(function(a){
+      var col=a.jours<=0?"#dc2626":(a.jours<=7?"#f59e0b":"#ca8a04");
+      h+='<div style="background:var(--surface);border-radius:10px;padding:8px 12px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">';
+      h+='<div><div style="font-weight:700;font-size:12.5px">'+a.chauffeur.nom+'</div>';
+      h+='<div style="font-size:11px;color:var(--txt-2)">'+a.doc+' expire le '+formatDateRelative(a.exp)+'</div></div>';
+      h+='<div style="background:'+col+';color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:800">'+(a.jours<=0?"EXPIRÉ":a.jours+"j")+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  // Liste des chauffeurs
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">👥 Documents par chauffeur</div>';
+
+  CH.forEach(function(c){
+    var docs=c.docs||{};
+    var nbDocs=Object.keys(docs).length;
+    var hasExpire=[c.cniExp,c.permisExp,c.assuranceExp,c.vignetteExp].some(function(d){
+      if(!d) return false;
+      var diff=Math.floor((new Date(d)-new Date())/(24*3600*1000));
+      return diff<=30;
+    });
+
+    h+='<div onclick="openDocsChauffeur('+c.id+')" style="background:var(--surface);border:1px solid var(--border);'+(hasExpire?'border-left:4px solid #f59e0b;':'')+'border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px">';
+    h+='<div style="width:42px;height:42px;background:'+avatarColor(c.id)+';color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">'+initials(c.nom)+'</div>';
+    h+='<div style="flex:1"><div style="font-weight:800;font-size:14px">'+c.nom+'</div>';
+    h+='<div style="font-size:11.5px;color:var(--txt-2)">'+nbDocs+' photo(s) · '+(c.numCNI?"CNI ":"")+(c.permisExp?"Permis ":"")+'</div></div>';
+    if(hasExpire) h+='<div style="background:#f59e0b;color:#fff;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:800">⚠️ À renouveler</div>';
+    else h+='<div style="color:var(--txt-3);font-size:18px">›</div>';
+    h+='</div>';
+  });
+
+  return h;
+}
+
+function openDocsChauffeur(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var docs=c.docs||{};
+
+  var body='';
+
+  // Infos documents avec dates
+  var champs=[
+    {key:"cni",label:"📇 CNI",num:c.numCNI,exp:c.cniExp,expKey:"cniExp",numKey:"numCNI"},
+    {key:"permis",label:"🚗 Permis de conduire",exp:c.permisExp,expKey:"permisExp"},
+    {key:"assurance",label:"🛡️ Assurance",exp:c.assuranceExp,expKey:"assuranceExp"},
+    {key:"vignette",label:"🪙 Vignette",exp:c.vignetteExp,expKey:"vignetteExp"},
+    {key:"carteGrise",label:"📄 Carte grise"}
+  ];
+
+  champs.forEach(function(ch){
+    var photoExists=docs[ch.key]&&docs[ch.key].photo;
+    var col=ch.exp?(function(){
+      var diff=Math.floor((new Date(ch.exp)-new Date())/(24*3600*1000));
+      if(diff<=0) return "#dc2626";
+      if(diff<=30) return "#f59e0b";
+      return "#10b981";
+    })():"var(--border)";
+
+    body+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+col+';border-radius:12px;padding:12px;margin-bottom:8px">';
+    body+='<div style="font-weight:800;font-size:14px;margin-bottom:8px">'+ch.label+'</div>';
+
+    if(ch.num){
+      body+='<div style="font-size:12px;color:var(--txt-2);margin-bottom:4px">N° : <strong>'+ch.num+'</strong></div>';
+    }
+    if(ch.exp){
+      var diff=Math.floor((new Date(ch.exp)-new Date())/(24*3600*1000));
+      var statut=diff<=0?"❌ EXPIRÉ":(diff<=30?"⚠️ Expire dans "+diff+" jours":"✅ Valide");
+      body+='<div style="font-size:12px;color:var(--txt-2);margin-bottom:8px">Expire le '+formatDateRelative(ch.exp)+' — '+statut+'</div>';
+    }
+
+    if(photoExists){
+      body+='<img src="'+docs[ch.key].photo+'" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px;margin-bottom:8px;background:#000"/>';
+    }
+
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+    body+='<button class="btn-ghost" style="padding:8px;font-size:12px;margin:0" onclick="document.getElementById(\'photo_'+ch.key+'_'+chauffeurId+'\').click()">📷 '+(photoExists?"Modifier photo":"Ajouter photo")+'</button>';
+    body+='<button class="btn-ghost" style="padding:8px;font-size:12px;margin:0" onclick="setDateExpiration('+chauffeurId+',\''+(ch.expKey||"")+'\',\''+ch.label+'\')">📅 Définir date</button>';
+    body+='</div>';
+    body+='<input type="file" id="photo_'+ch.key+'_'+chauffeurId+'" accept="image/*" capture="environment" style="display:none" onchange="uploadDocPhoto('+chauffeurId+',\''+ch.key+'\',this)"/>';
+    body+='</div>';
+  });
+
+  openModal("📄 Documents - "+c.nom, body);
+}
+
+function uploadDocPhoto(chauffeurId, docKey, input){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var file=input.files[0];
+  if(!file) return;
+  if(file.size>2*1024*1024){
+    toast("⚠️ Fichier trop lourd (max 2 MB)","error");
+    return;
+  }
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    // Compresser image
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement("canvas");
+      var maxW=1000;
+      var scale=img.width>maxW?maxW/img.width:1;
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+      var compressed=canvas.toDataURL("image/jpeg",0.75);
+
+      if(!c.docs) c.docs={};
+      c.docs[docKey]={photo:compressed,date:td()};
+      save();
+      try{ fbSave("chauffeurs",c); }catch(e){}
+      toast("✅ Photo ajoutée","success");
+      closeModal();
+      setTimeout(function(){openDocsChauffeur(chauffeurId);},300);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setDateExpiration(chauffeurId, expKey, label){
+  if(!expKey) {toast("Pas de date pour ce document","info");return;}
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+
+  var body='';
+  body+='<div class="field"><label>Date d\'expiration de '+label+'</label>';
+  body+='<input id="dateExpInput" type="date" value="'+(c[expKey]||"")+'"/></div>';
+  body+='<button class="btn-primary" onclick="saveDateExpiration('+chauffeurId+',\''+expKey+'\')">💾 Enregistrer</button>';
+  openModal("📅 "+label, body);
+}
+
+function saveDateExpiration(chauffeurId, expKey){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+  var date=document.getElementById("dateExpInput").value;
+  c[expKey]=date;
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  toast("✅ Date enregistrée","success");
+  closeModal();
+  setTimeout(function(){openDocsChauffeur(chauffeurId);},300);
+}
+
 
 function renderNotifications(){
   var cfg=getNotifConfig();
@@ -6487,6 +8420,20 @@ function openVersementModal(){
     return;
   }
   var body='';
+
+  // ─── BOUTON SCAN SMS (en haut du modal) ───
+  body+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);border-radius:14px;padding:14px;margin-bottom:14px;color:#fff">';
+  body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+  body+='<div style="font-size:28px">📸</div>';
+  body+='<div style="flex:1"><div style="font-weight:800;font-size:13.5px">Scan automatique du SMS</div>';
+  body+='<div style="font-size:11px;opacity:.85;margin-top:2px">Prends une photo du SMS Wave/Orange Money/MTN, l\'IA remplit tout automatiquement</div></div></div>';
+  body+='<button type="button" onclick="document.getElementById(\'smsScanInput\').click()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:10px;border-radius:10px;width:100%;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">📸 Scanner un SMS / Capture d\'écran</button>';
+  body+='<input type="file" id="smsScanInput" accept="image/*" capture="environment" style="display:none" onchange="scannerSMSVersement(this)"/>';
+  body+='</div>';
+
+  // Ou saisie manuelle
+  body+='<div style="text-align:center;margin:10px 0;color:var(--txt-3);font-size:11px;font-weight:700;letter-spacing:1px">— OU SAISIE MANUELLE —</div>';
+
   body+='<div class="field"><label>Chauffeur</label><select id="vc">';
   CH.forEach(function(c){body+='<option value="'+c.id+'">'+c.nom+' · '+(c.saloni||"—")+'</option>';});
   body+='</select></div>';
@@ -7752,6 +9699,12 @@ function renderGeneric(){
   else if(p==="notifications")html+=renderNotifications();
   else if(p==="autopilot")html+=renderAutopilot();
   else if(p==="performance")html+=renderPerformance();
+  else if(p==="compta")html+=renderComptabilite();
+  else if(p==="cautions")html+=renderCautions();
+  else if(p==="statszone")html+=renderStatsZone();
+  else if(p==="calendrier")html+=renderCalendrier();
+  else if(p==="messagesgroupes")html+=renderMessagesGroupes();
+  else if(p==="ocrpapiers")html+=renderOCRPapiers();
   else if(p==="gps")html+=renderGPS();
   else if(p==="gpsChauffeur")html+=renderGPSChauffeur(S.gpsChauffeurId);
   else if(p==="waveconfig")html+=renderWaveConfig();
@@ -11653,6 +13606,50 @@ function renderParametres(){
     h+='</div>';
   }
 
+  // ─── AUTO-VERSEMENT IA ───
+  if(S.user && S.user.niveau>=2){
+    var autoCfg=getAutoVersementConfig();
+    h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🤖 Auto-versement IA</div>';
+    h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">';
+    h+='<div style="font-size:11.5px;color:var(--txt-2);margin-bottom:12px;line-height:1.5">Quand tu scannes un SMS via 📸, l\'IA peut <strong>enregistrer automatiquement</strong> le versement si toutes les conditions sont remplies.</div>';
+
+    // Toggle activation
+    h+='<div style="background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">';
+    h+='<div><div style="font-weight:700;font-size:13px">Activer l\'auto-versement</div>';
+    h+='<div style="font-size:11px;color:var(--txt-2)">Niveau 2 : Auto si fiabilité haute</div></div>';
+    h+='<label style="position:relative;display:inline-block;width:48px;height:26px">';
+    h+='<input type="checkbox" id="autoVersActif" '+(autoCfg.actif?"checked":"")+' style="opacity:0;width:0;height:0"/>';
+    h+='<span class="slider-track" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:'+(autoCfg.actif?"#10b981":"#cbd5e1")+';border-radius:26px;transition:.3s"><span style="position:absolute;height:20px;width:20px;left:'+(autoCfg.actif?"25":"3")+'px;bottom:3px;background:#fff;border-radius:50%;transition:.3s"></span></span>';
+    h+='</label></div>';
+
+    h+='<div class="field"><label>💰 Montant minimum (F CFA)</label>';
+    h+='<input id="autoVersMin" type="number" inputmode="numeric" value="'+autoCfg.montantMin+'" placeholder="5000"/></div>';
+
+    h+='<div class="field"><label>💰 Montant maximum (F CFA)</label>';
+    h+='<input id="autoVersMax" type="number" inputmode="numeric" value="'+autoCfg.montantMax+'" placeholder="30000"/></div>';
+
+    h+='<div class="field"><label>⏰ Délai max accepté (jours)</label>';
+    h+='<select id="autoVersDelai">';
+    [{v:0,l:"Aujourd\'hui uniquement"},{v:1,l:"Aujourd\'hui ou hier"},{v:3,l:"Jusqu\'à 3 jours"},{v:7,l:"Jusqu\'à 7 jours"}].forEach(function(o){
+      h+='<option value="'+o.v+'"'+(autoCfg.delaiMaxJours===o.v?" selected":"")+'>'+o.l+'</option>';
+    });
+    h+='</select></div>';
+
+    h+='<div style="background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">';
+    h+='<div><div style="font-weight:700;font-size:13px">🔔 Son "ka-ching"</div>';
+    h+='<div style="font-size:11px;color:var(--txt-2)">Son de caisse à chaque versement auto</div></div>';
+    h+='<label style="position:relative;display:inline-block;width:48px;height:26px">';
+    h+='<input type="checkbox" id="autoVersSon" '+(autoCfg.sonKaching?"checked":"")+' style="opacity:0;width:0;height:0"/>';
+    h+='<span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:'+(autoCfg.sonKaching?"#10b981":"#cbd5e1")+';border-radius:26px;transition:.3s"><span style="position:absolute;height:20px;width:20px;left:'+(autoCfg.sonKaching?"25":"3")+'px;bottom:3px;background:#fff;border-radius:50%;transition:.3s"></span></span>';
+    h+='</label></div>';
+
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">';
+    h+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:12px" onclick="playKaching()">🔊 Tester le son</button>';
+    h+='<button class="btn-primary" style="margin:0;padding:10px;font-size:12px" onclick="sauverAutoVersConfig()">💾 Enregistrer</button>';
+    h+='</div>';
+    h+='</div>';
+  }
+
   // Données & Sync
   h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">📊 Données et synchronisation</div>';
 
@@ -12012,6 +14009,25 @@ function sauverEntrepriseConfig(){
   }
   setEntrepriseConfig(cfg);
   toast("✅ Identité entreprise enregistrée","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderParametres()+'</div>';
+}
+
+function sauverAutoVersConfig(){
+  var cfg={
+    actif:document.getElementById("autoVersActif").checked,
+    montantMin:parseInt(document.getElementById("autoVersMin").value)||5000,
+    montantMax:parseInt(document.getElementById("autoVersMax").value)||30000,
+    delaiMaxJours:parseInt(document.getElementById("autoVersDelai").value)||1,
+    sonKaching:document.getElementById("autoVersSon").checked,
+    vibration:true
+  };
+  if(cfg.montantMin>=cfg.montantMax){
+    toast("Le montant minimum doit être inférieur au maximum","error");
+    return;
+  }
+  setAutoVersementConfig(cfg);
+  toast("✅ Configuration auto-versement enregistrée","success");
   var content=document.getElementById("content-generic");
   if(content) content.innerHTML='<div class="content-inner">'+renderParametres()+'</div>';
 }
