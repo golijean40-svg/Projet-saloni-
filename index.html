@@ -8424,11 +8424,19 @@ function openVersementModal(){
   // ─── BOUTON SCAN SMS (en haut du modal) ───
   body+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);border-radius:14px;padding:14px;margin-bottom:14px;color:#fff">';
   body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
-  body+='<div style="font-size:28px">📸</div>';
+  body+='<div style="font-size:28px">🤖</div>';
   body+='<div style="flex:1"><div style="font-weight:800;font-size:13.5px">Scan automatique du SMS</div>';
-  body+='<div style="font-size:11px;opacity:.85;margin-top:2px">Prends une photo du SMS Wave/Orange Money/MTN, l\'IA remplit tout automatiquement</div></div></div>';
-  body+='<button type="button" onclick="document.getElementById(\'smsScanInput\').click()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:10px;border-radius:10px;width:100%;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">📸 Scanner un SMS / Capture d\'écran</button>';
-  body+='<input type="file" id="smsScanInput" accept="image/*" capture="environment" style="display:none" onchange="scannerSMSVersement(this)"/>';
+  body+='<div style="font-size:11px;opacity:.85;margin-top:2px">Capture d\'écran ou photo du SMS → l\'IA remplit tout</div></div></div>';
+
+  // 2 boutons : Galerie + Caméra
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  body+='<button type="button" onclick="document.getElementById(\'smsScanGalerie\').click()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:12px 8px;border-radius:10px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">🖼️ Galerie<div style="font-size:10px;font-weight:600;opacity:.85;margin-top:2px">Capture d\'écran SMS</div></button>';
+  body+='<button type="button" onclick="document.getElementById(\'smsScanCamera\').click()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:12px 8px;border-radius:10px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">📸 Photo<div style="font-size:10px;font-weight:600;opacity:.85;margin-top:2px">Prendre photo écran</div></button>';
+  body+='</div>';
+
+  // Inputs cachés
+  body+='<input type="file" id="smsScanGalerie" accept="image/*" style="display:none" onchange="scannerSMSVersement(this)"/>';
+  body+='<input type="file" id="smsScanCamera" accept="image/*" capture="environment" style="display:none" onchange="scannerSMSVersement(this)"/>';
   body+='</div>';
 
   // Ou saisie manuelle
@@ -8486,6 +8494,23 @@ function openChauffeurModal(existing){
   var c=existing||{};
   var isEdit=!!existing;
   var body='';
+
+  // ─── SCAN IA - INSCRIPTION RAPIDE (uniquement pour nouveau chauffeur) ───
+  if(!isEdit){
+    body+='<div style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);border-radius:14px;padding:14px;margin-bottom:14px;color:#fff">';
+    body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+    body+='<div style="font-size:28px">🤖</div>';
+    body+='<div style="flex:1"><div style="font-weight:800;font-size:13.5px">Inscription rapide par scan</div>';
+    body+='<div style="font-size:11px;opacity:.85;margin-top:2px">Scanne la CNI → l\'IA crée le chauffeur en 5 secondes</div></div></div>';
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    body+='<button type="button" onclick="document.getElementById(\'cniScanGalerie\').click()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:12px 8px;border-radius:10px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">🖼️ Galerie<div style="font-size:10px;font-weight:600;opacity:.85;margin-top:2px">Photo existante</div></button>';
+    body+='<button type="button" onclick="document.getElementById(\'cniScanCamera\').click()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:12px 8px;border-radius:10px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">📸 Photo<div style="font-size:10px;font-weight:600;opacity:.85;margin-top:2px">Prendre maintenant</div></button>';
+    body+='</div>';
+    body+='<input type="file" id="cniScanGalerie" accept="image/*" style="display:none" onchange="scannerDocumentInscription(this,\'cni\')"/>';
+    body+='<input type="file" id="cniScanCamera" accept="image/*" capture="environment" style="display:none" onchange="scannerDocumentInscription(this,\'cni\')"/>';
+    body+='</div>';
+    body+='<div style="text-align:center;margin:10px 0 14px 0;color:var(--txt-3);font-size:11px;font-weight:700;letter-spacing:1px">— OU SAISIE MANUELLE —</div>';
+  }
 
   // ─── INFOS DE BASE ───
   body+='<div style="font-weight:800;font-size:12px;color:var(--info);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">👤 Informations de base</div>';
@@ -14031,6 +14056,303 @@ function sauverAutoVersConfig(){
   var content=document.getElementById("content-generic");
   if(content) content.innerHTML='<div class="content-inner">'+renderParametres()+'</div>';
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SCAN IA DOCUMENTS - Inscription rapide chauffeur
+   ═══════════════════════════════════════════════════════════════ */
+
+// Prompts IA spécialisés par type de document
+var PROMPTS_DOCUMENTS={
+  cni:'Tu es un expert en lecture de documents ivoiriens. Analyse cette CARTE NATIONALE D\'IDENTITÉ ivoirienne (CNI).\n\nÉTAPES :\n1. VÉRIFIE que c\'est bien une CNI ivoirienne authentique (pas une photo floue, pas un autre document)\n2. EXTRAIS toutes les informations visibles\n3. ÉVALUE la fiabilité de chaque champ\n\nRéponds UNIQUEMENT en JSON STRICT :\n{\n  "valide": true/false,\n  "raison_invalide": "<si pas valide>",\n  "type_detecte": "CNI"|"Autre",\n  "nom": "<nom de famille>",\n  "prenom": "<prénom(s)>",\n  "nomComplet": "<NOM Prénom format final>",\n  "dateNaissance": "<YYYY-MM-DD>",\n  "lieuNaissance": "<ville>",\n  "numCNI": "<numéro CNI>",\n  "dateDelivrance": "<YYYY-MM-DD>",\n  "dateExpiration": "<YYYY-MM-DD>",\n  "sexe": "M"|"F",\n  "fiabilite": "haute"|"moyenne"|"basse",\n  "alertes": ["<alertes>"]\n}\n\nALERTES À DÉTECTER :\n- Document expiré\n- Photo floue/illisible\n- CNI suspecte ou photocopie\n- Champs manquants',
+
+  permis:'Tu es un expert en lecture de PERMIS DE CONDUIRE IVOIRIEN. Analyse cette image.\n\nRéponds UNIQUEMENT en JSON STRICT :\n{\n  "valide": true/false,\n  "raison_invalide": "<si pas valide>",\n  "type_detecte": "Permis"|"Autre",\n  "nom": "<nom complet>",\n  "numPermis": "<numéro>",\n  "categorie": "<A1, B, C, D, etc.>",\n  "dateDelivrance": "<YYYY-MM-DD>",\n  "dateExpiration": "<YYYY-MM-DD>",\n  "fiabilite": "haute"|"moyenne"|"basse",\n  "alertes": ["<alertes>"]\n}',
+
+  vignette:'Tu es un expert en lecture de VIGNETTE/CARTE ROSE pour véhicule en Côte d\'Ivoire. Analyse cette image.\n\nRéponds UNIQUEMENT en JSON STRICT :\n{\n  "valide": true/false,\n  "raison_invalide": "<si pas valide>",\n  "type_detecte": "Vignette"|"Carte_Rose"|"Autre",\n  "immatriculation": "<plaque>",\n  "numVignette": "<numéro>",\n  "marque": "<marque>",\n  "modele": "<modèle>",\n  "annee": "<année>",\n  "dateDelivrance": "<YYYY-MM-DD>",\n  "dateExpiration": "<YYYY-MM-DD>",\n  "fiabilite": "haute"|"moyenne"|"basse",\n  "alertes": ["<alertes>"]\n}',
+
+  carteGrise:'Tu es un expert en lecture de CARTE GRISE de véhicule en Côte d\'Ivoire. Analyse cette image.\n\nRéponds UNIQUEMENT en JSON STRICT :\n{\n  "valide": true/false,\n  "raison_invalide": "<si pas valide>",\n  "type_detecte": "CarteGrise"|"Autre",\n  "immatriculation": "<plaque>",\n  "marque": "<marque>",\n  "modele": "<modèle>",\n  "annee": "<année>",\n  "couleur": "<couleur>",\n  "numChassis": "<n° chassis>",\n  "proprietaire": "<nom propriétaire>",\n  "dateMiseEnCirculation": "<YYYY-MM-DD>",\n  "fiabilite": "haute"|"moyenne"|"basse",\n  "alertes": ["<alertes>"]\n}',
+
+  assurance:'Tu es un expert en lecture d\'ATTESTATION D\'ASSURANCE véhicule en Côte d\'Ivoire. Analyse cette image.\n\nRéponds UNIQUEMENT en JSON STRICT :\n{\n  "valide": true/false,\n  "raison_invalide": "<si pas valide>",\n  "type_detecte": "Assurance"|"Autre",\n  "compagnie": "<compagnie>",\n  "numPolice": "<n° police>",\n  "immatriculation": "<plaque>",\n  "assure": "<nom assuré>",\n  "dateDebut": "<YYYY-MM-DD>",\n  "dateExpiration": "<YYYY-MM-DD>",\n  "fiabilite": "haute"|"moyenne"|"basse",\n  "alertes": ["<alertes>"]\n}'
+};
+
+/* ─── Fonction générique : appel IA pour analyser un document ─── */
+function ocrDocument(imageBase64, typeDoc, callback){
+  var cfg=getIAConfig();
+  if(!cfg.claudeKey){
+    callback(null,"⚠️ Clé API Claude non configurée. Va dans 🤖 Assistant IA → Config.");
+    return;
+  }
+  var prompt=PROMPTS_DOCUMENTS[typeDoc];
+  if(!prompt){callback(null,"Type de document non reconnu");return;}
+
+  toast("🤖 IA analyse le document...","info");
+
+  fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key":cfg.claudeKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify({
+      model:"claude-haiku-4-5-20251001",
+      max_tokens:1000,
+      messages:[{
+        role:"user",
+        content:[
+          {type:"image",source:{type:"base64",media_type:"image/jpeg",data:imageBase64}},
+          {type:"text",text:prompt}
+        ]
+      }]
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    if(data.error){callback(null,data.error.message);return;}
+    if(!data.content||!data.content[0]){callback(null,"Réponse vide");return;}
+    var txt=data.content[0].text.trim();
+    txt=txt.replace(/```json\s*|\s*```/g,"").trim();
+    try{
+      var parsed=JSON.parse(txt);
+      callback(parsed,null);
+    }catch(e){
+      callback(null,"Impossible de parser la réponse IA.");
+    }
+  }).catch(function(e){callback(null,e.message);});
+}
+
+function compresserImagePourIA(file, callback){
+  if(file.size>5*1024*1024){callback(null,"⚠️ Image trop lourde (max 5 MB)");return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement("canvas");
+      var maxW=1500;
+      var scale=img.width>maxW?maxW/img.width:1;
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+      var compressed=canvas.toDataURL("image/jpeg",0.85);
+      callback({base64:compressed.split(",")[1],dataURL:compressed},null);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function scannerDocumentInscription(input, typeDoc){
+  var file=input.files[0];
+  if(!file) return;
+  compresserImagePourIA(file, function(img, err){
+    if(err){toast(err,"error");return;}
+    ocrDocument(img.base64, typeDoc, function(result, err){
+      if(err){toast("❌ "+err,"error");return;}
+      if(!result.valide){
+        afficherErreurScanDocument(result, img.dataURL, typeDoc);
+        return;
+      }
+      if(typeDoc==="cni"){
+        creerChauffeurAutoDepuisCNI(result, img.dataURL);
+      }
+    });
+  });
+}
+
+function afficherErreurScanDocument(result, imageBase64, typeDoc){
+  var body='<div style="text-align:center;padding:20px 10px">';
+  body+='<div style="font-size:48px;margin-bottom:14px">⚠️</div>';
+  body+='<div style="font-weight:800;font-size:16px;color:var(--danger);margin-bottom:8px">Document non reconnu</div>';
+  body+='<div style="font-size:13px;color:var(--txt-2);line-height:1.6">'+escapeHtml(result.raison_invalide||"L\'IA n\'a pas pu lire ce document.")+'</div></div>';
+  body+='<div style="background:var(--warning-soft);color:var(--warning);border-radius:10px;padding:12px;font-size:12px;margin:14px 0">💡 Conseils :<br>• Évite reflets/ombres<br>• Photographie en haut/de face<br>• Document entièrement visible</div>';
+  body+='<button class="btn-ghost" style="width:100%" onclick="closeModal();openChauffeurModal();">Saisir manuellement</button>';
+  openModal("🤖 Scan échoué", body);
+}
+
+function creerChauffeurAutoDepuisCNI(result, imageBase64){
+  var CH=(S.data.chauffeurs||[]);
+  // Vérification doublon
+  if(result.numCNI){
+    var doublon=CH.find(function(c){return c.numCNI===result.numCNI;});
+    if(doublon){
+      var body='<div style="text-align:center;padding:20px 10px">';
+      body+='<div style="font-size:48px;margin-bottom:14px">⚠️</div>';
+      body+='<div style="font-weight:800;font-size:16px;color:var(--warning);margin-bottom:8px">Chauffeur déjà existant</div>';
+      body+='<div style="font-size:13px;color:var(--txt-2)">Un chauffeur avec cette CNI existe déjà :<br><strong>'+doublon.nom+'</strong></div></div>';
+      body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">';
+      body+='<button class="btn-ghost" onclick="closeModal();openDetailChauffeur('+doublon.id+')">👁️ Voir</button>';
+      body+='<button class="btn-primary" onclick="closeModal();openChauffeurModal();">➕ Nouveau quand même</button>';
+      body+='</div>';
+      openModal("⚠️ Doublon détecté", body);
+      return;
+    }
+  }
+
+  // Préparer le nom
+  var nomFinal=result.nomComplet||"";
+  if(!nomFinal){
+    var nom=(result.nom||"").toUpperCase();
+    var prenom=(result.prenom||"");
+    if(prenom) prenom=prenom.split(" ").map(function(p){return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase();}).join(" ");
+    nomFinal=(nom+" "+prenom).trim();
+  }
+
+  var chauffeur={
+    id:Date.now(),
+    nom:nomFinal,
+    tel:"",
+    saloniId:"",
+    saloni:"",
+    zone:"",
+    freqPaiement:"Journalier",
+    objectifJour:5000,
+    statut:"actif",
+    solde:0,
+    dette:0,
+    dateAjout:td(),
+    dateNaissance:result.dateNaissance||"",
+    lieuNaissance:result.lieuNaissance||"",
+    numCNI:result.numCNI||"",
+    cniExp:result.dateExpiration||"",
+    sexe:result.sexe||"",
+    docs:{
+      cni:{
+        photo:imageBase64,
+        date:td(),
+        fiabilite:result.fiabilite,
+        scanIA:true
+      }
+    },
+    creePar:S.user?S.user.pseudo:"gerant",
+    creeParNiveau:S.user?S.user.niveau:3
+  };
+  if(S.user && S.user.niveau<3 && S.user.nom) chauffeur.creeParNom=S.user.nom;
+
+  if(!S.data.chauffeurs) S.data.chauffeurs=[];
+  S.data.chauffeurs.push(chauffeur);
+  save();
+  try{ fbSave("chauffeurs",chauffeur); }catch(e){}
+
+  playKaching();
+  if(typeof addIAJournal==="function") addIAJournal("chauffeur","🤖 Créé automatiquement",chauffeur.nom+" - via scan CNI");
+
+  afficherSuccesInscriptionChauffeur(chauffeur, result);
+}
+
+function afficherSuccesInscriptionChauffeur(c, scanResult){
+  var body='';
+  body+='<div style="text-align:center;padding:14px 10px 18px 10px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:14px;margin-bottom:14px">';
+  body+='<div style="font-size:48px;margin-bottom:8px">✅</div>';
+  body+='<div style="font-weight:800;font-size:18px">'+c.nom+'</div>';
+  body+='<div style="font-size:12px;opacity:.9;margin-top:4px">Créé automatiquement via scan IA</div>';
+  body+='</div>';
+
+  body+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">';
+  body+='<div style="font-weight:800;font-size:12px;color:var(--info);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">📋 Informations CNI</div>';
+  if(c.dateNaissance) body+='<div style="font-size:12px;padding:4px 0;color:var(--txt-2)">🎂 Né(e) : '+formatDateRelative(c.dateNaissance)+'</div>';
+  if(c.lieuNaissance) body+='<div style="font-size:12px;padding:4px 0;color:var(--txt-2)">📍 Lieu : '+escapeHtml(c.lieuNaissance)+'</div>';
+  if(c.numCNI) body+='<div style="font-size:12px;padding:4px 0;color:var(--txt-2)">🆔 N° CNI : '+escapeHtml(c.numCNI)+'</div>';
+  if(c.cniExp){
+    var diff=Math.floor((new Date(c.cniExp)-new Date())/(24*3600*1000));
+    var couleur=diff<0?"var(--danger)":(diff<30?"var(--warning)":"var(--success)");
+    body+='<div style="font-size:12px;padding:4px 0;color:'+couleur+';font-weight:700">📅 Expire le : '+formatDateRelative(c.cniExp)+(diff<0?" ⚠️ EXPIRÉ":(diff<30?" ⚠️ Dans "+diff+"j":""))+'</div>';
+  }
+  body+='</div>';
+
+  body+='<div style="background:rgba(245,158,11,.08);border:1px solid #f59e0b;border-radius:12px;padding:12px;margin-bottom:14px">';
+  body+='<div style="font-weight:800;font-size:13px;color:#d97706;margin-bottom:6px">⚠️ À compléter manuellement</div>';
+  body+='<div style="font-size:11.5px;color:var(--txt-2)">📞 Téléphone · 🛺 N° Saloni · 📍 Zone · 💰 Objectif</div>';
+  body+='</div>';
+
+  body+='<div style="font-weight:800;font-size:12px;color:var(--info);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">🚀 Que veux-tu faire ?</div>';
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#0a1f44,#1e3a8a);margin-bottom:6px" onclick="closeModal();completerChauffeurApresScan('+c.id+')">✏️ Compléter les infos manquantes</button>';
+
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">';
+  body+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="scannerAutreDoc('+c.id+',\'permis\')">📸 Scanner Permis</button>';
+  body+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="scannerAutreDoc('+c.id+',\'vignette\')">📸 Scanner Vignette</button>';
+  body+='</div>';
+
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
+  body+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="scannerAutreDoc('+c.id+',\'carteGrise\')">📸 Carte grise</button>';
+  body+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:11.5px" onclick="scannerAutreDoc('+c.id+',\'assurance\')">📸 Assurance</button>';
+  body+='</div>';
+
+  body+='<button class="btn-ghost" style="margin-top:10px;color:var(--txt-2)" onclick="closeModal();render();">✓ Terminer</button>';
+
+  openModal("✨ Chauffeur créé !", body);
+}
+
+function completerChauffeurApresScan(chauffeurId){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c){toast("Chauffeur introuvable","error");return;}
+  openChauffeurModal(c);
+}
+
+function scannerAutreDoc(chauffeurId, typeDoc){
+  var input=document.createElement("input");
+  input.type="file";
+  input.accept="image/*";
+  input.style.display="none";
+  input.onchange=function(){
+    var file=input.files[0];
+    if(!file) return;
+    compresserImagePourIA(file, function(img, err){
+      if(err){toast(err,"error");return;}
+      ocrDocument(img.base64, typeDoc, function(result, err){
+        if(err){toast("❌ "+err,"error");return;}
+        if(!result.valide){
+          afficherErreurScanDocument(result, img.dataURL, typeDoc);
+          return;
+        }
+        sauverDocumentChauffeur(chauffeurId, typeDoc, result, img.dataURL);
+      });
+    });
+  };
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(function(){document.body.removeChild(input);},2000);
+}
+
+function sauverDocumentChauffeur(chauffeurId, typeDoc, result, imageBase64){
+  var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
+  if(!c) return;
+
+  if(typeDoc==="permis"){
+    c.numPermis=result.numPermis||"";
+    c.permisCat=result.categorie||"";
+    c.permisExp=result.dateExpiration||"";
+  } else if(typeDoc==="vignette"){
+    c.immatriculation=c.immatriculation||result.immatriculation||"";
+    c.marqueSaloni=c.marqueSaloni||result.marque||"";
+    c.modeleSaloni=c.modeleSaloni||result.modele||"";
+    c.vignetteExp=result.dateExpiration||"";
+  } else if(typeDoc==="carteGrise"){
+    c.immatriculation=c.immatriculation||result.immatriculation||"";
+    c.marqueSaloni=c.marqueSaloni||result.marque||"";
+    c.modeleSaloni=c.modeleSaloni||result.modele||"";
+    c.couleurSaloni=result.couleur||"";
+    c.numChassis=result.numChassis||"";
+  } else if(typeDoc==="assurance"){
+    c.compagnieAssurance=result.compagnie||"";
+    c.numPoliceAssurance=result.numPolice||"";
+    c.assuranceExp=result.dateExpiration||"";
+  }
+
+  if(!c.docs) c.docs={};
+  c.docs[typeDoc]={
+    photo:imageBase64,
+    date:td(),
+    fiabilite:result.fiabilite,
+    scanIA:true
+  };
+
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+
+  toast("✅ "+typeDoc.charAt(0).toUpperCase()+typeDoc.slice(1)+" enregistré","success");
+  playKaching();
+
+  afficherSuccesInscriptionChauffeur(c, result);
+}
+
 function renderApropos(){
   return '<div class="screen-title">ℹ️ À propos</div>'+
     '<div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;text-align:center">'+
