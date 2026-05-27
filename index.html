@@ -592,7 +592,7 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
 <body>
 
 <!-- ═══ SPLASH SCREEN ═══ -->
-<div id="splash" class="splash-screen">
+<div id="splash" class="splash-screen" onclick="this.style.display='none';if(window._splashSkipped) return;window._splashSkipped=true;">
   <div class="splash-bg">
     <div class="splash-particle p1"></div>
     <div class="splash-particle p2"></div>
@@ -1137,6 +1137,11 @@ body.dark .badge.info{background:#1e3a8a;color:#bfdbfe}
         <div class="sidebar-item-label">Documents chauffeurs</div>
         <div class="sidebar-item-chevron">›</div>
       </button>
+      <button class="sidebar-item" onclick="goGeneric('personnalisation')" style="background:linear-gradient(135deg,rgba(236,72,153,.08),rgba(219,39,119,.04))">
+        <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff">🎨</div>
+        <div class="sidebar-item-label">Personnalisation</div>
+        <div class="sidebar-item-chevron">›</div>
+      </button>
       <button class="sidebar-item" onclick="goGeneric('autopilot')" style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(91,33,182,.04))">
         <div class="sidebar-item-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff">🤖</div>
         <div class="sidebar-item-label">Autopilot IA</div>
@@ -1334,15 +1339,40 @@ function get7JoursGlissants(){
 // Calculer le ratio de jours avec versement sur 7 jours
 // Retourne {jours:5, total:7, ratio:0.71, montant:50000, montantAttendu:70000}
 function getStatsChauffeur(c, VE, periode){
+  // ═══ CACHE: éviter de recalculer les mêmes stats ═══
+  var cacheKey="stats_"+c.id+"_"+periode+"_"+VE.length;
+  if(window._perfCache && window._perfCache[cacheKey]!==undefined){
+    var now=Date.now();
+    if((now-window._perfCacheTime[cacheKey])<5000){
+      return window._perfCache[cacheKey];
+    }
+  }
+
   // periode: "glissant" | "semaine" | "mois"
   var jours;
   if(periode==="semaine") jours=getSem();
   else if(periode==="mois") jours=getMois();
   else jours=get7JoursGlissants();
 
-  var versCh=VE.filter(function(v){return String(v.chauffeurId)===String(c.id);});
+  // ═══ OPTIMISATION: utiliser un Set pour lookup O(1) ═══
+  var joursSet={};
+  jours.forEach(function(j){joursSet[j]=true;});
 
-  // Pour les chauffeurs hebdomadaires : on compte au moins 1 versement sur la période
+  // Filter une seule fois et grouper par jour
+  var idStr=String(c.id);
+  var versParJour={};
+  var hasVersementsPeriode=false;
+  var i;
+  for(i=0;i<VE.length;i++){
+    var v=VE[i];
+    if(String(v.chauffeurId)!==idStr) continue;
+    var d=normDate(v.date);
+    if(!joursSet[d]) continue;
+    if(!versParJour[d]) versParJour[d]=[];
+    versParJour[d].push(v);
+    hasVersementsPeriode=true;
+  }
+
   var isH=c.freqPaiement==="Hebdomadaire";
   var nbAttendu=isH?Math.max(1,Math.floor(jours.length/7)):jours.length;
   var joursAvecVersement=0;
@@ -1351,26 +1381,29 @@ function getStatsChauffeur(c, VE, periode){
     (c.objectifSemaine||(c.objectifJour||0)*5)*Math.ceil(jours.length/7):
     (c.objectifJour||0)*jours.length;
 
-  jours.forEach(function(j){
-    var vsJ=versCh.filter(function(v){return normDate(v.date)===j;});
-    if(vsJ.length>0){
+  // Parcourir les jours UNE FOIS
+  for(i=0;i<jours.length;i++){
+    var jour=jours[i];
+    if(versParJour[jour]){
       joursAvecVersement++;
-      vsJ.forEach(function(v){montantTotal+=(v.montant||0);});
+      for(var k=0;k<versParJour[jour].length;k++){
+        montantTotal+=(versParJour[jour][k].montant||0);
+      }
     }
-  });
+  }
 
-  // Pour hebdo, on compte les versements de la période entière comme un seul
+  // Pour hebdo, simplification
   if(isH){
-    joursAvecVersement=versCh.filter(function(v){return jours.indexOf(normDate(v.date))>=0;}).length>0?1:0;
+    joursAvecVersement=hasVersementsPeriode?1:0;
   }
 
   var ratio=nbAttendu>0?(montantTotal/montantAttendu):0;
   var ratioJours=nbAttendu>0?(joursAvecVersement/nbAttendu):0;
 
-  return {
+  var result={
     jours:joursAvecVersement,
     total:nbAttendu,
-    ratio:Math.min(ratio,1.5),  // cap à 150%
+    ratio:Math.min(ratio,1.5),
     ratioJours:ratioJours,
     montant:montantTotal,
     montantAttendu:montantAttendu,
@@ -1378,6 +1411,14 @@ function getStatsChauffeur(c, VE, periode){
     pourcentageJours:Math.round(ratioJours*100),
     estHebdo:isH
   };
+
+  // Stocker en cache
+  if(window._perfCache){
+    window._perfCache[cacheKey]=result;
+    window._perfCacheTime[cacheKey]=Date.now();
+  }
+
+  return result;
 }
 
 // Couleur de performance basée sur le pourcentage versé
@@ -1386,6 +1427,28 @@ function getCouleurPerformance(pct){
   if(pct>=85) return {bg:"#10b981",bgSoft:"rgba(16,185,129,.12)",label:"Excellent",emoji:"🟢",texte:"#059669"};
   if(pct>=51) return {bg:"#f59e0b",bgSoft:"rgba(245,158,11,.12)",label:"Moyen",emoji:"🟠",texte:"#d97706"};
   return {bg:"#ef4444",bgSoft:"rgba(239,68,68,.12)",label:"Faible",emoji:"🔴",texte:"#dc2626"};
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PRE-PROCESSING : indexer versements par chauffeur pour O(1)
+   ═══════════════════════════════════════════════════════════════ */
+function getVersementsIndexes(){
+  return perfCache("versIndexed", function(){
+    var idx={};
+    var VE=(S.data.versements||[]);
+    for(var i=0;i<VE.length;i++){
+      var v=VE[i];
+      var cid=String(v.chauffeurId);
+      if(!idx[cid]) idx[cid]=[];
+      idx[cid].push(v);
+    }
+    return idx;
+  }, 3000);
+}
+
+function getVersementsChauffeur(chauffeurId){
+  var idx=getVersementsIndexes();
+  return idx[String(chauffeurId)]||[];
 }
 
 // Notation A/B/C/D basée sur les stats hebdo
@@ -1525,6 +1588,10 @@ function initials(nom){
 function escapeHtml(s){
   if(s==null) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function escapeAttr(s){
+  if(s==null) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 function copyToClip(txt){
   try{
@@ -3265,6 +3332,9 @@ function rejeterPreuve(id){
 }
 
 function showApp(){
+  // Appliquer la personnalisation visuelle dès le démarrage
+  try{ appliquerPersoConfig(); }catch(e){console.warn("Perso config:",e);}
+
   document.getElementById("login").style.display="none";
   var appEl=document.getElementById("app");
   appEl.style.display="block";
@@ -8191,6 +8261,22 @@ function closeModal(){
 // ═══ RENDER ROUTER ═══
 function render(){
   if(!S.user) return;
+
+  // ═══ OPTIMISATION 1: Throttle des renders ═══
+  // Empêcher plus de 1 render toutes les 100ms
+  if(window._renderLock){
+    if(window._renderPending) return;
+    window._renderPending=true;
+    setTimeout(function(){
+      window._renderPending=false;
+      window._renderLock=false;
+      render();
+    },100);
+    return;
+  }
+  window._renderLock=true;
+  setTimeout(function(){window._renderLock=false;},100);
+
   // Si chauffeur, c'est renderChauffeurApp qui gère
   if(estChauffeur()){
     renderChauffeurApp();
@@ -8218,6 +8304,52 @@ function render(){
   else if(tab==="fleet" && typeof renderFleet==="function") renderFleet();
   else if(tab==="fin" && typeof renderFin==="function") renderFin();
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SYSTÈME DE CACHE PERFORMANCE
+   Cache les calculs lourds pour éviter de les refaire
+   ═══════════════════════════════════════════════════════════════ */
+window._perfCache={};
+window._perfCacheTime={};
+
+function perfCache(key, computeFn, ttl){
+  ttl=ttl||5000; // 5s par défaut
+  var now=Date.now();
+  if(window._perfCache[key]!==undefined && (now-window._perfCacheTime[key])<ttl){
+    return window._perfCache[key];
+  }
+  var result=computeFn();
+  window._perfCache[key]=result;
+  window._perfCacheTime[key]=now;
+  return result;
+}
+
+function invalidatePerfCache(prefix){
+  if(!prefix){
+    window._perfCache={};
+    window._perfCacheTime={};
+    return;
+  }
+  Object.keys(window._perfCache).forEach(function(k){
+    if(k.indexOf(prefix)===0){
+      delete window._perfCache[k];
+      delete window._perfCacheTime[k];
+    }
+  });
+}
+
+// Hook : invalider le cache à chaque sauvegarde
+(function(){
+  if(typeof save==="function" && !window._saveCacheHooked){
+    var originalSave=save;
+    window.save=function(){
+      invalidatePerfCache();
+      return originalSave.apply(this,arguments);
+    };
+    window._saveCacheHooked=true;
+  }
+})();
+
 
 /* ═══════════════════════════════════════════════════════════
    SCREEN: ACCUEIL
@@ -8877,6 +9009,343 @@ function _doGenererContrat(chauffeurId,pseudoAdmin){
     }
   });
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PERSONNALISATION VISUELLE - Logo, couleurs, nom de l'app
+   ═══════════════════════════════════════════════════════════════ */
+
+// Thèmes prédéfinis
+var THEMES_PRESETS={
+  "bleu":{
+    nom:"Bleu Marine (défaut)",
+    primary:"#0a1f44",
+    primaryEnd:"#1e3a8a",
+    accent:"#f97316",
+    accentEnd:"#ea580c",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  },
+  "vert":{
+    nom:"Vert Tropical",
+    primary:"#064e3b",
+    primaryEnd:"#047857",
+    accent:"#f59e0b",
+    accentEnd:"#d97706",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  },
+  "violet":{
+    nom:"Violet Premium",
+    primary:"#581c87",
+    primaryEnd:"#7c3aed",
+    accent:"#ec4899",
+    accentEnd:"#db2777",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  },
+  "orange":{
+    nom:"Orange Vibrant",
+    primary:"#9a3412",
+    primaryEnd:"#c2410c",
+    accent:"#fbbf24",
+    accentEnd:"#f59e0b",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  },
+  "noir":{
+    nom:"Noir Élégant",
+    primary:"#1f2937",
+    primaryEnd:"#374151",
+    accent:"#f59e0b",
+    accentEnd:"#d97706",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  },
+  "rouge":{
+    nom:"Rouge Passion",
+    primary:"#7f1d1d",
+    primaryEnd:"#b91c1c",
+    accent:"#fbbf24",
+    accentEnd:"#f59e0b",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  }
+};
+
+function getPersoConfig(){
+  var def={
+    nomApp:"Saloni Manager",
+    slogan:"Gestion de flotte tricycles-taxis",
+    logo:null,        // Base64 du logo uploadé
+    theme:"bleu",     // Nom du thème actif
+    primary:"#0a1f44",
+    primaryEnd:"#1e3a8a",
+    accent:"#f97316",
+    accentEnd:"#ea580c",
+    success:"#10b981",
+    warning:"#f59e0b",
+    danger:"#ef4444"
+  };
+  try{
+    var c=JSON.parse(localStorage.getItem("sal_perso_config")||"{}");
+    return Object.assign(def,c);
+  }catch(e){return def;}
+}
+
+function setPersoConfig(cfg){
+  try{ localStorage.setItem("sal_perso_config",JSON.stringify(cfg)); }catch(e){}
+}
+
+/* ─── Appliquer les couleurs à l'app ─── */
+function appliquerPersoConfig(){
+  var cfg=getPersoConfig();
+  var style=document.getElementById("perso-style");
+  if(!style){
+    style=document.createElement("style");
+    style.id="perso-style";
+    document.head.appendChild(style);
+  }
+  style.textContent=
+    ":root{"+
+    "--perso-primary:"+cfg.primary+";"+
+    "--perso-primary-end:"+cfg.primaryEnd+";"+
+    "--perso-accent:"+cfg.accent+";"+
+    "--perso-accent-end:"+cfg.accentEnd+";"+
+    "}"+
+    /* Topbar */
+    ".topbar{background:linear-gradient(135deg,"+cfg.primary+" 0%,"+cfg.primaryEnd+" 100%) !important}"+
+    /* Login screen */
+    ".login-screen{background:linear-gradient(135deg,"+cfg.primary+" 0%,"+cfg.primaryEnd+" 100%) !important}"+
+    /* Splash */
+    ".splash-screen{background:linear-gradient(135deg,"+cfg.primary+" 0%,"+cfg.primaryEnd+" 100%) !important}"+
+    /* Boutons primary */
+    ".btn-primary{background:linear-gradient(135deg,"+cfg.primary+","+cfg.primaryEnd+") !important}"+
+    /* Bouton +Versement central */
+    ".nav-center{background:linear-gradient(135deg,"+cfg.accent+","+cfg.accentEnd+") !important;box-shadow:0 8px 20px "+cfg.accent+"66 !important}"+
+    /* Sidebar header */
+    ".sidebar-header{background:linear-gradient(135deg,"+cfg.primary+","+cfg.primaryEnd+") !important}"+
+    /* Login button */
+    ".login-btn{background:linear-gradient(135deg,"+cfg.accent+","+cfg.accentEnd+") !important}"+
+    /* Desktop tabs actif */
+    ".desktop-tab.active{background:linear-gradient(135deg,"+cfg.primary+","+cfg.primaryEnd+") !important}"+
+    /* Desktop tab add */
+    ".desktop-tab-add{background:linear-gradient(135deg,"+cfg.accent+","+cfg.accentEnd+") !important}"+
+    /* Hero card */
+    ".hero{background:linear-gradient(135deg,"+cfg.primary+","+cfg.primaryEnd+") !important}";
+
+  // Appliquer le nom de l'app
+  document.title=cfg.nomApp;
+  var titles=document.querySelectorAll('.login-title,.sb-name-app');
+  titles.forEach(function(t){t.textContent=cfg.nomApp;});
+
+  // Appliquer le slogan
+  var slogans=document.querySelectorAll('.login-subtitle,.sb-slogan');
+  slogans.forEach(function(s){s.textContent=cfg.slogan;});
+
+  // Appliquer le logo si disponible
+  if(cfg.logo){
+    var logos=document.querySelectorAll('.login-logo,.sb-logo');
+    logos.forEach(function(l){
+      // Si c'est un emoji (texte), remplacer par img
+      if(l.tagName==="DIV"){
+        l.innerHTML='<img src="'+cfg.logo+'" style="width:100%;height:100%;object-fit:contain"/>';
+      }
+    });
+  }
+}
+
+/* ─── PAGE PERSONNALISATION ─── */
+function renderPersonnalisation(){
+  var cfg=getPersoConfig();
+  var h='<div class="screen-title">🎨 Personnalisation</div>';
+  h+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Personnalise ton app avec ton logo, tes couleurs et ton nom.</div>';
+
+  // ─── APERÇU EN TEMPS RÉEL ───
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">👁️ Aperçu</div>';
+  h+='<div style="background:linear-gradient(135deg,'+cfg.primary+' 0%,'+cfg.primaryEnd+' 100%);border-radius:18px;padding:20px;color:#fff;margin-bottom:14px;text-align:center">';
+  if(cfg.logo){
+    h+='<img src="'+cfg.logo+'" style="width:64px;height:64px;object-fit:contain;margin-bottom:10px;border-radius:14px;background:rgba(255,255,255,.1);padding:6px"/>';
+  } else {
+    h+='<div style="font-size:48px;margin-bottom:10px">🛺</div>';
+  }
+  h+='<div style="font-weight:800;font-size:20px;margin-bottom:4px">'+escapeHtml(cfg.nomApp)+'</div>';
+  h+='<div style="font-size:12px;opacity:.85;margin-bottom:14px">'+escapeHtml(cfg.slogan)+'</div>';
+  h+='<button style="background:linear-gradient(135deg,'+cfg.accent+','+cfg.accentEnd+');color:#fff;border:none;padding:10px 24px;border-radius:12px;font-weight:800;font-size:13px;cursor:pointer">Exemple de bouton</button>';
+  h+='</div>';
+
+  // ─── LOGO ───
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🖼️ Logo de l\'app</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">';
+  if(cfg.logo){
+    h+='<div style="text-align:center;margin-bottom:12px"><img src="'+cfg.logo+'" style="max-width:120px;max-height:120px;object-fit:contain;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);padding:8px"/></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    h+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:12px" onclick="document.getElementById(\'logoUpload\').click()">🔄 Changer</button>';
+    h+='<button class="btn-ghost" style="margin:0;padding:10px;font-size:12px;color:var(--danger)" onclick="supprimerLogo()">🗑 Supprimer</button>';
+    h+='</div>';
+  } else {
+    h+='<div style="text-align:center;padding:20px;color:var(--txt-2);font-size:13px;border:2px dashed var(--border);border-radius:10px;margin-bottom:12px">Aucun logo personnalisé</div>';
+    h+='<button class="btn-primary" style="margin:0" onclick="document.getElementById(\'logoUpload\').click()">📤 Uploader un logo</button>';
+  }
+  h+='<input type="file" id="logoUpload" accept="image/*" style="display:none" onchange="uploaderLogo(this)"/>';
+  h+='<div style="font-size:11px;color:var(--txt-3);margin-top:8px;text-align:center">📏 Recommandé : 512×512 px, fond transparent</div>';
+  h+='</div>';
+
+  // ─── NOM & SLOGAN ───
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">📝 Identité textuelle</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">';
+  h+='<div class="field"><label>Nom de l\'app</label>';
+  h+='<input id="persoNomApp" type="text" value="'+escapeAttr(cfg.nomApp)+'" placeholder="Ex: DIAKITE TRANSPORT" maxlength="40"/></div>';
+  h+='<div class="field"><label>Slogan / Tagline</label>';
+  h+='<input id="persoSlogan" type="text" value="'+escapeAttr(cfg.slogan)+'" placeholder="Ex: Le partenaire de tes saloni" maxlength="60"/></div>';
+  h+='<button class="btn-primary" style="margin:0" onclick="sauverNomSlogan()">💾 Enregistrer</button>';
+  h+='</div>';
+
+  // ─── THÈMES PRÉDÉFINIS ───
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🎨 Thèmes prédéfinis</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">';
+  Object.keys(THEMES_PRESETS).forEach(function(k){
+    var t=THEMES_PRESETS[k];
+    var actif=cfg.theme===k;
+    h+='<button onclick="appliquerTheme(\''+k+'\')" style="background:linear-gradient(135deg,'+t.primary+','+t.primaryEnd+');color:#fff;border:'+(actif?"3px solid "+t.accent:"none")+';border-radius:14px;padding:18px 12px;cursor:pointer;font-family:inherit;position:relative;overflow:hidden">';
+    h+='<div style="font-weight:800;font-size:13px;margin-bottom:6px">'+t.nom+'</div>';
+    h+='<div style="display:flex;gap:4px;justify-content:center">';
+    h+='<div style="width:16px;height:16px;border-radius:50%;background:'+t.primary+';border:2px solid #fff"></div>';
+    h+='<div style="width:16px;height:16px;border-radius:50%;background:'+t.accent+';border:2px solid #fff"></div>';
+    h+='</div>';
+    if(actif) h+='<div style="position:absolute;top:6px;right:6px;background:#fff;color:'+t.primary+';width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800">✓</div>';
+    h+='</button>';
+  });
+  h+='</div>';
+
+  // ─── COULEURS PERSONNALISÉES ───
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🎨 Couleurs personnalisées</div>';
+  h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">';
+  h+='<div style="font-size:11.5px;color:var(--txt-2);margin-bottom:12px">Définis tes propres couleurs</div>';
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+='<div class="field"><label>Couleur principale</label>';
+  h+='<input id="persoPrimary" type="color" value="'+cfg.primary+'" style="width:100%;height:42px;cursor:pointer"/></div>';
+  h+='<div class="field"><label>Principale (fin)</label>';
+  h+='<input id="persoPrimaryEnd" type="color" value="'+cfg.primaryEnd+'" style="width:100%;height:42px;cursor:pointer"/></div>';
+  h+='</div>';
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+='<div class="field"><label>Couleur accent</label>';
+  h+='<input id="persoAccent" type="color" value="'+cfg.accent+'" style="width:100%;height:42px;cursor:pointer"/></div>';
+  h+='<div class="field"><label>Accent (fin)</label>';
+  h+='<input id="persoAccentEnd" type="color" value="'+cfg.accentEnd+'" style="width:100%;height:42px;cursor:pointer"/></div>';
+  h+='</div>';
+
+  h+='<button class="btn-primary" style="margin:0" onclick="sauverCouleursPerso()">💾 Appliquer mes couleurs</button>';
+  h+='</div>';
+
+  // ─── RESET ───
+  h+='<div class="section-title" style="font-size:14px;margin:14px 0 10px">🔄 Réinitialisation</div>';
+  h+='<button class="btn-ghost" style="margin:0;color:var(--danger);border-color:var(--danger)" onclick="resetPersonnalisation()">↩️ Restaurer le thème par défaut</button>';
+
+  return h;
+}
+
+function uploaderLogo(input){
+  var file=input.files[0];
+  if(!file) return;
+  if(file.size>2*1024*1024){
+    toast("⚠️ Logo trop lourd (max 2 MB)","error");
+    return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    // Compresser le logo
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement("canvas");
+      var maxSize=512;
+      var scale=Math.max(img.width,img.height)>maxSize?maxSize/Math.max(img.width,img.height):1;
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+      var compressed=canvas.toDataURL("image/png");
+
+      var cfg=getPersoConfig();
+      cfg.logo=compressed;
+      setPersoConfig(cfg);
+      appliquerPersoConfig();
+      toast("✅ Logo enregistré","success");
+      var content=document.getElementById("content-generic");
+      if(content) content.innerHTML='<div class="content-inner">'+renderPersonnalisation()+'</div>';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function supprimerLogo(){
+  if(!confirm("Supprimer le logo personnalisé ?")) return;
+  var cfg=getPersoConfig();
+  cfg.logo=null;
+  setPersoConfig(cfg);
+  appliquerPersoConfig();
+  toast("Logo supprimé","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderPersonnalisation()+'</div>';
+}
+
+function sauverNomSlogan(){
+  var cfg=getPersoConfig();
+  cfg.nomApp=(document.getElementById("persoNomApp").value||"Saloni Manager").trim();
+  cfg.slogan=(document.getElementById("persoSlogan").value||"").trim();
+  setPersoConfig(cfg);
+  appliquerPersoConfig();
+  toast("✅ Identité enregistrée","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderPersonnalisation()+'</div>';
+}
+
+function appliquerTheme(themeKey){
+  var theme=THEMES_PRESETS[themeKey];
+  if(!theme) return;
+  var cfg=getPersoConfig();
+  cfg.theme=themeKey;
+  cfg.primary=theme.primary;
+  cfg.primaryEnd=theme.primaryEnd;
+  cfg.accent=theme.accent;
+  cfg.accentEnd=theme.accentEnd;
+  setPersoConfig(cfg);
+  appliquerPersoConfig();
+  toast("✅ Thème "+theme.nom+" appliqué","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderPersonnalisation()+'</div>';
+}
+
+function sauverCouleursPerso(){
+  var cfg=getPersoConfig();
+  cfg.theme="custom";
+  cfg.primary=document.getElementById("persoPrimary").value;
+  cfg.primaryEnd=document.getElementById("persoPrimaryEnd").value;
+  cfg.accent=document.getElementById("persoAccent").value;
+  cfg.accentEnd=document.getElementById("persoAccentEnd").value;
+  setPersoConfig(cfg);
+  appliquerPersoConfig();
+  toast("✅ Couleurs personnalisées appliquées","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderPersonnalisation()+'</div>';
+}
+
+function resetPersonnalisation(){
+  if(!confirm("Restaurer le thème par défaut ? (Bleu Marine + Saloni Manager)")) return;
+  try{ localStorage.removeItem("sal_perso_config"); }catch(e){}
+  appliquerPersoConfig();
+  toast("✅ Thème par défaut restauré","success");
+  var content=document.getElementById("content-generic");
+  if(content) content.innerHTML='<div class="content-inner">'+renderPersonnalisation()+'</div>';
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    CONFIG ENTREPRISE - Nom du gérant et de l'entreprise pour le contrat
@@ -9730,6 +10199,7 @@ function renderGeneric(){
   else if(p==="calendrier")html+=renderCalendrier();
   else if(p==="messagesgroupes")html+=renderMessagesGroupes();
   else if(p==="ocrpapiers")html+=renderOCRPapiers();
+  else if(p==="personnalisation")html+=renderPersonnalisation();
   else if(p==="gps")html+=renderGPS();
   else if(p==="gpsChauffeur")html+=renderGPSChauffeur(S.gpsChauffeurId);
   else if(p==="waveconfig")html+=renderWaveConfig();
@@ -14368,6 +14838,9 @@ function renderApropos(){
    INIT — Vérifier session sauvegardée
    ═══════════════════════════════════════════════════════════ */
 (function init(){
+  // Appliquer la personnalisation visuelle dès le tout début
+  try{ appliquerPersoConfig(); }catch(e){}
+
   // Démarrer service worker pour PWA et push
   try{ registerSW(); }catch(e){}
 
@@ -14399,15 +14872,15 @@ function renderApropos(){
     if(splash) splash.style.display="none";
     if(loginEl){
       loginEl.style.opacity="1";
-      loginEl.style.transition="opacity .6s ease-out";
+      loginEl.style.transition="opacity .4s ease-out";
     }
     // Si auto-login, afficher l'app
     if(S.user){
       showApp();
-      setTimeout(initFirebase,300);
-      setTimeout(showPendingNotifs,1500);
+      setTimeout(initFirebase,100);
+      setTimeout(showPendingNotifs,1000);
     }
-  },3400);
+  },2000);  // Réduit de 3400ms à 2000ms
 })();
 
 </script>
