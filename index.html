@@ -1430,6 +1430,404 @@ function getCouleurPerformance(pct){
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   MODULE CONTRAT D'ACQUISITION (Location-vente sur 16 mois)
+   Le chauffeur devient propriétaire du saloni à la fin du contrat
+   s'il respecte les conditions. Données stockées dans c.acquisition.
+   ═══════════════════════════════════════════════════════════════ */
+function acqParseDate(iso){
+  if(!iso) return null;
+  var p=String(iso).split("T")[0].split("-");
+  if(p.length<3) return null;
+  var dt=new Date(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10));
+  return isNaN(dt.getTime())?null:dt;
+}
+function acqAddMonths(dt,n){
+  var d=new Date(dt.getTime());
+  var jour=d.getDate();
+  d.setMonth(d.getMonth()+n);
+  if(d.getDate()<jour) d.setDate(0);
+  return d;
+}
+function acqDefaut(){
+  return {actif:false,dateDebut:"",dureeMois:16,dateFin:"",valeurSaloni:0,
+    toleranceRetards:20,seuilDiscipline:90,jourRepos:0,statut:"en_cours",
+    signalements:[],retardsManuel:null,notes:"",dateAttribution:""};
+}
+function getAcq(c){ return (c && c.acquisition && c.acquisition.actif)?c.acquisition:null; }
+
+// Calcule l'état complet du contrat d'acquisition d'un chauffeur
+function calcAcquisition(c){
+  var a=getAcq(c);
+  if(!a) return null;
+  var deb=acqParseDate(a.dateDebut);
+  if(!deb) return null;
+  var duree=a.dureeMois||16;
+  var fin=acqAddMonths(deb,duree);
+  var now=new Date(); now.setHours(0,0,0,0);
+  var finie=now.getTime()>=fin.getTime();
+  var ref=finie?fin:now;
+
+  // ─ Progression temps ─
+  var msJour=86400000;
+  var joursTotal=Math.max(1,Math.round((fin-deb)/msJour));
+  var joursEcoules=Math.max(0,Math.min(joursTotal,Math.round((ref-deb)/msJour)));
+  var pctTemps=Math.min(100,Math.round(joursEcoules/joursTotal*100));
+  var moisEcoules=Math.floor(joursEcoules/30.4);
+  var moisRestants=Math.max(0,duree-moisEcoules);
+
+  // ─ Versements pendant la période du contrat ─
+  var VE=S.data.versements||[];
+  var idStr=String(c.id);
+  var debISO=fmtISO(deb), refISO=fmtISO(ref);
+  var montantVerse=0, joursAvecVers={};
+  for(var i=0;i<VE.length;i++){
+    var v=VE[i];
+    if(String(v.chauffeurId)!==idStr) continue;
+    var dISO=normDate(v.date);
+    if(dISO>=debISO && dISO<=refISO){ montantVerse+=(v.montant||0); joursAvecVers[dISO]=true; }
+  }
+  var valeur=a.valeurSaloni||0;
+  var pctMontant=valeur>0?Math.min(100,Math.round(montantVerse/valeur*100)):pctTemps;
+  var resteAPayer=Math.max(0,valeur-montantVerse);
+
+  // ─ Signalements (justifications horodatées) ─
+  var sig=a.signalements||[];
+  var joursJustifies={};
+  for(var s=0;s<sig.length;s++){ if(sig[s].date) joursJustifies[normDate(sig[s].date)]=true; }
+
+  // ─ Retards non justifiés (jours ouvrés sans versement ni signalement) ─
+  var retardsAuto=0;
+  var isH=c.freqPaiement==="Hebdomadaire";
+  if(!isH){
+    var cur=new Date(deb.getTime());
+    while(cur.getTime()<=ref.getTime()){
+      var jr=cur.getDay(); // 0=dim
+      if(jr!==(a.jourRepos!==undefined?a.jourRepos:0)){
+        var iso=fmtISO(cur);
+        if(!joursAvecVers[iso] && !joursJustifies[iso]) retardsAuto++;
+      }
+      cur.setDate(cur.getDate()+1);
+    }
+  }
+  var retards=(a.retardsManuel!==null && a.retardsManuel!==undefined)?a.retardsManuel:retardsAuto;
+  var tol=a.toleranceRetards||20;
+
+  // ─ Discipline de versement (montant versé / attendu sur la période) ─
+  var objJ=getObjJ(c);
+  var joursOuvres=joursEcoules;
+  if(!isH && (a.jourRepos!==undefined)) joursOuvres=Math.round(joursEcoules*6/7);
+  var attendu=isH?((c.objectifSemaine||objJ*5)*Math.max(1,Math.floor(joursEcoules/7))):(objJ*joursOuvres);
+  var discipline=attendu>0?Math.min(150,Math.round(montantVerse/attendu*100)):100;
+  var seuil=a.seuilDiscipline||90;
+
+  // ─ Entretiens pendant le contrat ─
+  var ENT=S.data.entretiens||[];
+  var nbEntretiens=0;
+  for(var e=0;e<ENT.length;e++){
+    if(String(ENT[e].chauffeurId)===idStr || String(ENT[e].saloniId)===String(c.saloniId||c.saloni)){
+      var deISO=normDate(ENT[e].date);
+      if(deISO>=debISO && deISO<=refISO) nbEntretiens++;
+    }
+  }
+  var entAttendus=Math.floor(moisEcoules/3); // 1 entretien / trimestre
+
+  // ─ Sanctions actives ─
+  var SA=S.data.sanctions||[];
+  var sancActives=0, sancGrave=false;
+  for(var k=0;k<SA.length;k++){
+    if(String(SA[k].chauffeurId)!==idStr) continue;
+    if(SA[k].statut==="active"||SA[k].active===true){
+      sancActives++;
+      if((SA[k].niveau||0)>=3) sancGrave=true;
+    }
+  }
+
+  // ─ Documents à jour ─
+  var docsExpires=[];
+  var todayISO=fmtISO(now);
+  [["permisExp","Permis"],["vignetteExp","Vignette"],["cgFin","Carte grise"]].forEach(function(d){
+    if(c[d[0]] && normDate(c[d[0]])<todayISO) docsExpires.push(d[1]);
+  });
+
+  // ─ Fidélité ─
+  var fideliteOk=(c.statut!=="suspendu" && c.statut!=="fui" && c.statut!=="parti");
+
+  function etat(ok,warn){ return ok?"ok":(warn?"warn":"bad"); }
+  var conditions=[
+    {ic:"💵",titre:"Discipline de versement",
+     etat:etat(discipline>=seuil, discipline>=seuil-15),
+     detail:discipline+"% versé (objectif ≥ "+seuil+"%)"},
+    {ic:"📢",titre:"Signalement des problèmes",
+     etat:"ok",
+     detail:sig.length+" panne(s)/absence(s) signalée(s) à temps"},
+    {ic:"⏰",titre:"Retards non justifiés",
+     etat:etat(retards<=tol, retards<=tol+Math.ceil(tol*0.3)),
+     detail:retards+" / "+tol+" toléré(s)"},
+    {ic:"🔧",titre:"Entretien du véhicule",
+     etat:etat(nbEntretiens>=entAttendus||moisEcoules<3, true),
+     detail:nbEntretiens+" entretien(s)"+(entAttendus>0?" / "+entAttendus+" attendu(s)":"")},
+    {ic:"⚖️",titre:"Aucune sanction grave",
+     etat:etat(!sancGrave, sancActives===0),
+     detail:sancActives===0?"Aucune sanction active":sancActives+" sanction(s) active(s)"},
+    {ic:"📄",titre:"Documents à jour",
+     etat:etat(docsExpires.length===0, docsExpires.length<=1),
+     detail:docsExpires.length===0?"Tous les papiers à jour":"Expiré : "+docsExpires.join(", ")},
+    {ic:"💰",titre:"Montant cible atteint",
+     etat:etat(montantVerse>=valeur||valeur===0, pctMontant>=pctTemps-15),
+     detail:valeur>0?(fc(montantVerse)+" / "+fc(valeur)):"Pas de montant cible"},
+    {ic:"🤝",titre:"Fidélité & présence",
+     etat:fideliteOk?"ok":"bad",
+     detail:fideliteOk?"Poste respecté":"Statut : "+(c.statut||"—")}
+  ];
+
+  // ─ Statut global ─
+  var disqualifiant=(retards>tol)||sancGrave||(!fideliteOk);
+  var nbBad=0, nbWarn=0;
+  conditions.forEach(function(co){ if(co.etat==="bad")nbBad++; else if(co.etat==="warn")nbWarn++; });
+  var statut;
+  if(a.statut==="acquis") statut="acquis";
+  else if(disqualifiant) statut="disqualifie";
+  else if(finie && (montantVerse>=valeur||valeur===0) && nbBad===0) statut="eligible";
+  else if(retards>Math.floor(tol*0.7) || nbBad>0) statut="a_risque";
+  else statut="en_cours";
+
+  return {actif:true,deb:deb,fin:fin,finie:finie,duree:duree,
+    joursTotal:joursTotal,joursEcoules:joursEcoules,pctTemps:pctTemps,
+    moisEcoules:moisEcoules,moisRestants:moisRestants,
+    montantVerse:montantVerse,valeur:valeur,pctMontant:pctMontant,resteAPayer:resteAPayer,
+    retards:retards,retardsAuto:retardsAuto,tolerance:tol,discipline:discipline,seuil:seuil,
+    signalements:sig,nbEntretiens:nbEntretiens,sancActives:sancActives,sancGrave:sancGrave,
+    docsExpires:docsExpires,conditions:conditions,statut:statut,
+    dateFinISO:fmtISO(fin),dateDebISO:fmtISO(deb)};
+}
+
+function acqStatutMeta(statut){
+  var M={
+    en_cours:{label:"En cours",emoji:"🟦",color:"#1e3a8a",bg:"rgba(30,58,138,.12)"},
+    a_risque:{label:"À risque",emoji:"🟠",color:"#d97706",bg:"rgba(245,158,11,.14)"},
+    eligible:{label:"Éligible 🎉",emoji:"🟢",color:"#059669",bg:"rgba(16,185,129,.14)"},
+    disqualifie:{label:"Disqualifié",emoji:"🔴",color:"#dc2626",bg:"rgba(239,68,68,.14)"},
+    acquis:{label:"Saloni acquis 🏆",emoji:"🏆",color:"#7c3aed",bg:"rgba(124,58,237,.14)"}
+  };
+  return M[statut]||M.en_cours;
+}
+function acqEtatColor(etat){
+  if(etat==="ok") return {c:"#059669",bg:"rgba(16,185,129,.12)",ic:"✓"};
+  if(etat==="warn") return {c:"#d97706",bg:"rgba(245,158,11,.14)",ic:"!"};
+  return {c:"#dc2626",bg:"rgba(239,68,68,.12)",ic:"✗"};
+}
+
+/* ─── ADMIN : activer / configurer le contrat d'acquisition ─── */
+function ouvrirContratAcquisition(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){toast("Chauffeur introuvable","error");return;}
+  var a=c.acquisition||acqDefaut();
+  var deb=a.dateDebut||td();
+  var b='';
+  b+='<div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:14px;padding:14px;margin-bottom:14px">';
+  b+='<div style="font-weight:800;font-size:15px">🎯 Contrat d\'acquisition</div>';
+  b+='<div style="font-size:12px;opacity:.85;margin-top:4px">'+(c.nom||"")+' deviendra propriétaire du saloni au terme du contrat s\'il respecte les conditions.</div>';
+  b+='</div>';
+  b+='<div class="field"><label>Date de début</label><input id="acqDeb" type="date" value="'+deb+'" /></div>';
+  b+='<div class="field"><label>Durée (mois)</label><input id="acqDuree" type="number" value="'+(a.dureeMois||16)+'" /><div style="font-size:11px;color:var(--txt-3);margin-top:4px">16 mois = 1 an et 4 mois</div></div>';
+  b+='<div class="field"><label>Valeur du saloni à atteindre (FCFA)</label><input id="acqValeur" type="number" inputmode="numeric" value="'+(a.valeurSaloni||"")+'" placeholder="ex: 1 500 000" /></div>';
+  b+='<div class="field"><label>Tolérance — retards NON justifiés max</label><input id="acqTol" type="number" value="'+(a.toleranceRetards||20)+'" /><div style="font-size:11px;color:var(--txt-3);margin-top:4px">Au-delà, le chauffeur est disqualifié du contrat.</div></div>';
+  b+='<div class="field"><label>Seuil de discipline minimum (%)</label><input id="acqSeuil" type="number" value="'+(a.seuilDiscipline||90)+'" /></div>';
+  b+='<div class="field"><label>Jour de repos hebdomadaire</label><select id="acqRepos">';
+  var jours=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+  var jr=(a.jourRepos!==undefined)?a.jourRepos:0;
+  jours.forEach(function(j,idx){ b+='<option value="'+idx+'"'+(idx===jr?" selected":"")+'>'+j+'</option>'; });
+  b+='</select><div style="font-size:11px;color:var(--txt-3);margin-top:4px">Les jours de repos ne comptent pas comme retard.</div></div>';
+
+  // Ajustement manuel des retards si déjà actif
+  if(a.actif){
+    var calc=calcAcquisition(c);
+    b+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px;margin:6px 0 14px">';
+    b+='<div style="font-size:12px;font-weight:700;margin-bottom:6px">Retards non justifiés (auto : '+(calc?calc.retardsAuto:0)+')</div>';
+    b+='<input id="acqRetMan" type="number" value="'+((a.retardsManuel!==null&&a.retardsManuel!==undefined)?a.retardsManuel:"")+'" placeholder="Laisser vide = automatique" style="width:100%" />';
+    b+='<div style="font-size:11px;color:var(--txt-3);margin-top:4px">Renseigne un nombre pour forcer la valeur, sinon calcul automatique.</div></div>';
+  }
+
+  b+='<button class="btn-primary" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)" onclick="saveContratAcquisition('+c.id+')">💾 '+(a.actif?"Mettre à jour le contrat":"Activer le contrat")+'</button>';
+  if(a.actif){
+    b+='<button class="btn-ghost" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="desactiverAcquisition('+c.id+')">⛔ Désactiver le contrat</button>';
+  }
+  openModal("🎯 Contrat d'acquisition",b);
+}
+
+function saveContratAcquisition(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){toast("Chauffeur introuvable","error");return;}
+  var a=c.acquisition||acqDefaut();
+  a.actif=true;
+  a.dateDebut=document.getElementById("acqDeb").value||td();
+  a.dureeMois=parseInt(document.getElementById("acqDuree").value,10)||16;
+  a.valeurSaloni=parseInt(document.getElementById("acqValeur").value,10)||0;
+  a.toleranceRetards=parseInt(document.getElementById("acqTol").value,10)||20;
+  a.seuilDiscipline=parseInt(document.getElementById("acqSeuil").value,10)||90;
+  a.jourRepos=parseInt(document.getElementById("acqRepos").value,10)||0;
+  if(!a.signalements) a.signalements=[];
+  var rm=document.getElementById("acqRetMan");
+  if(rm){ a.retardsManuel=(rm.value===""?null:parseInt(rm.value,10)); }
+  var deb=acqParseDate(a.dateDebut);
+  if(deb) a.dateFin=fmtISO(acqAddMonths(deb,a.dureeMois));
+  if(a.statut==="acquis"){} else a.statut="en_cours";
+  c.acquisition=a;
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  if(typeof addIAJournal==="function") addIAJournal("contrat","Contrat d'acquisition activé",c.nom+" — "+fc(a.valeurSaloni));
+  closeModal();
+  toast("✅ Contrat d'acquisition enregistré","success");
+  if(typeof render==="function") render();
+}
+
+function desactiverAcquisition(chauffeurId){
+  if(!confirm("Désactiver le contrat d'acquisition de ce chauffeur ?\n\nL'historique est conservé mais le contrat ne sera plus suivi.")) return;
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c||!c.acquisition) return;
+  c.acquisition.actif=false;
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  closeModal();
+  toast("Contrat désactivé","success");
+  if(typeof render==="function") render();
+}
+
+function attribuerSaloni(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c||!c.acquisition){toast("Contrat introuvable","error");return;}
+  var calc=calcAcquisition(c);
+  var msg="🏆 Attribuer définitivement le saloni à "+(c.nom||"ce chauffeur")+" ?\n\n";
+  if(calc && calc.statut!=="eligible"){
+    msg+="⚠️ ATTENTION : le contrat n'est pas encore au statut « Éligible » ("+acqStatutMeta(calc?calc.statut:"en_cours").label+").\n\n";
+  }
+  msg+="Le chauffeur deviendra propriétaire et un acte de propriété PDF sera généré.";
+  if(!confirm(msg)) return;
+  c.acquisition.statut="acquis";
+  c.acquisition.dateAttribution=td();
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  if(typeof addIAJournal==="function") addIAJournal("contrat","🏆 Saloni attribué",c.nom);
+  if(typeof notify==="function") notify("🏆 Saloni attribué",c.nom+" est désormais propriétaire de son saloni.","contrat");
+  closeModal();
+  toast("🏆 Saloni attribué à "+(c.nom||""),"success");
+  setTimeout(function(){ genererActePropriete(chauffeurId); },400);
+  if(typeof render==="function") render();
+}
+
+/* ─── Carte du contrat dans la fiche chauffeur (admin) ─── */
+function acqCarteAdmin(c){
+  var a=c.acquisition;
+  var b='';
+  if(!a || !a.actif){
+    b+='<div style="background:linear-gradient(135deg,rgba(124,58,237,.1),rgba(91,33,182,.05));border:1px solid rgba(124,58,237,.3);border-radius:12px;padding:14px;margin-top:14px">';
+    b+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="font-size:24px">🎯</div>';
+    b+='<div><div style="font-weight:800;font-size:13px">Contrat d\'acquisition</div>';
+    b+='<div style="font-size:11px;color:var(--txt-2)">Location-vente : le chauffeur devient propriétaire du saloni en fin de contrat</div></div></div>';
+    b+='<button class="btn-primary" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)" onclick="ouvrirContratAcquisition('+c.id+')">🎯 Activer le contrat d\'acquisition</button>';
+    b+='</div>';
+    return b;
+  }
+  var calc=calcAcquisition(c);
+  if(!calc) return b;
+  var sm=acqStatutMeta(calc.statut);
+  b+='<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid '+sm.color+';border-radius:12px;padding:14px;margin-top:14px">';
+  b+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+  b+='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">🎯</span><span style="font-weight:800;font-size:13px">Contrat d\'acquisition</span></div>';
+  b+='<span style="background:'+sm.bg+';color:'+sm.color+';font-weight:800;font-size:11px;padding:4px 10px;border-radius:20px">'+sm.label+'</span></div>';
+
+  // Compteur restant
+  b+='<div style="text-align:center;padding:8px 0 10px"><div style="font-size:26px;font-weight:800;color:'+sm.color+'">'+calc.moisRestants+' mois</div><div style="font-size:11px;color:var(--txt-3)">restants sur '+calc.duree+' · fin le '+formatDateFR(calc.dateFinISO)+'</div></div>';
+
+  // Double barre de progression
+  function barre(label,pct,col){
+    var x='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--txt-2)">'+label+'</span><span style="font-weight:700;color:'+col+'">'+pct+'%</span></div>';
+    x+='<div style="height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:4px"></div></div></div>';
+    return x;
+  }
+  b+=barre("⏳ Temps écoulé",calc.pctTemps,"#1e3a8a");
+  b+=barre("💰 Payé ("+fc(calc.montantVerse)+(calc.valeur>0?" / "+fc(calc.valeur):"")+")",calc.pctMontant,"#059669");
+
+  // Mini checklist
+  b+='<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  calc.conditions.forEach(function(co){
+    var ec=acqEtatColor(co.etat);
+    b+='<div style="display:flex;align-items:center;gap:6px;background:'+ec.bg+';border-radius:8px;padding:6px 8px">';
+    b+='<span style="width:16px;height:16px;border-radius:50%;background:'+ec.c+';color:#fff;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">'+ec.ic+'</span>';
+    b+='<span style="font-size:10px;font-weight:600;line-height:1.2">'+co.titre+'</span></div>';
+  });
+  b+='</div>';
+
+  // Retards + signalements
+  b+='<div style="display:flex;gap:8px;margin-top:10px">';
+  b+='<div style="flex:1;text-align:center;background:var(--surface-2);border-radius:8px;padding:8px"><div style="font-size:16px;font-weight:800;color:'+(calc.retards>calc.tolerance?"#dc2626":"var(--txt)")+'">'+calc.retards+'/'+calc.tolerance+'</div><div style="font-size:10px;color:var(--txt-3)">Retards non justifiés</div></div>';
+  b+='<div style="flex:1;text-align:center;background:var(--surface-2);border-radius:8px;padding:8px"><div style="font-size:16px;font-weight:800">'+(calc.signalements.length)+'</div><div style="font-size:10px;color:var(--txt-3)">Signalements reçus</div></div>';
+  b+='</div>';
+
+  // Derniers signalements
+  if(calc.signalements.length>0){
+    b+='<div style="margin-top:10px;font-size:11px;font-weight:700;color:var(--txt-2)">📢 Derniers signalements</div>';
+    calc.signalements.slice(-3).reverse().forEach(function(s){
+      b+='<div style="font-size:11px;background:var(--surface-2);border-radius:8px;padding:7px 9px;margin-top:5px"><span style="font-weight:600">'+(s.type||"")+'</span> <span style="color:var(--txt-3)">· '+formatDateFR(s.date)+'</span>'+(s.message?'<div style="color:var(--txt-2);margin-top:2px">'+s.message+'</div>':'')+'</div>';
+    });
+  }
+
+  // Actions
+  b+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">';
+  if(calc.statut==="eligible"){
+    b+='<button class="btn-primary" style="background:linear-gradient(135deg,#059669,#047857)" onclick="attribuerSaloni('+c.id+')">🏆 Attribuer le saloni au chauffeur</button>';
+  }
+  if(calc.statut==="acquis"){
+    b+='<button class="btn-primary" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)" onclick="genererActePropriete('+c.id+')">📜 Acte de propriété (PDF)</button>';
+  }
+  b+='<button class="btn-ghost" onclick="ouvrirContratAcquisition('+c.id+')">⚙️ Modifier le contrat</button>';
+  b+='</div>';
+
+  b+='</div>';
+  return b;
+}
+
+/* ─── CHAUFFEUR : signaler une panne / maladie / absence ─── */
+function ouvrirSignalement(){
+  var c=getChauffeurDuCompte();
+  if(!c){toast("Compte non lié","error");return;}
+  var b='';
+  b+='<div style="font-size:13px;color:var(--txt-2);margin-bottom:12px">Préviens immédiatement le gérant. Un problème signalé à temps ne compte pas contre toi dans ton contrat. 💪</div>';
+  b+='<div class="field"><label>Type de problème</label><select id="sigType">';
+  ["🔧 Panne du saloni","🤒 Maladie","🚫 Absence justifiée","🛠 Réparation en cours","⚠️ Autre"].forEach(function(t){ b+='<option>'+t+'</option>'; });
+  b+='</select></div>';
+  b+='<div class="field"><label>Explique en quelques mots</label><textarea id="sigMsg" rows="3" placeholder="Ex : crevaison ce matin, je répare et je reprends demain"></textarea></div>';
+  b+='<button class="btn-primary" onclick="envoyerSignalement()">📢 Envoyer au gérant</button>';
+  openModal("⚠️ Signaler un problème",b);
+}
+function envoyerSignalement(){
+  var c=getChauffeurDuCompte();
+  if(!c) return;
+  var type=document.getElementById("sigType").value;
+  var msg=(document.getElementById("sigMsg").value||"").trim();
+  if(!c.acquisition) c.acquisition=acqDefaut();
+  if(!c.acquisition.signalements) c.acquisition.signalements=[];
+  var item={id:Date.now(),date:td(),heure:hr(),type:type,message:msg,statut:"recu"};
+  c.acquisition.signalements.push(item);
+  save();
+  try{ fbSave("chauffeurs",c); }catch(e){}
+  // Notifier le gérant + trace journal
+  if(typeof notify==="function") notify("⚠️ Signalement de "+(c.nom||"chauffeur"),type+(msg?" — "+msg:""),"signalement");
+  if(typeof addIAJournal==="function") addIAJournal("signalement","Signalement chauffeur",(c.nom||"")+" — "+type);
+  // Envoyer aussi un message dans le chat avec le gérant
+  try{
+    if(!S.data.chats) S.data.chats=[];
+    var chat={id:Date.now()+1,convId:"conv_"+c.id,de:"chauffeur",auteur:S.user.pseudo,
+      texte:"⚠️ SIGNALEMENT — "+type+(msg?" : "+msg:""),date:td(),heure:hr(),ts:Date.now(),lu:false,vue:false};
+    S.data.chats.push(chat);
+    fbSave("chats",chat);
+  }catch(e){}
+  closeModal();
+  toast("✅ Signalement envoyé au gérant","success");
+  if(typeof renderChauffeurApp==="function") renderChauffeurApp();
+}
+
+/* ═══════════════════════════════════════════════════════════════
    PRE-PROCESSING : indexer versements par chauffeur pour O(1)
    ═══════════════════════════════════════════════════════════════ */
 function getVersementsIndexes(){
@@ -3444,8 +3842,9 @@ function renderChauffeurApp(){
   var html='<div class="content-inner">';
 
   // Tabs chauffeur (6 onglets maintenant)
-  html+='<div class="ch-tabs" style="grid-template-columns:repeat(7,1fr)">';
+  html+='<div class="ch-tabs" style="grid-template-columns:repeat(8,1fr)">';
   html+='<button class="ch-tab '+(S.chTab==="home"?"active":"")+'" onclick="goChTab(\'home\')">🏠</button>';
+  html+='<button class="ch-tab '+(S.chTab==="contrat"?"active":"")+'" onclick="goChTab(\'contrat\')">🎯</button>';
   html+='<button class="ch-tab '+(S.chTab==="vers"?"active":"")+'" onclick="goChTab(\'vers\')">💵</button>';
   html+='<button class="ch-tab '+(S.chTab==="chat"?"active":"")+'" onclick="goChTab(\'chat\')">💬</button>';
   html+='<button class="ch-tab '+(S.chTab==="entretien"?"active":"")+'" onclick="goChTab(\'entretien\')">🔧</button>';
@@ -3456,6 +3855,7 @@ function renderChauffeurApp(){
 
   // Contenu de l'onglet
   if(S.chTab==="home") html+=renderChAccueil(c);
+  else if(S.chTab==="contrat") html+=renderChContrat(c);
   else if(S.chTab==="vers") html+=renderChVersements(c);
   else if(S.chTab==="chat") html+=renderChChat(c);
   else if(S.chTab==="entretien") html+=renderChEntretien(c);
@@ -3512,6 +3912,26 @@ function renderChAccueil(c){
   html+='<div class="driver-bar" style="height:10px"><div class="driver-bar-fill '+(pctJ>=80?"":(pctJ>=50?"warn":"danger"))+'" style="width:'+pctJ+'%"></div></div>';
   if(pctJ<100) html+='<div style="font-size:11px;color:var(--txt-3);margin-top:8px">Plus que '+fc(objJ-totalJ)+' à verser</div>';
   html+='</div>';
+
+  // ─── CARTE CONTRAT D'ACQUISITION ───
+  if(c.acquisition && c.acquisition.actif){
+    var calcA=calcAcquisition(c);
+    if(calcA){
+      var smA=acqStatutMeta(calcA.statut);
+      html+='<div onclick="goChTab(\'contrat\')" style="cursor:pointer;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 8px 20px rgba(124,58,237,.25)">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+      html+='<div style="font-weight:800;font-size:14px">🎯 Mon saloni</div>';
+      html+='<span style="background:rgba(255,255,255,.2);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">'+smA.emoji+' '+smA.label+'</span></div>';
+      if(calcA.statut==="acquis"){
+        html+='<div style="font-size:15px;font-weight:800">🏆 Il est à toi, félicitations !</div>';
+      } else {
+        html+='<div style="font-size:13px;opacity:.9;margin-bottom:8px">Plus que <b>'+calcA.moisRestants+' mois</b> pour devenir propriétaire 🛺</div>';
+        html+='<div style="height:8px;background:rgba(255,255,255,.2);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+calcA.pctTemps+'%;background:#fff;border-radius:5px"></div></div>';
+        html+='<div style="font-size:11px;opacity:.85;margin-top:6px;text-align:right">Touche pour voir le détail →</div>';
+      }
+      html+='</div>';
+    }
+  }
 
   // KPI
   html+='<div class="kpi-grid">';
@@ -5421,6 +5841,91 @@ function chAccepterReglement(){
   try{ fbSave("chats",msg); }catch(e){}
 
   renderChauffeurApp();
+}
+
+function renderChContrat(c){
+  var html='<div class="screen-title">🎯 Mon contrat d\'acquisition</div>';
+  var a=c.acquisition;
+  if(!a || !a.actif){
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px 20px;text-align:center;margin-top:10px">';
+    html+='<div style="font-size:46px;margin-bottom:10px">🛺</div>';
+    html+='<div style="font-weight:800;font-size:16px;margin-bottom:6px">Pas encore de contrat d\'acquisition</div>';
+    html+='<div style="font-size:13px;color:var(--txt-2);line-height:1.5">Le gérant peut t\'ouvrir un contrat de location-vente : en travaillant sérieusement pendant 16 mois, le saloni devient <b>ta propriété</b>. Parles-en avec lui !</div>';
+    html+='</div>';
+    return html;
+  }
+  var calc=calcAcquisition(c);
+  if(!calc){ html+='<div class="empty">Contrat en cours de configuration.</div>'; return html; }
+  var sm=acqStatutMeta(calc.statut);
+
+  // ─ Hero compte à rebours ─
+  var heroBg=calc.statut==="acquis"?"linear-gradient(135deg,#7c3aed,#5b21b6)":
+             calc.statut==="eligible"?"linear-gradient(135deg,#059669,#047857)":
+             calc.statut==="disqualifie"?"linear-gradient(135deg,#dc2626,#991b1b)":
+             "linear-gradient(135deg,#0a1f44,#1e3a8a)";
+  html+='<div style="background:'+heroBg+';color:#fff;border-radius:20px;padding:22px;text-align:center;margin-bottom:14px">';
+  if(calc.statut==="acquis"){
+    html+='<div style="font-size:44px;margin-bottom:6px">🏆</div>';
+    html+='<div style="font-weight:800;font-size:20px">Le saloni est à toi !</div>';
+    html+='<div style="font-size:13px;opacity:.85;margin-top:6px">Félicitations, tu es désormais propriétaire 🎉</div>';
+  } else if(calc.statut==="disqualifie"){
+    html+='<div style="font-size:40px;margin-bottom:6px">⚠️</div>';
+    html+='<div style="font-weight:800;font-size:18px">Contrat à régulariser</div>';
+    html+='<div style="font-size:13px;opacity:.9;margin-top:6px">Contacte vite le gérant pour faire le point.</div>';
+  } else {
+    html+='<div style="font-size:13px;opacity:.85;text-transform:uppercase;letter-spacing:1px">Plus que</div>';
+    html+='<div style="font-size:42px;font-weight:800;line-height:1.1;margin:2px 0">'+calc.moisRestants+'<span style="font-size:18px;opacity:.85"> mois</span></div>';
+    html+='<div style="font-size:13px;opacity:.9">avant que le saloni soit à toi 🛺</div>';
+  }
+  html+='<div style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700">'+sm.emoji+' '+sm.label+'</div>';
+  html+='</div>';
+
+  // ─ Bouton signaler (toujours visible, central dans la stratégie) ─
+  html+='<button class="btn-primary" style="background:linear-gradient(135deg,#f97316,#ea580c);margin-bottom:14px" onclick="ouvrirSignalement()">⚠️ Signaler un problème (panne, maladie...)</button>';
+  html+='<div style="font-size:11px;color:var(--txt-3);text-align:center;margin:-8px 0 14px;line-height:1.4">💡 Préviens toujours en cas de souci : un problème signalé à temps ne compte pas contre toi.</div>';
+
+  // ─ Progressions ─
+  function barre(label,pct,col){
+    var x='<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--txt-2);font-weight:600">'+label+'</span><span style="font-weight:800;color:'+col+'">'+pct+'%</span></div>';
+    x+='<div style="height:10px;background:var(--surface-2);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:6px;transition:width .5s"></div></div></div>';
+    return x;
+  }
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px">';
+  html+='<div style="font-weight:800;font-size:14px;margin-bottom:12px">Ma progression</div>';
+  html+=barre("⏳ Temps : "+calc.moisEcoules+" mois sur "+calc.duree,calc.pctTemps,"#1e3a8a");
+  html+=barre("💰 Payé : "+fc(calc.montantVerse)+(calc.valeur>0?" / "+fc(calc.valeur):""),calc.pctMontant,"#059669");
+  if(calc.valeur>0 && calc.resteAPayer>0){
+    html+='<div style="font-size:12px;color:var(--txt-2);text-align:center;margin-top:2px">Reste à verser : <b>'+fc(calc.resteAPayer)+'</b></div>';
+  }
+  html+='</div>';
+
+  // ─ Checklist des conditions ─
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px">';
+  html+='<div style="font-weight:800;font-size:14px;margin-bottom:4px">Mes conditions à respecter</div>';
+  html+='<div style="font-size:11px;color:var(--txt-3);margin-bottom:12px">Garde tout au vert pour obtenir ton saloni 💪</div>';
+  calc.conditions.forEach(function(co){
+    var ec=acqEtatColor(co.etat);
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">';
+    html+='<span style="font-size:18px">'+co.ic+'</span>';
+    html+='<div style="flex:1"><div style="font-size:13px;font-weight:700">'+co.titre+'</div><div style="font-size:11px;color:var(--txt-3)">'+co.detail+'</div></div>';
+    html+='<span style="width:22px;height:22px;border-radius:50%;background:'+ec.c+';color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">'+ec.ic+'</span>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // ─ Mes signalements ─
+  if(calc.signalements.length>0){
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px">';
+    html+='<div style="font-weight:800;font-size:14px;margin-bottom:10px">📢 Mes signalements</div>';
+    calc.signalements.slice(-5).reverse().forEach(function(s){
+      html+='<div style="background:var(--surface-2);border-radius:10px;padding:9px 11px;margin-bottom:6px">';
+      html+='<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700">'+(s.type||"")+'</span><span style="font-size:10px;color:var(--txt-3)">'+formatDateFR(s.date)+'</span></div>';
+      if(s.message) html+='<div style="font-size:11px;color:var(--txt-2);margin-top:3px">'+s.message+'</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  return html;
 }
 
 function renderChProfil(c){
@@ -8726,6 +9231,9 @@ function openChauffeurModal(existing){
     });
     body+='</div>';
 
+    // ─── CONTRAT D'ACQUISITION (location-vente) ───
+    body+=acqCarteAdmin(c);
+
     // ─── GÉNÉRATION CONTRAT ───
     body+='<div style="background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(5,150,105,.05));border:1px solid rgba(16,185,129,.3);border-radius:12px;padding:14px;margin-top:14px">';
     body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
@@ -9371,6 +9879,99 @@ function setEntrepriseConfig(cfg){
    CONTRAT PDF — RESTAURATION DE L'ANCIEN CODE V19 QUI MARCHAIT
    + Article 9 (constat restitution) + 3 signataires si admin créateur
    ═══════════════════════════════════════════════════════════════ */
+function genererActePropriete(chauffeurId){
+  var c=(S.data.chauffeurs||[]).filter(function(x){return String(x.id)===String(chauffeurId);})[0];
+  if(!c){toast("Chauffeur introuvable","error");return;}
+  var a=c.acquisition||{};
+  try{
+    var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
+    var doc=new jsPDFClass({orientation:'portrait',unit:'mm',format:'a4'});
+    var W=210,ml=18,mr=18,pw=174,y=0;
+    var ent=getEntrepriseConfig();
+    var sal=(S.data.salonis||[]).filter(function(x){return String(x.id)===String(c.saloniId||c.saloni);})[0];
+    var fmt=function(iso){ var d=acqParseDate(iso); if(!d)return"—"; return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getFullYear(); };
+
+    // Bandeau haut
+    doc.setFillColor(124,58,237);doc.rect(0,0,W,38,'F');
+    doc.setFillColor(91,33,182);doc.rect(0,38,W,3,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');doc.setFontSize(20);
+    doc.text(ent.nomEntreprise||"DIAKITE TRANSPORT",W/2,18,{align:'center'});
+    doc.setFont('helvetica','normal');doc.setFontSize(11);
+    doc.text("ACTE DE PROPRIETE DU VEHICULE",W/2,28,{align:'center'});
+    doc.setFontSize(8);
+    doc.text("Contrat de location-vente arrive a terme",W/2,34,{align:'center'});
+
+    y=54;
+    doc.setTextColor(124,58,237);doc.setFont('helvetica','bold');doc.setFontSize(13);
+    doc.text("🏆 FELICITATIONS",ml,y);
+    y+=8;
+    doc.setTextColor(40,40,40);doc.setFont('helvetica','normal');doc.setFontSize(10);
+    var intro="Au terme du contrat de location-vente d'une duree de "+(a.dureeMois||16)+" mois, et apres avoir rempli l'ensemble des conditions convenues, le vehicule designe ci-dessous devient la propriete pleine et entiere du chauffeur.";
+    var lignes=doc.splitTextToSize(intro,pw);
+    doc.text(lignes,ml,y);y+=lignes.length*5+6;
+
+    // Encadré bénéficiaire
+    function bloc(titre,lignesArr){
+      doc.setFillColor(245,243,255);doc.setDrawColor(124,58,237);
+      var h=10+lignesArr.length*7;
+      doc.roundedRect(ml,y,pw,h,2,2,'FD');
+      doc.setTextColor(124,58,237);doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.text(titre,ml+4,y+6.5);
+      doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(40,40,40);
+      lignesArr.forEach(function(L,i){
+        doc.setFont('helvetica','bold');doc.text(L[0],ml+4,y+13+i*7);
+        doc.setFont('helvetica','normal');doc.text(String(L[1]||"—"),ml+62,y+13+i*7);
+      });
+      y+=h+6;
+    }
+    bloc("NOUVEAU PROPRIETAIRE",[
+      ["Nom & prenoms",c.nom||"—"],
+      ["Telephone",c.tel||"—"],
+      ["N CNI",c.numCNI||"—"],
+      ["Adresse",c.adresse||"—"]
+    ]);
+    bloc("VEHICULE (SALONI / TRICYCLE)",[
+      ["Identification",sal?("Saloni "+(sal.numero||sal.id)):(c.saloniId||"—")],
+      ["Immatriculation",sal&&sal.immat?sal.immat:(c.saloniId||"—")],
+      ["Valeur du contrat",a.valeurSaloni?fc(a.valeurSaloni):"—"]
+    ]);
+    bloc("CONTRAT",[
+      ["Date de debut",fmt(a.dateDebut)],
+      ["Date de fin",fmt(a.dateFin)],
+      ["Date d'attribution",fmt(a.dateAttribution||td())]
+    ]);
+
+    // Mention finale
+    doc.setFillColor(16,185,129);doc.roundedRect(ml,y,pw,16,2,2,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);
+    doc.text("Le vehicule est cede en pleine propriete, libre de toute dette liee au present contrat.",W/2,y+9,{align:'center'});
+    y+=24;
+
+    // Signatures
+    doc.setTextColor(40,40,40);doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text("Fait a "+(ent.ville||"Abidjan")+", le "+fmt(a.dateAttribution||td()),ml,y);
+    y+=18;
+    doc.setDrawColor(150,150,150);doc.setLineWidth(0.3);
+    doc.line(ml,y,ml+70,y);
+    doc.line(W-mr-70,y,W-mr,y);
+    doc.setFontSize(8);doc.setTextColor(90,90,90);
+    doc.text("Le Gerant",ml,y+5);
+    doc.text("Le Chauffeur (proprietaire)",W-mr-70,y+5);
+
+    // Pied de page
+    doc.setFontSize(7);doc.setTextColor(150,150,150);
+    doc.text((ent.nomEntreprise||"DIAKITE TRANSPORT")+" — Document genere par Saloni Manager",W/2,288,{align:'center'});
+
+    var nomFichier="Acte_propriete_"+(c.nom||"chauffeur").replace(/\s+/g,"_")+".pdf";
+    doc.save(nomFichier);
+    toast("📜 Acte de propriété généré","success");
+  }catch(e){
+    console.error(e);
+    toast("Erreur génération PDF : "+e.message,"error");
+  }
+}
+
 function _genererContratInner(c){
   var sal=(S.data.salonis||[]).filter(function(x){return String(x.id)===String(c.saloniId||c.saloni);})[0];
   var jsPDFClass=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
