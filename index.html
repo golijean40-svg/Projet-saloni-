@@ -9456,6 +9456,13 @@ function loadJsPDF(callback){
 }
 
 function genererContratPDF(chauffeurId){
+  var body='<div style="font-size:13px;color:var(--txt-2);margin-bottom:14px">Quel modèle de contrat veux-tu générer ?</div>';
+  body+='<button class="btn-primary" style="margin-bottom:8px" onclick="closeModal();window._contratType=\'standard\';genererContratPDFSuite('+chauffeurId+')">📄 Contrat standard</button>';
+  body+='<button class="btn-primary" style="background:linear-gradient(135deg,#f97316,#ea580c)" onclick="closeModal();window._contratType=\'moto\';genererContratPDFSuite('+chauffeurId+')">🛺 Contrat Saloni moto tricycle (3 roues)</button>';
+  openModal("📄 Type de contrat",body);
+}
+
+function genererContratPDFSuite(chauffeurId){
   var c=(S.data.chauffeurs||[]).find(function(x){return String(x.id)===String(chauffeurId);});
   if(!c){toast("Chauffeur introuvable","error");return;}
 
@@ -10052,7 +10059,8 @@ function _genererContratInner(c){
 
   // ══ TITRE ══
   setFont(13,'bold',17,24,39);
-  doc.text("CONTRAT DE LOCATION-EXPLOITATION DE TRICYCLE",W/2,y,{align:'center'});
+  var isMoto=(window._contratType==="moto");
+  doc.text(isMoto?"CONTRAT DE LOCATION - SALONI MOTO TRICYCLE A 3 ROUES":"CONTRAT DE LOCATION-EXPLOITATION DE TRICYCLE",W/2,y,{align:'center'});
   y+=6;
   setFont(9,'italic',107,114,128);
   doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:'center'});
@@ -10088,7 +10096,7 @@ function _genererContratInner(c){
 
   // ══ ART 2: OBJECTIFS ══
   y=sectionTitle("ARTICLE 2 — OBJECTIFS ET VERSEMENTS",y,55,65,81);
-  y=tableRow("Frequence :",objLabel,y,false);
+  y=tableRow("Frequence :",isMoto?objLabel+" (du lundi au vendredi)":objLabel,y,false);
   y=tableRow("Objectif :",objVal,y,true);
   y=tableRow("Mode de paiement :","Especes / Wave / Orange Money / MTN Money",y,false);
   y+=5;
@@ -10134,6 +10142,25 @@ function _genererContratInner(c){
     "ARTICLE 9 — CONSTAT DE RESTITUTION DU VEHICULE",
     "Si l'une des deux parties souhaite mettre fin au present contrat, anticipativement ou a son terme, un CONSTAT CONTRADICTOIRE du tricycle doit obligatoirement etre effectue en presence des deux parties. Ce constat vise a : (1) verifier l'etat general du vehicule ; (2) detecter toute panne, deterioration ou usure anormale ; (3) inventorier les accessoires et documents (carte grise, vignette, papiers du vehicule). Le tricycle doit etre restitue au Bailleur DANS L'ETAT OU IL A ETE REMIS au debut du contrat, hors usure normale liee a l'usage. Toute degradation imputable au Locataire sera prise en charge financierement par ce dernier, selon devis etabli par un garage agree. Un proces-verbal de constat sera signe par les deux parties.",
     y,254,243,231);
+
+  if(isMoto){
+    y=clauseBox(
+      "ARTICLE 10 — JOURS DE RECETTE ET DE REPOS",
+      "La recette est due du lundi au vendredi inclus. Le samedi, la recette appartient entierement au Locataire (chauffeur). Le dimanche, le vehicule doit obligatoirement se reposer et ne doit pas circuler.",
+      y,239,246,255);
+    y=clauseBox(
+      "ARTICLE 11 — VIDANGE HEBDOMADAIRE",
+      "Le Locataire doit effectuer la vidange du moteur chaque semaine et en apporter la preuve au Bailleur (facture, photo ou temoin), via l'application ou en main propre. A defaut de preuve, la vidange est consideree comme non effectuee et les degats qui en resultent sont a la charge du Locataire.",
+      y,255,251,235);
+    y=clauseBox(
+      "ARTICLE 12 — LAVAGE DU VEHICULE",
+      "Le vehicule doit etre lave au minimum une (1) fois par semaine afin d'assurer une bonne tenue et une bonne image aupres de la clientele.",
+      y,240,253,244);
+    y=clauseBox(
+      "ARTICLE 13 — ETAT DU VEHICULE EN CAS DE RUPTURE",
+      "En cas de rupture du contrat, quelle qu'en soit la cause ou la partie qui en prend l'initiative, un etat du vehicule est obligatoire avant toute restitution, conformement a l'Article 9. Aucune rupture ne sera consideree comme effective sans cet etat du vehicule signe par les deux parties.",
+      y,254,242,242);
+  }
 
   // ══ SIGNATURES ══
   if(y>200){doc.addPage();y=15;}else{y+=4;}
@@ -10249,7 +10276,7 @@ function _genererContratInner(c){
   doc.text("Contrat etabli en 2 exemplaires originaux — Genere par Saloni Manager",W/2,y,{align:'center'});
 
   // Sauvegarder
-  var filename="Contrat_"+nom.replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
+  var filename=(isMoto?"Contrat_Saloni_Moto_":"Contrat_")+nom.replace(/\s+/g,"_")+"_"+dateDebut.replace(/\//g,"-")+".pdf";
   doc.save(filename);
 
   // Enregistrer la date de fin de contrat
