@@ -9999,6 +9999,10 @@ function _genererContratInner(c){
   var objVal=isH?(c.objectifSemaine||0).toLocaleString()+" FCFA":(c.objectifJour||0).toLocaleString()+" FCFA";
   var objLabel=isH?"Hebdomadaire":"Journalier";
   var salInfo=sal?"Saloni "+(sal.numero||sal.id||c.saloniId||"N/A"):(c.saloniId||"N/A");
+  var isMoto=(window._contratType==="moto");
+  // Contrat moto : propriétaire de l'engin = SANDAY Marie Paule Frederic
+  var nomProprio=isMoto?"SANDAY Marie Paule Frederic":(ent.nomGerant||"DIAKITE Korotum Marceline");
+  var titreProprio=isMoto?"Proprietaire de l'engin":(ent.titreGerant||"Gerante & Proprietaire");
 
   function setFont(size,style,r,g,b){
     doc.setFontSize(size);
@@ -10014,13 +10018,19 @@ function _genererContratInner(c){
     doc.line(ml,y2,W-mr,y2);
   }
   function sectionTitle(title,y2,r,g,b){
+    if(isMoto){
+      setFont(9,'bold',17,17,17);
+      doc.text(title,ml,y2+4.8);
+      hline(y2+6.5,17,17,17,0.4);
+      return y2+9;
+    }
     fillRect(ml,y2,pw,7,r||29,g||78,b||216);
     setFont(9,'bold',255,255,255);
     doc.text(title,ml+3,y2+4.8);
     return y2+9;
   }
   function tableRow(label,val,y2,shade){
-    if(shade)fillRect(ml,y2,pw,5.5,245,247,250);
+    if(shade&&!isMoto)fillRect(ml,y2,pw,5.5,245,247,250);
     var safeLabel=String(label||"");
     var safeVal=String(val||"—");
     setFont(8,'bold',75,85,99);doc.text(safeLabel,ml+3,y2+3.8);
@@ -10032,6 +10042,12 @@ function _genererContratInner(c){
     var lines=doc.splitTextToSize(String(text||""),pw-8);
     var h=8+lines.length*4.5;
     if(y2+h>275){doc.addPage();y2=15;}
+    if(isMoto){
+      setFont(8.5,'bold',17,17,17);doc.text(title,ml,y2+5);
+      setFont(8,'normal',40,40,40);
+      lines.forEach(function(l,i){doc.text(l,ml,y2+9+i*4.5);});
+      return y2+h+3;
+    }
     fillRect(ml,y2,pw,h,r||239,g||246,b||255);
     setFont(8,'bold',29,78,216);doc.text(title,ml+3,y2+5);
     setFont(8,'normal',17,24,39);
@@ -10048,6 +10064,14 @@ function _genererContratInner(c){
   var hasAdminGarant=(creeParNiveau<3 && creeParNiveau>=1);
 
   // ══ HEADER ══
+  if(isMoto){
+  setFont(16,'bold',17,17,17);
+  doc.text(ent.nomEntreprise||"DIAKITE TRANSPORT",W/2,13,{align:'center'});
+  setFont(8,'normal',90,90,90);
+  doc.text(ent.adresseEntreprise||"Adjame St Michel, Lot 611, Abidjan",W/2,19,{align:'center'});
+  hline(24,17,17,17,0.6);
+  y=34;
+  }else{
   fillRect(0,0,W,30,29,78,216);
   setFont(17,'bold',255,255,255);
   doc.text(ent.nomEntreprise||"DIAKITE TRANSPORT",W/2,11,{align:'center'});
@@ -10056,32 +10080,41 @@ function _genererContratInner(c){
   doc.text("Gestion de Flotte — Saloni Manager",W/2,22,{align:'center'});
   fillRect(0,28,W,1,17,55,170);
   y=36;
+  }
 
   // ══ TITRE ══
   setFont(13,'bold',17,24,39);
-  var isMoto=(window._contratType==="moto");
   doc.text(isMoto?"CONTRAT DE LOCATION - SALONI MOTO TRICYCLE A 3 ROUES":"CONTRAT DE LOCATION-EXPLOITATION DE TRICYCLE",W/2,y,{align:'center'});
   y+=6;
   setFont(9,'italic',107,114,128);
   doc.text("Contrat a Duree Determinee — 6 mois",W/2,y,{align:'center'});
   y+=5;
-  hline(y,29,78,216,0.6);y+=7;
+  if(isMoto)y+=4;else{hline(y,29,78,216,0.6);y+=7;}
 
   // ══ ART 1: PARTIES ══
   y=sectionTitle("ARTICLE 1 — PARTIES AU CONTRAT",y);
   // Bailleur
-  fillRect(ml,y,pw,5.5,239,246,255);
-  setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire de la Flotte)",ml+3,y+4);y+=5.5;
+  if(isMoto){setFont(8.5,'bold',17,17,17);doc.text("LA PROPRIETAIRE DE L'ENGIN (Bailleur)",ml,y+4);}
+  else{fillRect(ml,y,pw,5.5,239,246,255);
+  setFont(8.5,'bold',29,78,216);doc.text("BAILLEUR (Proprietaire de la Flotte)",ml+3,y+4);}
+  y+=5.5;
+  if(isMoto){
+  y=tableRow("Nom & Prenoms :",nomProprio,y,false);
+  y=tableRow("Qualite :",titreProprio,y,false);
+  }else{
   y=tableRow("Entreprise :",ent.nomEntreprise||"DIAKITE TRANSPORT",y,false);
-  y=tableRow("Representee par :",(ent.nomGerant||"DIAKITE Korotum Marceline")+" — "+(ent.titreGerant||"Gerante & Proprietaire"),y,true);
+  y=tableRow("Representee par :",nomProprio+" — "+titreProprio,y,true);
+  }
   if(hasAdminGarant){
     y=tableRow("Administrateur :",nomCompletCreateur+" (pseudo: "+creePar+")",y,false);
   }
   y=tableRow("Adresse :",ent.adresseEntreprise||"Adjame St Michel, Lot 611, Abidjan",y,!hasAdminGarant);
   y+=3;
   // Locataire
-  fillRect(ml,y,pw,5.5,5,150,105);
-  setFont(8.5,'bold',255,255,255);doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4);y+=5.5;
+  if(isMoto){setFont(8.5,'bold',17,17,17);doc.text("LE LOCATAIRE (Chauffeur)",ml,y+4);}
+  else{fillRect(ml,y,pw,5.5,5,150,105);
+  setFont(8.5,'bold',255,255,255);doc.text("LOCATAIRE (Chauffeur)",ml+3,y+4);}
+  y+=5.5;
   y=tableRow("Nom & Prenom :",nom,y,false);
   y=tableRow("Telephone :",c.tel||"N/A",y,true);
   y=tableRow("Date de naissance :",c.dateNaissance?fmt(new Date(c.dateNaissance)):"N/A",y,false);
@@ -10103,67 +10136,81 @@ function _genererContratInner(c){
 
   // ══ ART 3: DUREE ══
   y=sectionTitle("ARTICLE 3 — DUREE DU CONTRAT",y);
-  fillRect(ml,y,pw,16,239,246,255);
+  if(!isMoto)fillRect(ml,y,pw,16,239,246,255);
   setFont(8.5,'normal',17,24,39);
   var texteduree="Le present contrat est conclu pour une duree de 6 (six) mois, prenant effet le "+dateDebut+" et prenant fin le "+dateFin+".";
   var linesD=doc.splitTextToSize(texteduree,pw-8);
-  linesD.forEach(function(l){doc.text(l,ml+3,y+4.5);y+=4.5;});
-  setFont(8,'bold',220,38,38);
-  doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.",ml+3,y+3);
+  var xD=isMoto?ml:ml+3;
+  linesD.forEach(function(l){doc.text(l,xD,y+4.5);y+=4.5;});
+  if(isMoto)setFont(8,'italic',90,90,90);else setFont(8,'bold',220,38,38);
+  doc.text("Alerte automatique 30 jours avant l'echeance via Saloni Manager.",xD,y+3);
   y+=9;
 
   // ══ CLAUSES ══
+  var na=4;
+  function art(t){return "ARTICLE "+(na++)+" — "+t;}
   y=clauseBox(
-    "ARTICLE 4 — RETRAIT DU TRICYCLE",
+    art("RETRAIT DU TRICYCLE"),
     "En cas d'absence de versement pendant 2 jours consecutifs sans justificatif valable (panne, maladie, vidange) signale des le premier jour d'arret au gerant ou a un administrateur via l'application, le tricycle sera retire immediatement sans preavis.",
     y,239,246,255);
 
+  if(!isMoto){
   y=clauseBox(
-    "ARTICLE 5 — PRIMES DE PERFORMANCE",
+    art("PRIMES DE PERFORMANCE"),
     "Le locataire beneficie d'une prime mensuelle de 5.000 a 15.000 FCFA si tous les versements du mois ont ete effectues en totalite et sans retard, et qu'aucune sanction n'a ete enregistree durant le mois concerne.",
     y,240,253,244);
+  }
 
   y=clauseBox(
-    "ARTICLE 6 — ENTRETIEN DU TRICYCLE",
+    art("ENTRETIEN DU TRICYCLE"),
     "Le locataire est responsable de l'entretien courant. Les vidanges et revisions sont obligatoires aux intervalles requis. Les frais de reparation resultant d'une negligence d'entretien sont integralement a la charge du locataire.",
     y,255,251,235);
 
   y=clauseBox(
-    "ARTICLE 7 — INTERDICTIONS ET OBLIGATIONS",
+    art("INTERDICTIONS ET OBLIGATIONS"),
     "Il est formellement interdit : (1) d'abandonner le tricycle sans en informer le gerant ou un administrateur — tout abandon caracterise constituera un abandon de bien confie et fera l'objet de poursuites judiciaires ; (2) de laisser le tricycle aller en fourriere sans avertissement — les frais sont a la charge du locataire ; (3) de sous-louer ou preter le tricycle sans autorisation ecrite.",
     y,254,242,242);
 
   y=clauseBox(
-    "ARTICLE 8 — RESILIATION",
+    art("RESILIATION"),
     "Le contrat peut etre resilie de plein droit, sans preavis, en cas de : non-respect des obligations de versement, abandon ou mise en fourriere du tricycle, comportement prejudiciable a l'entreprise, ou fausse declaration lors de la signature.",
     y,243,244,246);
 
+  var numConstat=na;
   y=clauseBox(
-    "ARTICLE 9 — CONSTAT DE RESTITUTION DU VEHICULE",
+    art("CONSTAT DE RESTITUTION DU VEHICULE"),
     "Si l'une des deux parties souhaite mettre fin au present contrat, anticipativement ou a son terme, un CONSTAT CONTRADICTOIRE du tricycle doit obligatoirement etre effectue en presence des deux parties. Ce constat vise a : (1) verifier l'etat general du vehicule ; (2) detecter toute panne, deterioration ou usure anormale ; (3) inventorier les accessoires et documents (carte grise, vignette, papiers du vehicule). Le tricycle doit etre restitue au Bailleur DANS L'ETAT OU IL A ETE REMIS au debut du contrat, hors usure normale liee a l'usage. Toute degradation imputable au Locataire sera prise en charge financierement par ce dernier, selon devis etabli par un garage agree. Un proces-verbal de constat sera signe par les deux parties.",
     y,254,243,231);
 
   if(isMoto){
     y=clauseBox(
-      "ARTICLE 10 — JOURS DE RECETTE ET DE REPOS",
+      art("JOURS DE RECETTE ET DE REPOS"),
       "La recette est due du lundi au vendredi inclus. Le samedi, la recette appartient entierement au Locataire (chauffeur). Le dimanche, le vehicule doit obligatoirement se reposer et ne doit pas circuler.",
       y,239,246,255);
     y=clauseBox(
-      "ARTICLE 11 — VIDANGE HEBDOMADAIRE",
+      art("VIDANGE HEBDOMADAIRE"),
       "Le Locataire doit effectuer la vidange du moteur chaque semaine et en apporter la preuve au Bailleur (facture, photo ou temoin), via l'application ou en main propre. A defaut de preuve, la vidange est consideree comme non effectuee et les degats qui en resultent sont a la charge du Locataire.",
       y,255,251,235);
     y=clauseBox(
-      "ARTICLE 12 — LAVAGE DU VEHICULE",
+      art("LAVAGE DU VEHICULE"),
       "Le vehicule doit etre lave au minimum une (1) fois par semaine afin d'assurer une bonne tenue et une bonne image aupres de la clientele.",
       y,240,253,244);
     y=clauseBox(
-      "ARTICLE 13 — ETAT DU VEHICULE EN CAS DE RUPTURE",
-      "En cas de rupture du contrat, quelle qu'en soit la cause ou la partie qui en prend l'initiative, un etat du vehicule est obligatoire avant toute restitution, conformement a l'Article 9. Aucune rupture ne sera consideree comme effective sans cet etat du vehicule signe par les deux parties.",
+      art("ETAT DU VEHICULE EN CAS DE RUPTURE"),
+      "En cas de rupture du contrat, quelle qu'en soit la cause ou la partie qui en prend l'initiative, un etat du vehicule est obligatoire avant toute restitution, conformement a l'Article "+numConstat+". Aucune rupture ne sera consideree comme effective sans cet etat du vehicule signe par les deux parties.",
       y,254,242,242);
+    y=clauseBox(
+      art("STATIONNEMENT ET REMISE DES CLES"),
+      "L'engin doit etre gare chaque jour au plus tard a 21h00, cles remises en main propre a la Proprietaire. Toute infraction a cette regle peut entrainer la cessation du present contrat.",
+      y,243,244,246);
+    y=clauseBox(
+      art("PANNE ET VERSEMENT"),
+      "Une panne de l'engin n'exonere pas le Locataire de son versement : celui-ci reste du, en totalite ou en partie, selon l'heure a laquelle la panne est survenue. Chaque panne doit etre signalee immediatement a la Proprietaire, a l'heure meme ou l'engin ne peut plus rouler. A defaut de signalement immediat, l'engin est repute avoir roule normalement et le versement integral est du.",
+      y,243,244,246);
   }
 
   // ══ SIGNATURES ══
-  if(y>200){doc.addPage();y=15;}else{y+=4;}
+  if(y>(isMoto?222:200)){doc.addPage();y=15;}else{y+=4;}
   hline(y,229,231,235,0.5);y+=6;
   setFont(11,'bold',55,65,81);
   doc.text("SIGNATURES",W/2,y,{align:'center'});
@@ -10176,23 +10223,28 @@ function _genererContratInner(c){
   var c1=ml,c2=W/2+5,cw=(pw/2)-5;
 
   // Header colonne bailleur
-  fillRect(c1,y,cw,6,29,78,216);
+  var ySigTop=y;
+  if(isMoto){setFont(8,'bold',17,17,17);doc.text("LA PROPRIETAIRE (BAILLEUR)",c1,y+4.2);doc.setDrawColor(17,17,17);doc.setLineWidth(0.3);doc.line(c1,y+5.5,c1+cw-5,y+5.5);}
+  else{fillRect(c1,y,cw,6,29,78,216);
   setFont(8,'bold',255,255,255);
-  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);
-  y+=8;
+  doc.text("LE BAILLEUR / PROPRIETAIRE",c1+3,y+4.2);}
+  y+=isMoto?11:8;
 
   // Nom entreprise + Gérant (TOUJOURS visibles - même sans admin garant)
-  setFont(8.5,'bold',29,78,216);
+  var bleu=isMoto?[17,17,17]:[29,78,216];
+  if(!isMoto){
+  setFont(8.5,'bold',bleu[0],bleu[1],bleu[2]);
   doc.text(ent.nomEntreprise||"DIAKITE TRANSPORT",c1+3,y);
   y+=5;
   setFont(8,'normal',55,65,81);
   doc.text("Proprietaire / Gerante :",c1+3,y);
   y+=4;
-  setFont(8.5,'bold',29,78,216);
-  doc.text(ent.nomGerant||"DIAKITE Korotum Marceline",c1+3,y);
+  }
+  setFont(8.5,'bold',bleu[0],bleu[1],bleu[2]);
+  doc.text(nomProprio,c1+3,y);
   y+=4;
   setFont(7,'italic',107,114,128);
-  doc.text(ent.titreGerant||"Gerante & Proprietaire",c1+3,y);
+  doc.text(titreProprio,c1+3,y);
   y+=6;
 
   // Si admin créateur : ajout en plus du gérant
@@ -10200,11 +10252,11 @@ function _genererContratInner(c){
     setFont(8,'normal',55,65,81);
     doc.text("Administrateur Garant :",c1+3,y);
     y+=4;
-    setFont(8.5,'bold',29,78,216);
+    setFont(8.5,'bold',bleu[0],bleu[1],bleu[2]);
     doc.text(nomCompletCreateur,c1+3,y);
     y+=4;
     setFont(7,'italic',107,114,128);
-    doc.text("(Agissant au nom de "+(ent.nomGerant||"la Gerante")+")",c1+3,y);
+    doc.text("(Agissant au nom de "+nomProprio+")",c1+3,y);
     y+=6;
   }else{y+=2;}
 
@@ -10219,10 +10271,11 @@ function _genererContratInner(c){
   var yChauf=y-22;
 
   // Header colonne chauffeur
-  fillRect(c2,yChauf-22,cw,6,5,150,105);
+  if(isMoto){yChauf=ySigTop+22;setFont(8,'bold',17,17,17);doc.text("LE LOCATAIRE (CHAUFFEUR)",c2,yChauf-22+4.2);doc.setDrawColor(17,17,17);doc.setLineWidth(0.3);doc.line(c2,yChauf-22+5.5,c2+cw-5,yChauf-22+5.5);}
+  else{fillRect(c2,yChauf-22,cw,6,5,150,105);
   setFont(8,'bold',255,255,255);
-  doc.text("LE LOCATAIRE (CHAUFFEUR)",c2+3,yChauf-22+4.2);
-  yChauf-=14;
+  doc.text("LE LOCATAIRE (CHAUFFEUR)",c2+3,yChauf-22+4.2);}
+  yChauf-=isMoto?11:14;
 
   // Label
   setFont(8,'normal',55,65,81);
@@ -10230,13 +10283,13 @@ function _genererContratInner(c){
   yChauf+=4;
 
   // ── Nom chauffeur EN BLEU (comme l'admin et la gérante) ──
-  setFont(8.5,'bold',29,78,216);
+  setFont(8.5,'bold',bleu[0],bleu[1],bleu[2]);
   doc.text(nom,c2+3,yChauf);
   yChauf+=5;
 
   // Mention "Lu et approuvé" pré-imprimée
-  fillRect(c2,yChauf,cw,8,240,253,244);
-  setFont(7.5,'bold',5,150,105);
+  if(!isMoto)fillRect(c2,yChauf,cw,8,240,253,244);
+  if(isMoto)setFont(7.5,'bold',17,17,17);else setFont(7.5,'bold',5,150,105);
   doc.text("Lu et approuve :",c2+3,yChauf+3.5);
   setFont(7,'italic',55,65,81);
   doc.text("Je certifie avoir lu et accepte les termes",c2+3,yChauf+7);
@@ -10253,19 +10306,19 @@ function _genererContratInner(c){
   if(hasAdminGarant){
     y+=8;
     hline(y,229,231,235,0.3);y+=6;
-    setFont(8,'bold',29,78,216);
-    doc.text("VISA DU GERANT PROPRIETAIRE",ml+3,y);
+    setFont(8,'bold',bleu[0],bleu[1],bleu[2]);
+    doc.text(isMoto?"VISA DE LA PROPRIETAIRE":"VISA DU GERANT PROPRIETAIRE",ml+3,y);
     y+=6;
     setFont(8,'normal',55,65,81);
     doc.text("Confirme et valide le present contrat :",ml+3,y);
     y+=5;
-    setFont(8.5,'bold',29,78,216);
-    doc.text((ent.nomGerant||"DIAKITE Korotum Marceline")+" — "+(ent.titreGerant||"Gerante & Proprietaire"),ml+3,y);
+    setFont(8.5,'bold',bleu[0],bleu[1],bleu[2]);
+    doc.text(nomProprio+" — "+titreProprio,ml+3,y);
     y+=8;
     doc.setDrawColor(55,65,81);doc.setLineWidth(0.3);
     doc.line(ml,y,ml+80,y);
     setFont(7,'normal',107,114,128);
-    doc.text("Signature & Cachet du Gerant",ml+3,y+4);
+    doc.text(isMoto?"Signature de la Proprietaire":"Signature & Cachet du Gerant",ml+3,y+4);
     y+=8;
   }else{
     y+=8;
